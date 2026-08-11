@@ -1,0 +1,232 @@
+{
+  "gameId": 6874231955,
+  "gameType": "CUSTOM_GAME",
+  "queueId": 0,
+  "gameMode": "CLASSIC",
+  "gameLength": 1874,
+  "gameEndedInEarlySurrender": false,
+  "teams": [
+    {
+      "teamId": 100,
+      "isWinningTeam": true,
+      "players": [
+        {
+          "puuid": "puuid-t1",
+          "summonerName": "Teoman",
+          "riotIdGameName": "Teoman",
+          "riotIdTagLine": "TR1",
+          "championId": 103,
+          "championName": "Ahri",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 7,
+            "NUM_DEATHS": 2,
+            "ASSISTS": 9,
+            "GOLD_EARNED": 13250,
+            "MINIONS_KILLED": 180,
+            "NEUTRAL_MINIONS_KILLED": 21,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 24810,
+            "VISION_SCORE": 21,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t2",
+          "summonerName": "Kaan",
+          "riotIdGameName": "Kaan",
+          "riotIdTagLine": "TR1",
+          "championId": 64,
+          "championName": "Lee Sin",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 4,
+            "NUM_DEATHS": 5,
+            "ASSISTS": 11,
+            "GOLD_EARNED": 9800,
+            "MINIONS_KILLED": 30,
+            "NEUTRAL_MINIONS_KILLED": 96,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 12040,
+            "VISION_SCORE": 34,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t3",
+          "summonerName": "Mert",
+          "riotIdGameName": "Mert",
+          "riotIdTagLine": "EUW",
+          "championId": 86,
+          "championName": "Garen",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 3,
+            "NUM_DEATHS": 4,
+            "ASSISTS": 6,
+            "GOLD_EARNED": 10100,
+            "MINIONS_KILLED": 172,
+            "NEUTRAL_MINIONS_KILLED": 4,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 15220,
+            "VISION_SCORE": 18,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t4",
+          "summonerName": "Ece",
+          "riotIdGameName": "Ece",
+          "riotIdTagLine": "TR1",
+          "championId": 22,
+          "championName": "Ashe",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 9,
+            "NUM_DEATHS": 3,
+            "ASSISTS": 7,
+            "GOLD_EARNED": 14100,
+            "MINIONS_KILLED": 211,
+            "NEUTRAL_MINIONS_KILLED": 8,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 28950,
+            "VISION_SCORE": 25,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t5",
+          "summonerName": "Deniz",
+          "riotIdGameName": "Deniz",
+          "riotIdTagLine": "TR1",
+          "championId": 412,
+          "championName": "Thresh",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 1,
+            "NUM_DEATHS": 6,
+            "ASSISTS": 19,
+            "GOLD_EARNED": 7600,
+            "MINIONS_KILLED": 28,
+            "NEUTRAL_MINIONS_KILLED": 0,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 6100,
+            "VISION_SCORE": 58,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        }
+      ]
+    },
+    {
+      "teamId": 200,
+      "isWinningTeam": false,
+      "players": [
+        {
+          "puuid": "puuid-t6",
+          "summonerName": "Baran",
+          "riotIdGameName": "Baran",
+          "riotIdTagLine": "TR1",
+          "championId": 58,
+          "championName": "Renekton",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 5,
+            "NUM_DEATHS": 4,
+            "ASSISTS": 4,
+            "GOLD_EARNED": 11200,
+            "MINIONS_KILLED": 190,
+            "NEUTRAL_MINIONS_KILLED": 6,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 19800,
+            "VISION_SCORE": 15,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t7",
+          "summonerName": "Selin",
+          "riotIdGameName": "Selin",
+          "riotIdTagLine": "TR1",
+          "championId": 154,
+          "championName": "Zac",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 2,
+            "NUM_DEATHS": 5,
+            "ASSISTS": 12,
+            "GOLD_EARNED": 8900,
+            "MINIONS_KILLED": 22,
+            "NEUTRAL_MINIONS_KILLED": 88,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 9900,
+            "VISION_SCORE": 30,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t8",
+          "summonerName": "Arda",
+          "riotIdGameName": "Arda",
+          "riotIdTagLine": "TR1",
+          "championId": 134,
+          "championName": "Syndra",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 6,
+            "NUM_DEATHS": 5,
+            "ASSISTS": 5,
+            "GOLD_EARNED": 11900,
+            "MINIONS_KILLED": 168,
+            "NEUTRAL_MINIONS_KILLED": 2,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 22400,
+            "VISION_SCORE": 19,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t9",
+          "summonerName": "Yusuf",
+          "riotIdGameName": "Yusuf",
+          "riotIdTagLine": "TR1",
+          "championId": 51,
+          "championName": "Caitlyn",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 7,
+            "NUM_DEATHS": 6,
+            "ASSISTS": 3,
+            "GOLD_EARNED": 12800,
+            "MINIONS_KILLED": 201,
+            "NEUTRAL_MINIONS_KILLED": 4,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 24100,
+            "VISION_SCORE": 17,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        },
+        {
+          "puuid": "puuid-t10",
+          "summonerName": "Zeynep",
+          "riotIdGameName": "Zeynep",
+          "riotIdTagLine": "TR1",
+          "championId": 89,
+          "championName": "Leona",
+          "selectedPosition": "NONE",
+          "stats": {
+            "CHAMPIONS_KILLED": 0,
+            "NUM_DEATHS": 8,
+            "ASSISTS": 14,
+            "GOLD_EARNED": 6900,
+            "MINIONS_KILLED": 19,
+            "NEUTRAL_MINIONS_KILLED": 0,
+            "TOTAL_DAMAGE_DEALT_TO_CHAMPIONS": 5400,
+            "VISION_SCORE": 49,
+            "WIN": 1,
+            "LOSE": 0
+          }
+        }
+      ]
+    }
+  ]
+}

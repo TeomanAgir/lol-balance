@@ -1,0 +1,5 @@
+httpx>=0.27
+pydantic>=2.7
+
+# test (geliştirme)
+pytest>=8.0

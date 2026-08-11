@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a1018">
+<title>LoL Balance</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1 class="brand">LoL <span>Balance</span></h1>
+  <button id="btn-key" class="key-btn" type="button" title="API anahtarını değiştir">Anahtar</button>
+</header>
+
+<main id="main">
+
+  <!-- ═══ Dengeleme ═══ -->
+  <section id="view-balance" class="view">
+    <p class="view-hint">Bu gece oynayacak 10 kişiyi seç.</p>
+    <div id="roster" class="roster-grid" aria-live="polite"></div>
+
+    <div id="suggestions" class="suggestions"></div>
+
+    <div class="action-bar">
+      <div id="pick-counter" class="pick-counter">0<span>/10 seçildi</span></div>
+      <button id="btn-balance" class="btn-primary" type="button" disabled>Dengele</button>
+    </div>
+  </section>
+
+  <!-- ═══ Leaderboard ═══ -->
+  <section id="view-leaderboard" class="view" hidden>
+    <table class="board">
+      <thead><tr><th class="rank">#</th><th>Oyuncu</th><th class="num">Puan</th><th class="num">Maç</th></tr></thead>
+      <tbody id="board-body"></tbody>
+    </table>
+  </section>
+
+  <!-- ═══ Maç geçmişi ═══ -->
+  <section id="view-matches" class="view" hidden>
+    <div id="match-list" class="match-list"></div>
+  </section>
+
+  <!-- ═══ Manuel giriş ═══ -->
+  <section id="view-manual" class="view" hidden>
+    <p class="view-hint">Collector çalışmadıysa maçı buradan gir. Her oyuncuya takım ata: 5 mavi, 5 kırmızı.</p>
+    <div id="manual-roster" class="manual-list"></div>
+
+    <fieldset class="winner-pick">
+      <legend>Kazanan taraf</legend>
+      <label class="winner-opt blue"><input type="radio" name="winner" value="100">Mavi taraf</label>
+      <label class="winner-opt red"><input type="radio" name="winner" value="200">Kırmızı taraf</label>
+    </fieldset>
+
+    <div class="action-bar">
+      <div id="manual-counter" class="pick-counter small">Mavi 0/5 · Kırmızı 0/5</div>
+      <button id="btn-manual-submit" class="btn-primary" type="button" disabled>Maçı kaydet</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button class="tab active" data-view="balance"     type="button">Dengele</button>
+  <button class="tab"        data-view="leaderboard" type="button">Sıralama</button>
+  <button class="tab"        data-view="matches"     type="button">Geçmiş</button>
+  <button class="tab"        data-view="manual"      type="button">Manuel</button>
+</nav>
+
+<!-- API key modal -->
+<div id="key-modal" class="modal-backdrop" hidden>
+  <form id="key-form" class="modal">
+    <h2>API anahtarı</h2>
+    <p>İsteklerin doğrulanması için anahtar gerekiyor. Backend'in <code>.env</code> dosyasındaki değeri gir.</p>
+    <input id="key-input" type="password" autocomplete="off" placeholder="API anahtarı" required>
+    <button class="btn-primary" type="submit">Kaydet</button>
+  </form>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>window.APP_CONFIG = { USE_MOCK: true, API_BASE: "/api/v1" }; // USE_MOCK: false → gerçek backend</script>
+<script src="mock_api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

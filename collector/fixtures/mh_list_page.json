@@ -1,0 +1,30 @@
+{
+  "games": {
+    "games": [
+      {
+        "gameId": 6874232000,
+        "gameCreationDate": "2026-08-05T21:03:10.000Z",
+        "gameDuration": 2011,
+        "queueId": 420,
+        "gameType": "MATCHED_GAME",
+        "gameMode": "CLASSIC"
+      },
+      {
+        "gameId": 6874231001,
+        "gameCreationDate": "2026-08-01T19:12:44.000Z",
+        "gameDuration": 2011,
+        "queueId": 0,
+        "gameType": "CUSTOM_GAME",
+        "gameMode": "CLASSIC"
+      },
+      {
+        "gameId": 6874230000,
+        "gameCreationDate": "2026-07-01T18:00:00.000Z",
+        "gameDuration": 2011,
+        "queueId": 0,
+        "gameType": "CUSTOM_GAME",
+        "gameMode": "CLASSIC"
+      }
+    ]
+  }
+}

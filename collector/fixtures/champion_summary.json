@@ -1,0 +1,57 @@
+[
+  {
+    "id": -1,
+    "name": "None",
+    "alias": "None"
+  },
+  {
+    "id": 103,
+    "name": "Ahri",
+    "alias": "Ahri"
+  },
+  {
+    "id": 64,
+    "name": "Lee Sin",
+    "alias": "LeeSin"
+  },
+  {
+    "id": 86,
+    "name": "Garen",
+    "alias": "Garen"
+  },
+  {
+    "id": 22,
+    "name": "Ashe",
+    "alias": "Ashe"
+  },
+  {
+    "id": 412,
+    "name": "Thresh",
+    "alias": "Thresh"
+  },
+  {
+    "id": 58,
+    "name": "Renekton",
+    "alias": "Renekton"
+  },
+  {
+    "id": 154,
+    "name": "Zac",
+    "alias": "Zac"
+  },
+  {
+    "id": 134,
+    "name": "Syndra",
+    "alias": "Syndra"
+  },
+  {
+    "id": 51,
+    "name": "Caitlyn",
+    "alias": "Caitlyn"
+  },
+  {
+    "id": 89,
+    "name": "Leona",
+    "alias": "Leona"
+  }
+]

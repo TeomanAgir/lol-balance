@@ -1,0 +1,95 @@
+"""Oyuncu endpoint'leri + leaderboard (api_contract §2, §5)."""
+from __future__ import annotations
+
+import sqlite3
+
+from fastapi import APIRouter, Depends, HTTPException
+from rating import Engine
+
+from ..config import Settings, get_settings
+from ..deps import get_db
+from ..schemas import PlayerCreate, PlayerOut, PlayerPatch, RatingOut
+from ..services.ratings import current_ratings
+
+router = APIRouter()
+
+
+def _player_list(
+    conn: sqlite3.Connection, engine_version: str
+) -> list[PlayerOut]:
+    default = Engine(version=engine_version).default_rating()
+    ratings = current_ratings(conn, engine_version)
+    rows = conn.execute(
+        "SELECT p.id, p.display_name, p.riot_id,"
+        " (SELECT COUNT(*) FROM match_participants mp"
+        "  JOIN matches m ON m.id = mp.match_id"
+        "  WHERE mp.player_id = p.id AND m.status = 'valid') AS matches_played "
+        "FROM players p ORDER BY p.id"
+    ).fetchall()
+    out = []
+    for row in rows:
+        r = ratings.get(row["id"], default)
+        out.append(
+            PlayerOut(
+                id=row["id"],
+                display_name=row["display_name"],
+                riot_id=row["riot_id"],
+                matches_played=row["matches_played"],
+                rating=RatingOut(mu=r.mu, sigma=r.sigma, ordinal=r.ordinal),
+            )
+        )
+    return out
+
+
+@router.get("/players")
+def list_players(
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> list[PlayerOut]:
+    return _player_list(conn, settings.engine_version)
+
+
+@router.get("/leaderboard")
+def leaderboard(
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> list[PlayerOut]:
+    players = _player_list(conn, settings.engine_version)
+    players.sort(key=lambda p: p.rating.ordinal, reverse=True)
+    return players
+
+
+@router.post("/players", status_code=201)
+def create_player(
+    body: PlayerCreate,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO players (riot_id, display_name) VALUES (?, ?)",
+            (body.riot_id, body.display_name),
+        )
+    return {"id": cur.lastrowid}
+
+
+@router.patch("/players/{player_id}")
+def patch_player(
+    player_id: int,
+    body: PlayerPatch,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict:
+    row = conn.execute(
+        "SELECT id FROM players WHERE id = ?", (player_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
+    if body.display_name is not None:
+        with conn:
+            conn.execute(
+                "UPDATE players SET display_name = ? WHERE id = ?",
+                (body.display_name, player_id),
+            )
+    updated = conn.execute(
+        "SELECT id, display_name, riot_id FROM players WHERE id = ?", (player_id,)
+    ).fetchone()
+    return dict(updated)

@@ -1,0 +1,313 @@
+{
+  "gameId": 6874231001,
+  "gameType": "CUSTOM_GAME",
+  "queueId": 0,
+  "gameMode": "CLASSIC",
+  "gameCreationDate": "2026-08-01T19:12:44.000Z",
+  "gameCreation": 1785611564000,
+  "gameDuration": 2011,
+  "teams": [
+    {
+      "teamId": 100,
+      "win": "Fail"
+    },
+    {
+      "teamId": 200,
+      "win": "Win"
+    }
+  ],
+  "participants": [
+    {
+      "participantId": 1,
+      "teamId": 100,
+      "championId": 103,
+      "stats": {
+        "kills": 7,
+        "deaths": 2,
+        "assists": 9,
+        "goldEarned": 13250,
+        "totalMinionsKilled": 180,
+        "neutralMinionsKilled": 21,
+        "totalDamageDealtToChampions": 24810,
+        "visionScore": 21,
+        "win": false
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 2,
+      "teamId": 100,
+      "championId": 64,
+      "stats": {
+        "kills": 4,
+        "deaths": 5,
+        "assists": 11,
+        "goldEarned": 9800,
+        "totalMinionsKilled": 30,
+        "neutralMinionsKilled": 96,
+        "totalDamageDealtToChampions": 12040,
+        "visionScore": 34,
+        "win": false
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 3,
+      "teamId": 100,
+      "championId": 86,
+      "stats": {
+        "kills": 3,
+        "deaths": 4,
+        "assists": 6,
+        "goldEarned": 10100,
+        "totalMinionsKilled": 172,
+        "neutralMinionsKilled": 4,
+        "totalDamageDealtToChampions": 15220,
+        "visionScore": 18,
+        "win": false
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 4,
+      "teamId": 100,
+      "championId": 22,
+      "stats": {
+        "kills": 9,
+        "deaths": 3,
+        "assists": 7,
+        "goldEarned": 14100,
+        "totalMinionsKilled": 211,
+        "neutralMinionsKilled": 8,
+        "totalDamageDealtToChampions": 28950,
+        "visionScore": 25,
+        "win": false
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 5,
+      "teamId": 100,
+      "championId": 412,
+      "stats": {
+        "kills": 1,
+        "deaths": 6,
+        "assists": 19,
+        "goldEarned": 7600,
+        "totalMinionsKilled": 28,
+        "neutralMinionsKilled": 0,
+        "totalDamageDealtToChampions": 6100,
+        "visionScore": 58,
+        "win": false
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 6,
+      "teamId": 200,
+      "championId": 58,
+      "stats": {
+        "kills": 5,
+        "deaths": 4,
+        "assists": 4,
+        "goldEarned": 11200,
+        "totalMinionsKilled": 190,
+        "neutralMinionsKilled": 6,
+        "totalDamageDealtToChampions": 19800,
+        "visionScore": 15,
+        "win": true
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 7,
+      "teamId": 200,
+      "championId": 154,
+      "stats": {
+        "kills": 2,
+        "deaths": 5,
+        "assists": 12,
+        "goldEarned": 8900,
+        "totalMinionsKilled": 22,
+        "neutralMinionsKilled": 88,
+        "totalDamageDealtToChampions": 9900,
+        "visionScore": 30,
+        "win": true
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 8,
+      "teamId": 200,
+      "championId": 134,
+      "stats": {
+        "kills": 6,
+        "deaths": 5,
+        "assists": 5,
+        "goldEarned": 11900,
+        "totalMinionsKilled": 168,
+        "neutralMinionsKilled": 2,
+        "totalDamageDealtToChampions": 22400,
+        "visionScore": 19,
+        "win": true
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 9,
+      "teamId": 200,
+      "championId": 51,
+      "stats": {
+        "kills": 7,
+        "deaths": 6,
+        "assists": 3,
+        "goldEarned": 12800,
+        "totalMinionsKilled": 201,
+        "neutralMinionsKilled": 4,
+        "totalDamageDealtToChampions": 24100,
+        "visionScore": 17,
+        "win": true
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    },
+    {
+      "participantId": 10,
+      "teamId": 200,
+      "championId": 89,
+      "stats": {
+        "kills": 0,
+        "deaths": 8,
+        "assists": 14,
+        "goldEarned": 6900,
+        "totalMinionsKilled": 19,
+        "neutralMinionsKilled": 0,
+        "totalDamageDealtToChampions": 5400,
+        "visionScore": 49,
+        "win": true
+      },
+      "timeline": {
+        "lane": "NONE",
+        "role": "NONE"
+      }
+    }
+  ],
+  "participantIdentities": [
+    {
+      "participantId": 1,
+      "player": {
+        "puuid": "puuid-t1",
+        "gameName": "Teoman",
+        "tagLine": "TR1",
+        "summonerName": "Teoman"
+      }
+    },
+    {
+      "participantId": 2,
+      "player": {
+        "puuid": "puuid-t2",
+        "gameName": "Kaan",
+        "tagLine": "TR1",
+        "summonerName": "Kaan"
+      }
+    },
+    {
+      "participantId": 3,
+      "player": {
+        "puuid": "puuid-t3",
+        "gameName": "Mert",
+        "tagLine": "EUW",
+        "summonerName": "Mert"
+      }
+    },
+    {
+      "participantId": 4,
+      "player": {
+        "puuid": "puuid-t4",
+        "gameName": "Ece",
+        "tagLine": "TR1",
+        "summonerName": "Ece"
+      }
+    },
+    {
+      "participantId": 5,
+      "player": {
+        "puuid": "puuid-t5",
+        "gameName": "Deniz",
+        "tagLine": "TR1",
+        "summonerName": "Deniz"
+      }
+    },
+    {
+      "participantId": 6,
+      "player": {
+        "puuid": "puuid-t6",
+        "gameName": "Baran",
+        "tagLine": "TR1",
+        "summonerName": "Baran"
+      }
+    },
+    {
+      "participantId": 7,
+      "player": {
+        "puuid": "puuid-t7",
+        "gameName": "Selin",
+        "tagLine": "TR1",
+        "summonerName": "Selin"
+      }
+    },
+    {
+      "participantId": 8,
+      "player": {
+        "puuid": "puuid-t8",
+        "gameName": "Arda",
+        "tagLine": "TR1",
+        "summonerName": "Arda"
+      }
+    },
+    {
+      "participantId": 9,
+      "player": {
+        "puuid": "puuid-t9",
+        "gameName": "Yusuf",
+        "tagLine": "TR1",
+        "summonerName": "Yusuf"
+      }
+    },
+    {
+      "participantId": 10,
+      "player": {
+        "puuid": "puuid-t10",
+        "gameName": "Zeynep",
+        "tagLine": "TR1",
+        "summonerName": "Zeynep"
+      }
+    }
+  ]
+}
