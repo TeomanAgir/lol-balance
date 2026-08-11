@@ -1,5 +1,7 @@
 # Change Requests
 
+- [Teoman → orkestratör] [2026-08-12] **GÖREV 1 (new_modules.md): oyuncu profil ekranı** — sıralamada oyuncuya tıklayınca profil; ortalama KDA, W/L, favori karakter, favori koridor, en sinerjili takım arkadaşı. **Orkestratör metrik tanımları (gösterim seviyesi, teknik):** KDA ratio = (ΣK+ΣA)/max(1,ΣD) statlı valid maçlardan; favoriler mod (null'lar hariç, deterministik eşitlik kırılımı); sinerji = aynı takımda ≥2 ortak valid maçta galibiyet oranı (winrate → ortak maç → ad sıralı, ilk 3) — yalnız GÖSTERİMDİR, rating'e girmez; Faz 2 pair-synergy rating modeli kapsam dışı kalmaya devam eder. Yeni endpoint `GET /players/{id}/stats` (api_contract §2). DB/rating/collector değişikliği yok.
+
 Agent'lar contract değişiklik önerilerini buraya ekler. Format:
 - [agent-adı] [tarih] Sorun + önerilen değişiklik. Karar: (orkestratör doldurur)
 

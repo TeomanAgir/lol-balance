@@ -89,6 +89,60 @@ class PlayerOut(BaseModel):
     role_ratings: dict[str, RoleRatingOut]
 
 
+class StatsPlayerOut(BaseModel):
+    id: int
+    display_name: str
+    riot_id: Optional[str]
+
+
+class StatsTotalsOut(BaseModel):
+    # api_contract §2: maçsız oyuncuda matches=0, wins=0, losses=0, winrate=None.
+    matches: int
+    wins: int
+    losses: int
+    winrate: Optional[float]
+
+
+class StatsKdaOut(BaseModel):
+    # Yalnız kills/deaths/assists üçü de dolu valid maçlardan; hiç yoksa
+    # PlayerStatsOut.kda tamamen None olur.
+    kills_avg: float
+    deaths_avg: float
+    assists_avg: float
+    ratio: float
+
+
+class FavoriteChampionOut(BaseModel):
+    champion: str
+    matches: int
+    winrate: float
+
+
+class FavoriteRoleOut(BaseModel):
+    role: Position
+    matches: int
+
+
+class SynergyOut(BaseModel):
+    # Aynı takımda ≥2 ortak valid maç; yalnız GÖSTERİM (rating'e girmez).
+    player_id: int
+    display_name: str
+    matches_together: int
+    wins_together: int
+    winrate: float
+
+
+class PlayerStatsOut(BaseModel):
+    # api_contract §2 "Oyuncu profili (GÖREV 1)". kda / favorite_* alanları
+    # veri yoksa null; synergy uygun kimse yoksa [].
+    player: StatsPlayerOut
+    totals: StatsTotalsOut
+    kda: Optional[StatsKdaOut]
+    favorite_champion: Optional[FavoriteChampionOut]
+    favorite_role: Optional[FavoriteRoleOut]
+    synergy: list[SynergyOut]
+
+
 class PositionsUpdate(BaseModel):
     # api_contract §3: anahtarlar bu maçın player_id'leri (JSON nesne anahtarı
     # olduğu için string), değerler rol adı veya null. Kısmi güncelleme serbest.

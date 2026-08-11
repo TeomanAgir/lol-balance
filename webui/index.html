@@ -32,11 +32,18 @@
 
   <!-- ═══ Leaderboard ═══ -->
   <section id="view-leaderboard" class="view" hidden>
-    <p class="view-hint">Rol ratinglerini görmek için oyuncu adına dokun.</p>
+    <p class="view-hint">Oyuncu adına dokununca istatistik sayfası açılır: maç dökümü, KDA,
+      favori karakter/koridor, rol ratingleri ve en iyi anlaştığı takım arkadaşları.</p>
     <table class="board">
       <thead><tr><th class="rank">#</th><th>Oyuncu</th><th class="num">Puan</th><th class="num">Maç</th></tr></thead>
       <tbody id="board-body"></tbody>
     </table>
+  </section>
+
+  <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralamadan açılan detay görünümü ═══ -->
+  <section id="view-profile" class="view" hidden>
+    <button id="btn-profile-back" class="back-btn" type="button">← Sıralamaya dön</button>
+    <div id="profile-body" aria-live="polite"></div>
   </section>
 
   <!-- ═══ Maç geçmişi ═══ -->

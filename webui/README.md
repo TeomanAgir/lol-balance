@@ -31,6 +31,8 @@ Mock, 14 kişilik gerçekçi bir roster (her oyuncuda 5 anahtarlı `role_ratings
 
 Mock'ta bilerek bırakılmış kenar durumlar: bir maçta iki katılımcının `rating_change`'i `null` (delta "—"), başka bir maçta iki katılımcının `position`'ı `null` (rol "—", o maç rol evrenine girmez). `PUT /matches/{id}/positions` mock'u yerel maç state'ini günceller ve `{updated, role_matches_replayed}` döner — rol ratinglerini yeniden hesaplamaz (gerçek replay backend'de).
 
+`GET /players/{id}/stats` mock'u istatistikleri maç geçmişinden **türetir** (yalnız `status: "valid"` maçlar), böylece bir maçı void edince profil de tutarlı biçimde değişir. Maçsız oyuncu **Ece** (`matches_played: 0`) hiçbir mock maçına girmez ve contract'taki tüm boş yolları temsil eder: `winrate: null`, `kda: null`, `favorite_champion: null`, `favorite_role: null`, `synergy: []`. Bilinmeyen id → `404`.
+
 ## Backend'e bağlama
 
 1. `index.html`'de `USE_MOCK: false` yap.
@@ -42,7 +44,9 @@ Mock'ta bilerek bırakılmış kenar durumlar: bir maçta iki katılımcının `
 ## Notlar
 
 - Gösterilen birincil rating değeri `rating.score`'dur (harman engine); sıralama tablosunda skorun altında W/L çekirdeği (`ordinal`) ve `perf_avg` soluk ikincil satır olarak görünür, `perf_avg` null ise (harman-dışı version, score = ordinal) bu satır gizlenir.
-- Rol ratingleri (`role_ratings`, GÖREV 0) iki yerde görünür: dengeleme ekranındaki oyuncu kartlarında kompakt şerit, sıralama tablosunda oyuncu adına dokununca açılan satır. Her kutu rol · puan (1 ondalık) · o roldeki maç sayısıdır; `matches = 0` olan rol soluk gösterilir (default prior, gerçek veri değil). Alan yoksa şerit hiç çizilmez.
+- Rol ratingleri (`role_ratings`, GÖREV 0) iki yerde görünür: dengeleme ekranındaki oyuncu kartlarında kompakt şerit, oyuncu profilinde geniş şerit. Her kutu rol · puan (1 ondalık) · o roldeki maç sayısıdır; `matches = 0` olan rol soluk gösterilir (default prior, gerçek veri değil). Alan yoksa şerit hiç çizilmez.
+- **Oyuncu profili (GÖREV 1):** sıralamada oyuncu adına dokununca `GET /players/{id}/stats` ile açılan, sekmesiz "detay" görünümü (`#view-profile`); üstteki "← Sıralamaya dön" ile kapanır, alt sekme çubuğunda Sıralama aktif kalır. Gösterilenler: maç & W/L, ortalama KDA, favori karakter, favori koridor (Türkçe rol adı), rol rating şeridi ve en yüksek sinerji (ilki vurgulu, kalan iki kayıt liste). Sinerji listesindeki isimler o oyuncunun profiline geçer. Contract'taki null durumları kısa notlarla karşılanır: `kda: null` → "İstatistikli maç yok", favoriler `null` → "—" + veri yok notu, `synergy: []` → "En az 2 ortak maç gerekiyor", maçsız oyuncu → "Henüz maç yok". Puan ve rol şeridi `GET /players` önbelleğinden gelir (profil isteği yalnız istatistikleri taşır).
+- Sıralama satırındaki eski rol açılırı (chevron) kaldırıldı: aynı şeridi profil daha geniş biçimde gösteriyor, tek satırda iki ayrı dokunma hedefi tutmanın karşılığı yoktu. Ada dokunma artık tek anlam taşır: profili aç.
 - Dengeleme yanıtı her zaman rol atamalıdır: `team_100`/`team_200` = `[{player_id, position}]`. Takımlar TOP → JUNGLE → MIDDLE → BOTTOM → UTILITY sırasıyla, Türkçe etiketlerle (Üst/Orman/Orta/Alt/Destek) listelenir.
 - Rol düzeltme: maç kartındaki "Rolleri düzenle" 10 katılımcı için rol seçici açar; "Rolleri Kaydet" yalnız **değişen** rolleri `PUT /api/v1/matches/{id}/positions` ile gönderir (`{"positions": {"<player_id>": "TOP"|null}}`) ve yanıttaki `updated` / `role_matches_replayed` bilgisini toast'ta gösterir. Ana rating etkilenmez; kaydedince maç listesi ve roster önbelleği tazelenir. Manuel girilen maçlarda roller boş geldiğinden bu panel o maçları rol evrenine sokmanın yoludur.
 - "Dengele" butonu tam 10 seçim olmadan aktifleşmez (asıl doğrulama backend'de, `422`).

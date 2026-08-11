@@ -8,7 +8,15 @@ from rating import ROLES, Engine, Rating
 
 from ..config import Settings, get_settings
 from ..deps import get_db
-from ..schemas import PlayerCreate, PlayerOut, PlayerPatch, RatingOut, RoleRatingOut
+from ..schemas import (
+    PlayerCreate,
+    PlayerOut,
+    PlayerPatch,
+    PlayerStatsOut,
+    RatingOut,
+    RoleRatingOut,
+)
+from ..services.player_stats import player_stats
 from ..services.ratings import current_ratings, is_blend, perf_averages
 from ..services.role_ratings import (
     current_role_ratings,
@@ -127,6 +135,21 @@ def leaderboard(
     players = _player_list(conn, settings.engine_version)
     players.sort(key=lambda p: p.rating.score, reverse=True)
     return players
+
+
+@router.get("/players/{player_id}/stats")
+def player_profile_stats(
+    player_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> PlayerStatsOut:
+    """Oyuncu profil istatistikleri (api_contract §2 "Oyuncu profili").
+
+    Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz.
+    """
+    stats = player_stats(conn, player_id)
+    if stats is None:
+        raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
+    return stats
 
 
 @router.post("/players", status_code=201)
