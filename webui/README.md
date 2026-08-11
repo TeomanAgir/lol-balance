@@ -39,6 +39,7 @@ Mock, 14 kişilik gerçekçi bir roster, 8 maçlık geçmiş ve 3 dengeleme öne
 
 ## Notlar
 
+- Gösterilen birincil rating değeri `rating.score`'dur (harman engine); sıralama tablosunda skorun altında W/L çekirdeği (`ordinal`) ve `perf_avg` soluk ikincil satır olarak görünür, `perf_avg` null ise (harman-dışı version, score = ordinal) bu satır gizlenir.
 - "Dengele" butonu tam 10 seçim olmadan aktifleşmez (asıl doğrulama backend'de, `422`).
 - Maç void etme onay dialogu ile korunur; void geri alınamaz ve rating replay tetikler.
 - Hata yanıtlarındaki `detail` alanı kullanıcıya aynen gösterilir (backend Türkçe döner).

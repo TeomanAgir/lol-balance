@@ -49,7 +49,14 @@
     toastTimer = setTimeout(() => { el.hidden = true; }, 5000);
   }
 
-  const fmtOrdinal = (o) => o.toFixed(1);
+  // Birincil değer rating.score'dur (harman engine; harman-dışı version'da score = ordinal).
+  const fmtRating = (x) => x.toFixed(1);
+  // İkincil bilgi: W/L çekirdeği (ordinal) + kariyer performans çarpanı.
+  // perf_avg null ise (harman-dışı version) gösterilmez — score zaten ordinal'dir.
+  const ratingSub = (r) =>
+    r.perf_avg == null
+      ? ""
+      : `W/L ${fmtRating(r.ordinal)} · Perf ${r.perf_avg.toFixed(2)}`;
   const fmtDelta = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(1);
   const fmtDate = (iso) =>
     new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -105,7 +112,7 @@
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
         `<span class="p-name">${p.display_name}</span>` +
-        `<span class="p-meta">${fmtOrdinal(p.rating.ordinal)} · ${p.matches_played} maç</span>`;
+        `<span class="p-meta">${fmtRating(p.rating.score)} · ${p.matches_played} maç</span>`;
       card.addEventListener("click", () => {
         if (state.selected.has(p.id)) state.selected.delete(p.id);
         else if (state.selected.size < 10) state.selected.add(p.id);
@@ -171,14 +178,16 @@
 
   // ── 2) Leaderboard ────────────────────────────────────────────
   async function loadLeaderboard() {
-    const rows = await api("/leaderboard");
-    $("#board-body").innerHTML = rows.map((p, i) =>
-      `<tr>
+    const rows = await api("/leaderboard"); // backend score'a göre sıralı döner
+    $("#board-body").innerHTML = rows.map((p, i) => {
+      const sub = ratingSub(p.rating);
+      return `<tr>
          <td class="rank">${i + 1}</td>
          <td>${p.display_name}</td>
-         <td class="num strong">${fmtOrdinal(p.rating.ordinal)}</td>
+         <td class="num strong">${fmtRating(p.rating.score)}${sub ? `<span class="rating-sub">${sub}</span>` : ""}</td>
          <td class="num">${p.matches_played}</td>
-       </tr>`).join("");
+       </tr>`;
+    }).join("");
   }
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────

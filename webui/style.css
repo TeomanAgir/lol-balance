@@ -239,6 +239,15 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .board tbody tr:first-child td:nth-child(2) { color: var(--brass); font-weight: 700; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .num.strong { font-weight: 600; }
+/* Skorun altındaki ikincil satır: W/L çekirdeği + perf çarpanı */
+.rating-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  margin-top: 2px;
+}
 
 /* ── Maç geçmişi ── */
 .match-card {

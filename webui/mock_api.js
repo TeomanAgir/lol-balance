@@ -4,22 +4,33 @@
   "use strict";
 
   // ── Mock roster: 14 kişilik gerçekçi havuz (1 tanesi hiç maç oynamamış) ──
+  // rating: harman engine (openskill-pl-blend50-v1) şekli {mu, sigma, ordinal, perf_avg, score}.
+  // Yigit ve Selin'de perf_avg null: harman-dışı version durumunun temsili (score = ordinal).
+  // Ece hiç maç oynamadı → contract gereği perf_avg = 1.0 (nötr), score ≈ 0.
   const players = [
-    { id: 1,  display_name: "Teoman", riot_id: "Teoman#TR1",    matches_played: 24, rating: { mu: 29.4, sigma: 3.1, ordinal: 20.1 } },
-    { id: 2,  display_name: "Baran",  riot_id: "Baranski#EUW",  matches_played: 22, rating: { mu: 27.8, sigma: 3.3, ordinal: 17.9 } },
-    { id: 3,  display_name: "Kaan",   riot_id: "KaanMid#TR1",   matches_played: 25, rating: { mu: 26.9, sigma: 3.0, ordinal: 17.9 } },
-    { id: 4,  display_name: "Emir",   riot_id: "Emir#0000",     matches_played: 19, rating: { mu: 26.2, sigma: 3.5, ordinal: 15.7 } },
-    { id: 5,  display_name: "Deniz",  riot_id: "DenizJG#TR1",   matches_played: 21, rating: { mu: 25.8, sigma: 3.2, ordinal: 16.2 } },
-    { id: 6,  display_name: "Mert",   riot_id: "MertADC#TR1",   matches_played: 17, rating: { mu: 25.1, sigma: 3.6, ordinal: 14.3 } },
-    { id: 7,  display_name: "Arda",   riot_id: "ArdaTop#TR1",   matches_played: 15, rating: { mu: 24.6, sigma: 3.8, ordinal: 13.2 } },
-    { id: 8,  display_name: "Efe",    riot_id: "EfeSup#TR1",    matches_played: 18, rating: { mu: 24.0, sigma: 3.4, ordinal: 13.8 } },
-    { id: 9,  display_name: "Cem",    riot_id: "CemW#TR1",      matches_played: 12, rating: { mu: 23.5, sigma: 4.1, ordinal: 11.2 } },
-    { id: 10, display_name: "Ozan",   riot_id: "OzanKral#TR1",  matches_played: 14, rating: { mu: 23.1, sigma: 3.9, ordinal: 11.4 } },
-    { id: 11, display_name: "Berk",   riot_id: "Berk#TR2",      matches_played: 9,  rating: { mu: 22.4, sigma: 4.6, ordinal: 8.6 } },
-    { id: 12, display_name: "Yigit",  riot_id: "Yigit#TR1",     matches_played: 7,  rating: { mu: 21.8, sigma: 5.0, ordinal: 6.8 } },
-    { id: 13, display_name: "Selin",  riot_id: "Selin#SUP",     matches_played: 5,  rating: { mu: 21.0, sigma: 5.5, ordinal: 4.5 } },
-    { id: 14, display_name: "Ece",    riot_id: "Ece#NEW",       matches_played: 0,  rating: { mu: 25.0, sigma: 8.333, ordinal: 0.0 } },
+    { id: 1,  display_name: "Teoman", riot_id: "Teoman#TR1",    matches_played: 24, rating: { mu: 29.4, sigma: 3.1, ordinal: 20.1, perf_avg: 1.12 } },
+    { id: 2,  display_name: "Baran",  riot_id: "Baranski#EUW",  matches_played: 22, rating: { mu: 27.8, sigma: 3.3, ordinal: 17.9, perf_avg: 1.05 } },
+    { id: 3,  display_name: "Kaan",   riot_id: "KaanMid#TR1",   matches_played: 25, rating: { mu: 26.9, sigma: 3.0, ordinal: 17.9, perf_avg: 1.18 } },
+    { id: 4,  display_name: "Emir",   riot_id: "Emir#0000",     matches_played: 19, rating: { mu: 26.2, sigma: 3.5, ordinal: 15.7, perf_avg: 0.97 } },
+    { id: 5,  display_name: "Deniz",  riot_id: "DenizJG#TR1",   matches_played: 21, rating: { mu: 25.8, sigma: 3.2, ordinal: 16.2, perf_avg: 1.08 } },
+    { id: 6,  display_name: "Mert",   riot_id: "MertADC#TR1",   matches_played: 17, rating: { mu: 25.1, sigma: 3.6, ordinal: 14.3, perf_avg: 1.22 } },
+    { id: 7,  display_name: "Arda",   riot_id: "ArdaTop#TR1",   matches_played: 15, rating: { mu: 24.6, sigma: 3.8, ordinal: 13.2, perf_avg: 0.91 } },
+    { id: 8,  display_name: "Efe",    riot_id: "EfeSup#TR1",    matches_played: 18, rating: { mu: 24.0, sigma: 3.4, ordinal: 13.8, perf_avg: 1.02 } },
+    { id: 9,  display_name: "Cem",    riot_id: "CemW#TR1",      matches_played: 12, rating: { mu: 23.5, sigma: 4.1, ordinal: 11.2, perf_avg: 0.88 } },
+    { id: 10, display_name: "Ozan",   riot_id: "OzanKral#TR1",  matches_played: 14, rating: { mu: 23.1, sigma: 3.9, ordinal: 11.4, perf_avg: 1.15 } },
+    { id: 11, display_name: "Berk",   riot_id: "Berk#TR2",      matches_played: 9,  rating: { mu: 22.4, sigma: 4.6, ordinal: 8.6, perf_avg: 0.95 } },
+    { id: 12, display_name: "Yigit",  riot_id: "Yigit#TR1",     matches_played: 7,  rating: { mu: 21.8, sigma: 5.0, ordinal: 6.8, perf_avg: null } },
+    { id: 13, display_name: "Selin",  riot_id: "Selin#SUP",     matches_played: 5,  rating: { mu: 21.0, sigma: 5.5, ordinal: 4.5, perf_avg: null } },
+    { id: 14, display_name: "Ece",    riot_id: "Ece#NEW",       matches_played: 0,  rating: { mu: 25.0, sigma: 8.333, ordinal: 0.0, perf_avg: 1.0 } },
   ];
+
+  // Contract formülü (rating_contract.md "Harman Engine"): W=0.5, MU_0=25, K=20.
+  // perf_avg null → harman-dışı version: score = ordinal.
+  const scoreOf = (r) =>
+    r.perf_avg == null
+      ? r.ordinal
+      : +(0.5 * r.mu + 0.5 * (25 + 20 * (r.perf_avg - 1)) - 3 * r.sigma).toFixed(1);
+  players.forEach(p => { p.rating.score = scoreOf(p.rating); });
 
   const CHAMPS = ["Ahri", "Lee Sin", "Jinx", "Thresh", "Darius", "Yasuo", "Lux", "Ezreal", "Vi", "Orianna"];
   const POS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
@@ -82,7 +93,7 @@
     // Mock partisyonlar: gerçek hesap backend'de; burada sadece makul görünen 3 örnek.
     const sorted = [...ids].sort((a, b) => {
       const pa = players.find(p => p.id === a), pb = players.find(p => p.id === b);
-      return pb.rating.ordinal - pa.rating.ordinal;
+      return pb.rating.score - pa.rating.score;
     });
     const snake = [0, 3, 4, 7, 8].map(i => sorted[i]);          // yılan drafta benzer bölme
     const evens = ids.filter((_, i) => i % 2 === 0);
@@ -107,7 +118,7 @@
     if (method === "GET" && path === "/players") return json(players);
 
     if (method === "GET" && path === "/leaderboard")
-      return json([...players].sort((a, b) => b.rating.ordinal - a.rating.ordinal));
+      return json([...players].sort((a, b) => b.rating.score - a.rating.score));
 
     if (method === "GET" && path.startsWith("/matches")) return json(matches);
 
@@ -115,7 +126,7 @@
       const body = JSON.parse(opts.body);
       const ids = [...new Set(body.player_ids || [])];
       if (ids.length !== 10) return err(422, "Dengeleme için tam 10 farklı oyuncu seçilmelidir.");
-      return json({ engine_version: "openskill-pl-v1", suggestions: balanceSuggestions(ids) });
+      return json({ engine_version: "openskill-pl-blend50-v1", suggestions: balanceSuggestions(ids) });
     }
 
     const voidMatch = path.match(/^\/matches\/(\d+)\/void$/);
