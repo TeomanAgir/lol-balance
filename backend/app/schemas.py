@@ -176,6 +176,37 @@ class WeeklyHighlightsOut(BaseModel):
     best_by_role: dict[str, Optional[HighlightPlayerOut]]
 
 
+class NemesisPlayerOut(BaseModel):
+    # api_contract §2 "Nemesis": pair.players HER ZAMAN küçük player_id önce.
+    player_id: int
+    display_name: str
+    wins: int
+
+
+class NemesisPairOut(BaseModel):
+    # Aday birim (çift, rol) üçlüsüdür: `encounters` yalnız BU roldeki
+    # karşılaşmaları sayar. closeness = 1 - 2*|wins[0]/encounters - 0.5|.
+    role: Position
+    players: list[NemesisPlayerOut]
+    encounters: int
+    closeness: float
+
+
+class NemesisOut(BaseModel):
+    # active: maç önerisinin kullanacağı çift — weekly > all_time > null.
+    all_time: Optional[NemesisPairOut]
+    weekly: Optional[NemesisPairOut]
+    active: Optional[Literal["weekly", "all_time"]]
+
+
+class NemesisMatchOut(BaseModel):
+    # POST /balance/nemesis yanıtındaki `nemesis` nesnesi; player_ids küçük
+    # id önce (pair.players ile aynı sıra).
+    source: Literal["weekly", "all_time"]
+    role: Position
+    player_ids: list[int]
+
+
 class PositionsUpdate(BaseModel):
     # api_contract §3: anahtarlar bu maçın player_id'leri (JSON nesne anahtarı
     # olduğu için string), değerler rol adı veya null. Kısmi güncelleme serbest.
@@ -210,6 +241,11 @@ class BalanceSuggestionOut(BaseModel):
 class BalanceResponse(BaseModel):
     engine_version: str
     suggestions: list[BalanceSuggestionOut]
+
+
+class NemesisBalanceResponse(BalanceResponse):
+    # api_contract §4 "Nemesis maçı": /balance yanıtının aynısı + `nemesis`.
+    nemesis: NemesisMatchOut
 
 
 class ReplayResponse(BaseModel):

@@ -99,6 +99,28 @@ def _window(
     return start, end, False, in_window
 
 
+def weekly_window(
+    conn: sqlite3.Connection, now: datetime | None = None
+) -> tuple[dict, list[int]]:
+    """Haftalık pencere + içindeki valid maç id'leri (kronolojik sırada).
+
+    Pencere kuralının TEK tanımı burasıdır (api_contract §2 "Pencere"):
+    haftanın enleri de nemesis'in haftalık çifti de bu fonksiyondan geçer —
+    kural iki yerde kopyalanmaz.
+
+    `now` verilmezse gerçek UTC şimdi kullanılır; her iki hâlde saniyeye
+    yuvarlanır ki dönen `window` ile filtreleme birebir aynı anı ifade etsin.
+    """
+    now = _as_utc(now if now is not None else datetime.now(timezone.utc))
+    now = now.replace(microsecond=0)
+    matches = _valid_matches(conn)
+    start, end, fallback, in_window = _window(matches, now)
+    return (
+        {"start": _iso(start), "end": _iso(end), "fallback": fallback},
+        [m[0] for m in in_window],
+    )
+
+
 def _pick(rows: list[dict], value_key: str) -> dict | None:
     """Eşitlik kırılımı (api_contract §2): değer ↓ → pencere maç sayısı ↓ →
     display_name alfabetik. Aday yoksa None."""
@@ -263,19 +285,10 @@ def weekly_highlights(
     engine_version: str,
     now: datetime | None = None,
 ) -> dict:
-    """Haftanın enleri (api_contract §2). `now` enjekte edilebilir (test).
+    """Haftanın enleri (api_contract §2). `now` enjekte edilebilir (test)."""
+    window_out, match_ids = weekly_window(conn, now)
 
-    `now` verilmezse gerçek UTC şimdi kullanılır; her iki hâlde saniyeye
-    yuvarlanır ki dönen `window` ile filtreleme birebir aynı anı ifade etsin.
-    """
-    now = _as_utc(now if now is not None else datetime.now(timezone.utc))
-    now = now.replace(microsecond=0)
-
-    matches = _valid_matches(conn)
-    start, end, fallback, in_window = _window(matches, now)
-    window_out = {"start": _iso(start), "end": _iso(end), "fallback": fallback}
-
-    if not in_window:
+    if not match_ids:
         # Hiç valid maç yok (ya da hepsi ayrıştırılamadı) → çapalanacak veri de
         # yok: contract gereği üç alan da null döner.
         return {
@@ -285,7 +298,6 @@ def weekly_highlights(
             "best_by_role": {role: None for role in ROLES},
         }
 
-    match_ids = [m[0] for m in in_window]
     order = {mid: i for i, mid in enumerate(match_ids)}  # kronolojik sıra
 
     engine = Engine(version=engine_version)
