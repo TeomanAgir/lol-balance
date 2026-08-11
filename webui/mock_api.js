@@ -43,14 +43,29 @@
         const won = team === winner;
         const delta = (won ? 1 : -1) * (0.4 + ((pid * 7 + m * 3) % 10) / 12);
         const p = players.find(x => x.id === pid);
+        // m === 0 maçında iki katılımcıda rating_change null: UI'ın "—" yolu test edilebilsin.
+        const noRating = m === 0 && (i === 2 || i === 7);
         return {
           player_id: pid,
           display_name: p.display_name,
           team,
           position: POS[i % 5],
           champion: CHAMPS[(pid + m) % CHAMPS.length],
-          mu_before: +(p.rating.mu - delta).toFixed(2),
-          mu_after: +p.rating.mu.toFixed(2),
+          stats: {
+            kills: (pid + m) % 12,
+            deaths: (pid * 3 + m) % 9,
+            assists: (pid * 5 + m) % 15,
+            gold: 8000 + ((pid * 911 + m * 137) % 8000),
+            cs: 90 + ((pid * 37 + m * 11) % 160),
+            damage_to_champs: 9000 + ((pid * 1723 + m * 431) % 22000),
+            vision_score: 5 + ((pid * 3 + m) % 40),
+          },
+          rating_change: noRating ? null : {
+            mu_before: +(p.rating.mu - delta).toFixed(2),
+            sigma_before: +(p.rating.sigma + 0.05).toFixed(3),
+            mu_after: +p.rating.mu.toFixed(2),
+            sigma_after: +p.rating.sigma.toFixed(3),
+          },
         };
       }),
     });
@@ -127,14 +142,22 @@
           const p = players.find(x => x.id === pt.player_id);
           const won = pt.team === body.winner_team;
           const delta = won ? 0.8 : -0.8;
+          const mu = p ? p.rating.mu : 25;
+          const sigma = p ? p.rating.sigma : 8.333;
           return {
             player_id: pt.player_id,
             display_name: p ? p.display_name : "?",
             team: pt.team,
             position: pt.position,
             champion: null,
-            mu_before: p ? +p.rating.mu.toFixed(2) : 25,
-            mu_after: p ? +(p.rating.mu + delta).toFixed(2) : 25,
+            stats: { kills: null, deaths: null, assists: null, gold: null,
+                     cs: null, damage_to_champs: null, vision_score: null },
+            rating_change: {
+              mu_before: +mu.toFixed(2),
+              sigma_before: +sigma.toFixed(3),
+              mu_after: +(mu + delta).toFixed(2),
+              sigma_after: +Math.max(0.5, sigma - 0.05).toFixed(3),
+            },
           };
         }),
       };

@@ -287,6 +287,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .team .delta { font-variant-numeric: tabular-nums; font-size: 13px; }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--red); }
+.delta.none { color: var(--muted); }
 .btn-void {
   margin-top: 12px;
   font-size: 13px;

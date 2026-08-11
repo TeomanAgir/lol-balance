@@ -195,9 +195,11 @@
         const won = m.winner_team === team;
         return `<ul class="team ${team === 100 ? "blue" : "red"} ${won ? "won" : ""}">` +
           members.map(p => {
-            const d = p.mu_after - p.mu_before;
-            return `<li>${p.display_name}` +
-              `<span class="delta ${d >= 0 ? "up" : "down"}">${fmtDelta(d)}</span></li>`;
+            const rc = p.rating_change; // nullable: void maç / rating satırı yok → delta gösterme
+            const deltaHtml = rc
+              ? `<span class="delta ${rc.mu_after - rc.mu_before >= 0 ? "up" : "down"}">${fmtDelta(rc.mu_after - rc.mu_before)}</span>`
+              : `<span class="delta none">—</span>`;
+            return `<li>${p.display_name}${deltaHtml}</li>`;
           }).join("") + "</ul>";
       };
       const card = document.createElement("article");
