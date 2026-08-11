@@ -32,7 +32,10 @@ def test_replay_deterministic_equals_incremental(client, db):
 
     r = client.post("/api/v1/admin/replay")
     assert r.status_code == 200
-    assert r.json() == {"matches_replayed": 3, "engine_version": "openskill-pl-v1"}
+    assert r.json() == {
+        "matches_replayed": 3,
+        "engine_version": "openskill-pl-perf-v1",
+    }
 
     conn = db()
     assert _history_snapshot(conn) == incremental

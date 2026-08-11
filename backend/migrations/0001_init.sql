@@ -36,7 +36,8 @@ CREATE TABLE match_participants (
     team        INTEGER NOT NULL CHECK (team IN (100, 200)),
     position    TEXT CHECK (position IN ('TOP','JUNGLE','MIDDLE','BOTTOM','UTILITY')),
     champion    TEXT,
-    -- Gösterim amaçlı istatistikler; rating'e GİRMEZ:
+    -- İstatistikler: gösterim + openskill-pl-perf-v1'de performans çarpanı girdisi
+    -- (bkz. docs/rating_contract.md):
     kills INTEGER, deaths INTEGER, assists INTEGER,
     gold INTEGER, cs INTEGER, damage_to_champs INTEGER, vision_score INTEGER,
     UNIQUE (match_id, player_id)
