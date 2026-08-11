@@ -164,3 +164,66 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 - Maçsız oyuncu: P_avg=1, default score = 0 civarı (25 - 3*25/3 = 0) — nötr.
 - score monotonluğu: aynı mu/sigma'da P_avg arttıkça score artar.
 - Efektif dengeleme: P_avg farkı predict_win'i beklenen yönde değiştirir.
+
+---
+
+# Rol Rating Evreni — blend50 rol bazlı (GÖREV 0)
+
+**Karar dayanağı:** Teoman, 2026-08-11 — `new_modules.md` GÖREV 0 + sohbet kararları
+(CHANGE_REQUESTS kaydı). Rol verisi hibrittir: collector tahmini + manuel düzeltme.
+
+## Model
+
+1. **Ana rating DEĞİŞMEZ.** Rol evreni ayrı bir state uzayıdır: (player, role) başına
+   mu/sigma. `role ∈ {TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY}`. İki evren ayrı hesaplanır,
+   birbirini asla etkilemez.
+2. **Formül ana engine ile BİREBİR aynı:** `openskill-pl-blend50-v1` sabitleri
+   (MU_0=25, K=20, W=0.5), saf W/L PlackettLuce çekirdeği (çarpan yok), aynı default
+   parametreler. `engine_version` string'i AYNIDIR; evren ayrımı tabloyla yapılır
+   (`role_rating_history`, bkz. db_schema migration 0003).
+3. **Uygunluk kuralı (deterministik):** valid bir maç rol evrenine yalnızca şu koşulda
+   girer: 10 katılımcının 10'unda da `position` dolu VE her takımda 5 farklı rolün her
+   birinden tam 1 tane. Aksi halde maç rol evrenine GİRMEZ (ana evren yine işler).
+4. **Güncelleme:** uygun maçta her katılımcının O ROLDEKİ güncel rating'i (yoksa default
+   prior mu=25, sigma=25/3) `Engine.update`'e girer — 5v5 yapısı, winner ve stats ana
+   evrendekiyle aynı şekilde geçilir. Sonuç `role_rating_history`'ye yazılır;
+   `perf_score` ana evrendeki maç perf değeriyle aynıdır (aynı stats, aynı fonksiyon).
+5. **P_avg rol bazındadır:** `P_avg(player, role) = AVG(role_rating_history.perf_score)`
+   — yalnız valid maçlar, yalnız bu engine_version, yalnız o rolün satırları.
+   `mu_eff_role = 0.5*mu_role + 0.5*(25 + 20*(P_avg_role - 1))`,
+   `score_role = mu_eff_role - 3*sigma_role`.
+6. **Hiç oynanmamış rol:** default prior + P_avg=1.0 → score 0 (nötr).
+7. **Position düzeltmesi** (`PUT /matches/{id}/positions`) rol evreninde replay tetikler;
+   ana evren bit-bit değişmeden kalır. Rol replay'i her zaman `match_participants.position`'ın
+   GÜNCEL değerinden okur (ham ingest payload'ından değil).
+
+## Dengeleme — HER ZAMAN rol bazlı (eski salt-rating modu kaldırıldı)
+
+1. Girdi: 10 oyuncu; her oyuncu için 5 rolün `(mu_eff_role, sigma_role)` çiftleri
+   (backend harmanı uygular, rating paketine harmanlanmış Rating geçer — mevcut desenle
+   tutarlı).
+2. 126 ayrımın her birinde, HER TAKIM için 120 rol atamasından takım toplam
+   `score_role`'ünü (= geçilen Rating'in ordinal'i) maksimize eden atama seçilir.
+   Eşitlikte deterministik kırılım: roller `TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY`
+   sırasıyla gezilir, ilk bulunan maksimum korunur (strict-greater karşılaştırma).
+3. `p_win`: seçilen atamadaki `(mu_eff_role, sigma_role)` çiftleriyle `predict_win`.
+   `quality = 1 - 2*|p - 0.5|` (değişmedi). Öneriler quality azalan sırada.
+4. Rating paketi API'si: `balance_roles(ratings_by_role, top_n)` — saf fonksiyon
+   (matematik rating paketinde kalır). `ratings_by_role[i]` = i. oyuncunun
+   `{role: Rating}` haritası (5 rolün tamamı zorunlu); dönen öneri takım index'leri +
+   hizalı rol atamaları + p_win içerir.
+5. Hiç rol verisi olmayan oyuncular her rolde nötr (score 0) olduğundan atamaları
+   fiilen serbesttir — sistem az veriyle "dümdüz" çalışır, veri biriktikçe keskinleşir
+   (kabul edilen davranış, Teoman 2026-08-11).
+
+## Test yükümlülükleri (rol evreni)
+
+- Uygun olmayan maç (herhangi bir position null / takımda rol seti bozuk) rol evrenine
+  girmez; ana evren etkilenmez.
+- Uygun maçta mu/sigma güncellemesi blend50 çekirdeğiyle aynı mekaniktedir; replay
+  deterministiktir (iki kez koş → bit-bit aynı).
+- `balance_roles`: elle kurgulanmış senaryoda optimal atama; "sadece TOP oynamış" iki
+  güçlü oyuncu, rol skorları ayrıştığında aynı takıma düşmez; determinizm (aynı girdi →
+  aynı çıktı).
+- Position güncellemesi → rol replay → tutarlı state; ana rating_history bit-bit
+  değişmemiş.

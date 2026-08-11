@@ -22,7 +22,8 @@ Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi 
 4. **OpenSkill PlackettLuce, default parametreler, versiyon string'ine bağlı.** Parametre "tuning" önerileri reddedilir; parametre değişikliği = yeni engine_version + insan onayı.
 5. **Web UI framework'süz kalır.** React/bundler önerisi reddedilir; 4 görünüm için build zinciri bakım yüküdür.
 6. **Bot yok, Tournament API yok.** Bunlar bilinçli olarak kapsam dışı bırakıldı; geri getirme önerme.
-7. **Backend LCU'nun ham formatını bilmez.** Normalizasyon collector'dadır; LCU şema kırılganlığı orada izole kalır.
+7. **Backend LCU'nun ham formatını bilmez.** Normalizasyon collector'dadır; LCU şema kırılganlığı orada izole kalır. Rol tahmini de (Smite/lane sinyalleri ham LCU verisi olduğu için) collector'dadır.
+8. **Rol rating evreni ayrı, ana rating dokunulmaz.** [Teoman, 2026-08-11 — GÖREV 0] (player, role) başına blend50'nin birebir aynısı, ayrı tablo (`role_rating_history`); rol verisi hibrit (collector kısıt-çözümlü tahmin + web UI manuel düzeltme → rol evreni replay); dengeleme HER ZAMAN rol bazlı (eski salt-rating modu geri getirilmez). Karar #1'deki "rol bazlı normalizasyon yapılmaz" perf BİLEŞENLERİ için geçerliliğini korur — rol evreni normalizasyon değil, ayrı state uzayıdır. Spec: `docs/rating_contract.md` "Rol Rating Evreni".
 
 ## Bilinen dış bağımlılık / bloklayıcı
 - **LCU fixture**: `collector/fixtures/` altında gerçek bir custom maçın EOG JSON'u olmadan Agent 1'in normalizer'ı gerçek şemaya karşı doğrulanamaz. Fixture yoksa: Agent 1'i sentetik fixture ile yapıya + testlere kadar ilerlet, ama işi "entegrasyon bekliyor" olarak işaretle ve insandan fixture'ı iste (kendi PC'sinde client açıkken alacak). Fixture geldiğinde normalizer'ı ona karşı yeniden doğrulat.

@@ -28,11 +28,36 @@ harman engine alanlarıdır (bkz. rating_contract.md "Harman Engine"): aktif ver
 sıralanır**; harman olmayan version'larda `perf_avg = null`, `score = ordinal`.
 Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluşturur (bkz. db_schema).
 
+**Rol ratingleri (GÖREV 0):** `GET /players` ve `GET /leaderboard` her oyuncuda ek olarak
+`role_ratings` nesnesi döner — 5 anahtar her zaman mevcut:
+```json
+"role_ratings": {
+  "TOP":     {"mu": 25.0, "sigma": 8.333, "perf_avg": 1.0, "score": 0.0, "matches": 0},
+  "JUNGLE":  {"mu": 26.4, "sigma": 7.1,  "perf_avg": 1.12, "score": 6.3, "matches": 4},
+  "MIDDLE":  {"...": "..."}, "BOTTOM": {"...": "..."}, "UTILITY": {"...": "..."}
+}
+```
+Hiç oynanmamış rol default döner (mu=25, sigma=25/3, perf_avg=1.0, score=0.0, matches=0).
+Spec: rating_contract.md "Rol Rating Evreni".
+
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
 POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
+PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
+
+`PUT /matches/{id}/positions` (rol düzeltme — web UI'daki maç detayından):
+```json
+{ "positions": { "1": "TOP", "4": "JUNGLE", "7": null } }
+```
+- Anahtarlar bu maçın `player_id`'leri (string; JSON nesne anahtarı), değerler
+  `TOP|JUNGLE|MIDDLE|BOTTOM|UTILITY|null`. Kısmi güncelleme serbesttir.
+- Maçta olmayan `player_id` veya geçersiz rol → `422`. Bilinmeyen maç → `404`.
+- Başarıda rol evreni replay'i koşar (ana rating ETKİLENMEZ);
+  yanıt: `{"updated": 3, "role_matches_replayed": 7}`.
+- Ham `ingest_events` değişmez; güncellenen yalnız `match_participants.position`'dır
+  (bkz. db_schema "küratörlü alan" notu).
 
 `GET /matches` yanıt örneği (CHANGE_REQUESTS: web-ui 2026-08-11 — kanonik şekil budur):
 ```json
@@ -54,7 +79,7 @@ POST /matches/{id}/void            → maçı void işaretler ve rating replay t
   Rating değişimi düz alan olarak DEĞİL, bu iç nesnede taşınır — `null`, "rating'e girmedi"
   durumunu ifade edebilmek için gereklidir.
 
-## 4. Dengeleme (çekirdek özellik)
+## 4. Dengeleme (çekirdek özellik) — HER ZAMAN rol bazlı (GÖREV 0)
 ```
 POST /balance
 Body: {
@@ -62,11 +87,15 @@ Body: {
   "top_n": 3                        // en dengeli kaç alternatif dönsün (default 3)
 }
 → 200 {
-  "engine_version": "openskill-pl-v1",
+  "engine_version": "openskill-pl-blend50-v1",
   "suggestions": [
     {
-      "team_100": [1,4,5,8,9],
-      "team_200": [2,3,6,7,10],
+      "team_100": [{"player_id": 1, "position": "TOP"},
+                   {"player_id": 4, "position": "JUNGLE"},
+                   {"player_id": 5, "position": "MIDDLE"},
+                   {"player_id": 8, "position": "BOTTOM"},
+                   {"player_id": 9, "position": "UTILITY"}],
+      "team_200": [{"player_id": 2, "position": "TOP"}, "..."],
       "p_win_team_100": 0.512,
       "quality": 0.988              // 1 - 2*|p_win - 0.5|; 1.0 = mükemmel denge
     }
@@ -74,16 +103,24 @@ Body: {
 }
 ```
 - Tam 10 farklı `player_ids` zorunlu; aksi `422`.
-- Rating'i olmayan oyuncu (0 maç) default prior (mu=25, sigma=25/3) ile hesaba katılır.
+- Dengeleme HER ZAMAN rol bazlıdır (Teoman kararı 2026-08-11; eski salt-rating modu
+  kaldırıldı). Her takım için rol ataması, rol score'ları toplamını maksimize edecek
+  şekilde seçilir; `p_win` atanmış rollerin `(mu_eff_role, sigma_role)` değerleriyle
+  hesaplanır. Algoritma spec'i: rating_contract.md "Rol Rating Evreni → Dengeleme".
+- Hiç rol verisi olmayan oyuncu her rolde default prior (score 0, nötr) ile hesaba
+  katılır — az veriyle sistem "dümdüz" çalışır.
 - Backend 126 ayrımın tamamını değerlendirir (brute force), `quality` azalan sırada döner.
 
 ## 5. Rating yönetimi
 ```
-POST /admin/replay                 → tüm rating_history'yi siler, valid maçları
-                                     kronolojik sırayla rating engine'den geçirir.
-                                     Dönen: {matches_replayed, engine_version}
+POST /admin/replay                 → HER İKİ evreni yeniden kurar: ana rating_history +
+                                     role_rating_history (aktif engine_version için siler,
+                                     valid maçları kronolojik sırayla yeniden işler).
+                                     Dönen: {matches_replayed, role_matches_replayed,
+                                             engine_version}
 GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
-                                     (harman olmayan version'da score = ordinal)
+                                     (harman olmayan version'da score = ordinal;
+                                      role_ratings alanı burada da döner, bkz. §2)
 ```
 `replay`, engine parametresi/versiyonu değiştiğinde ve `void` işlemlerinden sonra çağrılır. Ingest sırasındaki normal akışta replay DEĞİL, incremental update yapılır (son rating'in üstüne tek maç uygulanır) — replay O(n_maç) olduğundan sadece gerektiğinde koşar.
 
