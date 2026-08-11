@@ -35,7 +35,6 @@ jobs:
 
   image:
     # main'e push'ta, testler geçince GHCR'a image basılır.
-    # Deploy (cluster'ın yeni imajı çekmesi) VPS tarafında kurulacak — bkz. deploy/VPS_AGENT_BRIEF.md
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -63,3 +62,20 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    # Yeni image GHCR'a çıkınca VPS'teki deployment'ı restart eder (imagePullPolicy: Always
+    # yeni imajı çeker). Kimlik: dar yetkili ci-deployer SA — bkz. deploy/ci-rbac.yaml.
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kubeconfig'i hazırla
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+      - name: Rollout restart + bekle
+        run: |
+          kubectl -n lol-balance rollout restart deployment/lol-balance
+          kubectl -n lol-balance rollout status deployment/lol-balance --timeout=180s
