@@ -68,15 +68,28 @@ challenge'ı kendiliğinden geçti, elle müdahale gerekmedi.
    ```bash
    kubectl -n lol-balance get secret lol-balance-secrets -o jsonpath='{.data.API_KEY}' | base64 -d
    ```
-2. **Sürekli deploy — öneri (kurulum Teoman onayı bekliyor):**
-   **Tercih: CI'dan `kubectl rollout restart`.** GitHub Actions'a, `lol-balance` namespace'iyle
-   sınırlı bir ServiceAccount token'lı kubeconfig secret olarak eklenir; image push sonrası
-   `kubectl -n lol-balance rollout restart deploy/lol-balance` koşar.
-   Gerekçe: cluster'a ek bileşen girmez (Keel yok), yalnızca gerçek release'te restart olur
-   (Recreate stratejisinde her restart kısa kesinti demek — zamanlı restart cron'u boşuna
-   kesinti üretir), deploy anı CI log'unda izlenebilir. Ödünleşim: GitHub'a kubeconfig
-   secret'ı emanet edilir (dar yetkili SA ile sınırlandırılır) ve API server'ın (6443)
-   GitHub runner'larından erişilebilir olması gerekir. Teoman bunu istemezse alternatif: Keel.
+2. **Sürekli deploy — ONAYLANDI, kurulum 2026-08-11 (VPS tarafı tamam):**
+   Mekanizma: main push → testler → image GHCR'a → CI `kubectl rollout restart` →
+   `imagePullPolicy: Always` yeni imajı çeker.
+
+   Yapılanlar:
+   - `deploy/ci-rbac.yaml`: `ci-deployer` SA — yalnızca `lol-balance` ns'inde
+     deployments get/list/watch/**patch** + replicasets izleme. Doğrulandı:
+     başka namespace ✗, secret okuma ✗, rollout status ✓.
+   - Uzun ömürlü SA token'ından kubeconfig üretildi (server `https://159.195.216.232:6443`,
+     cluster CA ile TLS doğrulamalı — API cert SAN'ında public IP mevcut).
+   - Kubeconfig, GitHub repo secret'ı **`KUBE_CONFIG_B64`** olarak eklendi (API üzerinden,
+     sealed-box şifreli; PUT 201).
+   - ufw'de **6443/tcp açıldı** (GitHub runner'ları API server'a erişebilsin; TLS + token
+     + dar RBAC ile korunuyor. GitHub IP aralıkları değişken olduğundan IP kısıtı pratik değil).
+
+   ⚠️ **Kalan tek adım:** `.github/workflows/ci.yml`'e `deploy` job'unun eklenmesi.
+   VPS'teki PAT'ta `workflow` scope olmadığı için workflow dosyası push edilemedi
+   (GitHub reddi). Hazır diff: **`deploy/ci-deploy-job.patch`** — lokal tarafta:
+   ```bash
+   git apply deploy/ci-deploy-job.patch && git add .github/workflows/ci.yml && git commit && git push
+   ```
+   Alternatif: `workflow` scope'lu bir PAT verilirse VPS agent'ı kendisi push'lar.
 
 ## Güvenlik notu
 
