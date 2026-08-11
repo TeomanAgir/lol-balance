@@ -19,12 +19,17 @@ orkestratör oturumu (Teoman'ın PC'si), 2026-08-11.
 
 ### 1. Ön kontrol — cevapları rapor et
 - [ ] Cluster'da Ingress controller hangisi? (nginx/traefik/other) TLS nasıl sağlanıyor
-      (cert-manager var mı)?
+      (cert-manager var mı)? **Host: `lol.teomanagir.com`** (Teoman'ın kararı) —
+      DNS A/AAAA kaydının VPS'e baktığını doğrula, yoksa Teoman'dan iste.
 - [ ] RWO destekleyen bir StorageClass var mı, adı ne? (1 Gi yeter)
-- [ ] Image registry: cluster hangi registry'den çekiyor? Build VPS'te mi yapılacak
-      (docker/podman/kaniko) yoksa hazır image mi push edilecek? Tercihini bildir;
-      repo erişimi gerekiyorsa söyle.
-- [ ] Leaderboard'un servis edileceği hostname/subdomain önerisi (ör. `lol.<domain>`).
+- [ ] **Image kaynağı GHCR'dır, VPS'te build YOK:** GitHub Actions her `main` push'unda
+      `ghcr.io/<github-kullanıcısı>/lol-balance:latest` (+ `sha-...` tag'leri) basar
+      (bkz. `.github/workflows/ci.yml`). Repo private olduğu için paket de private'tır:
+      `read:packages` yetkili bir PAT ile `imagePullSecret` oluştur (PAT'ı Teoman'dan
+      iste; rapora değerini yazma) ve Deployment'a bağla.
+- [ ] Sürekli deploy mekanizması öner ve kur (sonraki aşama, Teoman onayıyla):
+      en hafif seçenek image-watcher (ör. Keel/`imagePullPolicy: Always` + restart
+      cron'u) vs. CI'dan kubeconfig'li `kubectl rollout`. Tercihini gerekçesiyle bildir.
 
 ### 2. Kurulum
 Aşağıdaki manifest iskeleti temel alınabilir; cluster gerçeklerine (ingress class,
@@ -62,7 +67,8 @@ spec:
     spec:
       containers:
         - name: app
-          image: <registry>/lol-balance:<tag>
+          image: ghcr.io/<github-kullanıcısı>/lol-balance:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 8000 }]
           envFrom: [{ secretRef: { name: lol-balance-secrets } }]
           # DB_PATH ve WEBUI_DIR image içinde tanımlı (/data/lol_balance.db, /app/webui)
@@ -77,6 +83,7 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { cpu: "500m", memory: 512Mi }
+      imagePullSecrets: [{ name: ghcr-pull }]   # read:packages PAT'lı secret
       volumes:
         - name: data
           persistentVolumeClaim: { claimName: lol-balance-data }
@@ -89,7 +96,7 @@ spec:
   ports: [{ port: 80, targetPort: 8000 }]
 ---
 # Ingress: cluster'ın kendi kalıbına göre yaz (class, TLS/cert-manager annotation'ları).
-# Host: 1. adımda önerdiğin subdomain. HTTPS ZORUNLU (API key düz metin taşınıyor).
+# Host: lol.teomanagir.com. HTTPS ZORUNLU (API key düz metin taşınıyor).
 ```
 
 ### 3. Yedekleme
@@ -101,18 +108,18 @@ spec:
 
 ### 4. Doğrulama (deploy sonrası, raporuna ekle)
 ```bash
-curl -s https://<host>/                                   # 200, HTML (web UI)
-curl -s https://<host>/api/v1/players                     # 401 (key'siz reddetmeli)
-curl -s -H "X-API-Key: $KEY" https://<host>/api/v1/players # 200, [] (boş liste)
+curl -s https://lol.teomanagir.com/                                   # 200, HTML (web UI)
+curl -s https://lol.teomanagir.com/api/v1/players                     # 401 (key'siz reddetmeli)
+curl -s -H "X-API-Key: $KEY" https://lol.teomanagir.com/api/v1/players # 200, [] (boş liste)
 ```
 - Pod restart testi: pod'u sil, yeniden geldiğinde `schema_migrations`'ın korunduğunu
   (`/api/v1/players` hâlâ 200) doğrula — PVC bağlı mı kanıtı.
 
 ### 5. Geri bildirim — lokal orkestratöre iletilecekler
-1. Public URL (https://<host>)
+1. `https://lol.teomanagir.com`'un yayında olduğu teyidi
 2. API key'in Teoman'a güvenli bir kanaldan iletildiği bilgisi (değeri bu dosyaya/rapora yazma)
 3. 4. adımdaki doğrulama çıktıları
-4. Registry/build kararı ve image tag'i
+4. imagePullSecret kurulumu teyidi + önerdiğin sürekli-deploy mekanizması
 
 Bu bilgiler geldikten sonra lokal tarafta yapılacaklar (bizim işimiz, senin değil):
 collector `.env`'inde `BACKEND_URL` VPS adresine çevrilecek, `--backfill` ile maç
