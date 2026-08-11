@@ -1,5 +1,7 @@
 # Change Requests
 
+- [Teoman → orkestratör] [2026-08-12] **GÖREV 2 (new_modules.md): haftanın enleri ekranı** — haftanın en iyi oyuncusu, "yıldız rukisi" (en fazla rating yükselişi), rol bazında haftanın enleri; tıklayınca profile gider. **Orkestratör tanımları (gösterim seviyesi, teknik):** pencere = son 7 gün (UTC, rolling); pencere boşsa son valid maça çapalanır (`fallback: true`) — ekran veri varken boş kalmaz. En iyi oyuncu = pencerede oynayanlar arasında güncel score; yıldız rukisi = pencere içi ordinal (mu−3σ) artışı (ana evren, blend P_avg terimi karışıklık yaratmasın diye çekirdek delta); rol enleri = o rolde pencerede oynayanlar arasında güncel rol score'u. Deterministik eşitlik kırılımları contract'ta. Yeni endpoint `GET /highlights/weekly` (api_contract §2). DB/rating/collector değişikliği yok.
+
 - [Teoman → orkestratör] [2026-08-12] **GÖREV 1 (new_modules.md): oyuncu profil ekranı** — sıralamada oyuncuya tıklayınca profil; ortalama KDA, W/L, favori karakter, favori koridor, en sinerjili takım arkadaşı. **Orkestratör metrik tanımları (gösterim seviyesi, teknik):** KDA ratio = (ΣK+ΣA)/max(1,ΣD) statlı valid maçlardan; favoriler mod (null'lar hariç, deterministik eşitlik kırılımı); sinerji = aynı takımda ≥2 ortak valid maçta galibiyet oranı (winrate → ortak maç → ad sıralı, ilk 3) — yalnız GÖSTERİMDİR, rating'e girmez; Faz 2 pair-synergy rating modeli kapsam dışı kalmaya devam eder. Yeni endpoint `GET /players/{id}/stats` (api_contract §2). DB/rating/collector değişikliği yok.
 
 Agent'lar contract değişiklik önerilerini buraya ekler. Format:

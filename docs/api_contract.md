@@ -73,6 +73,44 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
 - Hassasiyet: tüm oran/ortalama alanları (`*_avg`, `ratio`, `winrate`) 2 ondalığa
   yuvarlanır; sıralama ve eşitlik kırılımları yuvarlanmamış değerle yapılır.
 
+### Haftanın enleri (GÖREV 2)
+```
+GET /highlights/weekly
+→ 200 {
+  "window": {"start": "2026-08-05T21:00:00Z", "end": "2026-08-12T21:00:00Z",
+             "fallback": false},
+  "best_player":  {"player_id": 3, "display_name": "Konna Netlaka",
+                   "score": 5.5, "matches_in_window": 4} | null,
+  "rising_star":  {"player_id": 7, "display_name": "Fugori",
+                   "delta": 2.31, "matches_in_window": 4} | null,
+  "best_by_role": {
+    "TOP":     {"player_id": 9, "display_name": "SauronunAgzi",
+                "score": 2.9, "matches_in_window": 2} | null,
+    "JUNGLE": "... | null", "MIDDLE": "... | null",
+    "BOTTOM": "... | null", "UTILITY": "... | null"
+  }
+}
+```
+Kurallar (tümü valid maçlar; salt-okur, rating'e etkisi yok):
+- **Pencere:** `end` = şimdi (UTC), `start` = end − 7 gün; maç dahil olma koşulu
+  `start < played_at <= end`. Bu pencerede hiç valid maç yoksa `end` = en son valid
+  maçın `played_at`'i kabul edilir ve `fallback: true` döner (ekran veri varken asla
+  boş kalmaz). Hiç valid maç yoksa üç alan da `null`/`null`'lu döner.
+- **best_player:** pencerede ≥1 maç oynamışlar arasında GÜNCEL `score`
+  (leaderboard değeri) en yüksek olan.
+- **rising_star ("yıldız rukisi"):** pencerede ≥1 maç oynamışlar arasında pencere
+  içi ordinal artışı en yüksek olan: `delta = (mu−3σ) son pencere maçı SONRASI −
+  (mu−3σ) ilk pencere maçı ÖNCESİ` (ana evren `rating_history` satırlarından,
+  aktif engine_version; 2 ondalık). Negatif de olabilir — yine en yüksek döner.
+- **best_by_role:** her rol için pencerede o rolde ≥1 maç oynamışlar
+  (role_rating_history) arasında GÜNCEL rol `score`'u en yüksek olan; o rolde kimse
+  oynamadıysa `null`.
+- Eşitlik kırılımları (hepsinde): ilgili değer azalan → pencere maç sayısı azalan →
+  `display_name` alfabetik.
+- `matches_in_window` = ilgili oyuncunun penceredeki valid maç sayısı (rol
+  kartlarında o roldeki maç sayısı).
+- UI: kartlara tıklanınca oyuncu profiline gider (GÖREV 1 görünümü).
+
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
