@@ -18,7 +18,8 @@
 
   <!-- ═══ Dengeleme ═══ -->
   <section id="view-balance" class="view">
-    <p class="view-hint">Bu gece oynayacak 10 kişiyi seç.</p>
+    <p class="view-hint">Bu gece oynayacak 10 kişiyi seç. Kartın altındaki kutular rol ratingleridir:
+      rol · puan · o roldeki maç sayısı; hiç oynanmamış rol soluk görünür.</p>
     <div id="roster" class="roster-grid" aria-live="polite"></div>
 
     <div id="suggestions" class="suggestions"></div>
@@ -31,6 +32,7 @@
 
   <!-- ═══ Leaderboard ═══ -->
   <section id="view-leaderboard" class="view" hidden>
+    <p class="view-hint">Rol ratinglerini görmek için oyuncu adına dokun.</p>
     <table class="board">
       <thead><tr><th class="rank">#</th><th>Oyuncu</th><th class="num">Puan</th><th class="num">Maç</th></tr></thead>
       <tbody id="board-body"></tbody>
@@ -39,6 +41,8 @@
 
   <!-- ═══ Maç geçmişi ═══ -->
   <section id="view-matches" class="view" hidden>
+    <p class="view-hint">Rol yanlış tahmin edildiyse maç kartındaki "Rolleri düzenle" ile düzelt;
+      yalnız rol evreni yeniden hesaplanır, ana rating değişmez.</p>
     <div id="match-list" class="match-list"></div>
   </section>
 

@@ -66,6 +66,32 @@
     return p ? p.display_name : "#" + id;
   };
 
+  // ── Roller (GÖREV 0) ──────────────────────────────────────────
+  // Sıra contract'taki kanonik sıradır; gösterim her yerde bu sırayı izler.
+  const ROLES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+  const ROLE_TR = { TOP: "Üst", JUNGLE: "Orman", MIDDLE: "Orta", BOTTOM: "Alt", UTILITY: "Destek" };
+  const ROLE_ABBR = { TOP: "ÜST", JUNGLE: "ORM", MIDDLE: "ORT", BOTTOM: "ALT", UTILITY: "DES" };
+  const roleLabel = (pos) => (pos == null ? "—" : ROLE_TR[pos] || pos);
+  const roleOrder = (pos) => { const i = ROLES.indexOf(pos); return i === -1 ? ROLES.length : i; };
+
+  // role_ratings kompakt şeridi. long=true → geniş yerleşim (sıralama tablosu).
+  // matches === 0 olan rol soluk gösterilir (default prior, gerçek veri değil).
+  function roleCells(rr, long = false) {
+    if (!rr) return ""; // backend eski şekli dönüyorsa şerit hiç çizilmez
+    const cells = ROLES.map(r => {
+      const v = rr[r];
+      if (!v || typeof v.score !== "number") return "";
+      const zero = !v.matches;
+      const title = `${ROLE_TR[r]} · ${fmtRating(v.score)} puan · ${v.matches} maç`;
+      return `<div class="role-cell${zero ? " zero" : ""}" title="${title}">
+          <span class="rc-role">${long ? ROLE_TR[r] : ROLE_ABBR[r]}</span>
+          <span class="rc-score">${fmtRating(v.score)}</span>
+          <span class="rc-matches">${v.matches}${long ? " maç" : ""}</span>
+        </div>`;
+    }).join("");
+    return cells ? `<div class="role-strip${long ? " long" : ""}">${cells}</div>` : "";
+  }
+
   // ── API key modalı ────────────────────────────────────────────
   function openKeyModal() {
     $("#key-input").value = state.apiKey;
@@ -112,7 +138,8 @@
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
         `<span class="p-name">${p.display_name}</span>` +
-        `<span class="p-meta">${fmtRating(p.rating.score)} · ${p.matches_played} maç</span>`;
+        `<span class="p-meta">${fmtRating(p.rating.score)} · ${p.matches_played} maç</span>` +
+        roleCells(p.role_ratings);
       card.addEventListener("click", () => {
         if (state.selected.has(p.id)) state.selected.delete(p.id);
         else if (state.selected.size < 10) state.selected.add(p.id);
@@ -149,6 +176,18 @@
     }
   });
 
+  // Dengeleme yanıtı artık rol atamalı: team_100/team_200 = [{player_id, position}].
+  // Eski salt-id şekli gelirse (backend güncellenmemişse) rolsüz gösterilir.
+  const teamEntry = (e) =>
+    (e !== null && typeof e === "object") ? e : { player_id: e, position: null };
+  const teamList = (members, side) =>
+    `<ul class="team ${side}">` +
+    [...members].map(teamEntry)
+      .sort((a, b) => roleOrder(a.position) - roleOrder(b.position))
+      .map(m => `<li><span class="pos-tag">${roleLabel(m.position)}</span>` +
+                `<span class="p-who">${playerName(m.player_id)}</span></li>`)
+      .join("") + "</ul>";
+
   function renderSuggestions(suggestions) {
     const box = $("#suggestions");
     box.innerHTML = "<h2 class='sug-title'>Öneriler</h2>";
@@ -160,12 +199,12 @@
       card.innerHTML =
         (best ? `<div class="best-badge">En dengeli</div>` : "") +
         `<div class="sug-teams">
-           <ul class="team blue">${s.team_100.map(id => `<li>${playerName(id)}</li>`).join("")}</ul>
+           ${teamList(s.team_100, "blue")}
            <div class="sug-mid">
              <div class="quality">%${(s.quality * 100).toFixed(1)}</div>
              <div class="quality-label">denge</div>
            </div>
-           <ul class="team red">${s.team_200.map(id => `<li>${playerName(id)}</li>`).join("")}</ul>
+           ${teamList(s.team_200, "red")}
          </div>
          <div class="winbar" role="img" aria-label="Mavi taraf kazanma olasılığı %${bluePct}">
            <div class="winbar-blue" style="width:${bluePct}%"></div>
@@ -179,15 +218,30 @@
   // ── 2) Leaderboard ────────────────────────────────────────────
   async function loadLeaderboard() {
     const rows = await api("/leaderboard"); // backend score'a göre sıralı döner
-    $("#board-body").innerHTML = rows.map((p, i) => {
+    const body = $("#board-body");
+    body.innerHTML = rows.map((p, i) => {
       const sub = ratingSub(p.rating);
+      const strip = roleCells(p.role_ratings, true);
+      const nameCell = strip
+        ? `<button type="button" class="row-toggle" aria-expanded="false" aria-controls="roles-${p.id}">` +
+          `${p.display_name}<span class="chev" aria-hidden="true">▾</span></button>`
+        : p.display_name;
       return `<tr>
          <td class="rank">${i + 1}</td>
-         <td>${p.display_name}</td>
+         <td>${nameCell}</td>
          <td class="num strong">${fmtRating(p.rating.score)}${sub ? `<span class="rating-sub">${sub}</span>` : ""}</td>
          <td class="num">${p.matches_played}</td>
-       </tr>`;
+       </tr>` +
+       (strip ? `<tr class="board-roles" id="roles-${p.id}" hidden><td></td><td colspan="3">${strip}</td></tr>` : "");
     }).join("");
+
+    body.querySelectorAll(".row-toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = document.getElementById(btn.getAttribute("aria-controls"));
+        target.hidden = !target.hidden;
+        btn.setAttribute("aria-expanded", String(!target.hidden));
+      });
+    });
   }
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
@@ -200,7 +254,8 @@
     for (const m of list) {
       const voided = m.status === "void";
       const teamCol = (team) => {
-        const members = m.participants.filter(p => p.team === team);
+        const members = m.participants.filter(p => p.team === team)
+          .sort((a, b) => roleOrder(a.position) - roleOrder(b.position));
         const won = m.winner_team === team;
         return `<ul class="team ${team === 100 ? "blue" : "red"} ${won ? "won" : ""}">` +
           members.map(p => {
@@ -208,8 +263,28 @@
             const deltaHtml = rc
               ? `<span class="delta ${rc.mu_after - rc.mu_before >= 0 ? "up" : "down"}">${fmtDelta(rc.mu_after - rc.mu_before)}</span>`
               : `<span class="delta none">—</span>`;
-            return `<li>${p.display_name}${deltaHtml}</li>`;
+            return `<li><span class="pos-tag">${roleLabel(p.position)}</span>` +
+                   `<span class="p-who">${p.display_name}</span>${deltaHtml}</li>`;
           }).join("") + "</ul>";
+      };
+      // Rol düzeltme paneli: yalnız DEĞİŞEN roller PUT edilir (kısmi güncelleme serbest).
+      const roleEditor = () => {
+        const rows = [...m.participants]
+          .sort((a, b) => (a.team - b.team) || (roleOrder(a.position) - roleOrder(b.position)))
+          .map(p => {
+            const cur = p.position == null ? "" : p.position;
+            const opts = `<option value=""${cur === "" ? " selected" : ""}>—</option>` +
+              ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${ROLE_TR[r]}</option>`).join("");
+            return `<li class="re-row ${p.team === 100 ? "blue" : "red"}">
+                <span class="p-who">${p.display_name}</span>
+                <select data-player="${p.player_id}" data-original="${cur}"
+                        aria-label="${p.display_name} rolü">${opts}</select>
+              </li>`;
+          }).join("");
+        return `<div class="role-editor" hidden>
+            <ul class="re-list">${rows}</ul>
+            <button class="btn-primary btn-save-roles" type="button">Rolleri Kaydet</button>
+          </div>`;
       };
       const card = document.createElement("article");
       card.className = "match-card" + (voided ? " voided" : "");
@@ -220,8 +295,43 @@
              ? `<span class="void-badge">void</span>`
              : `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? "Mavi" : "Kırmızı"} kazandı</span>`}
          </header>
-         <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>` +
-        (voided ? "" : `<button class="btn-void" type="button">Maçı void yap</button>`);
+         <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>
+         <div class="match-actions">
+           <button class="btn-roles" type="button" aria-expanded="false">Rolleri düzenle</button>
+           ${voided ? "" : `<button class="btn-void" type="button">Maçı void yap</button>`}
+         </div>` +
+        roleEditor();
+
+      const editor = card.querySelector(".role-editor");
+      const btnRoles = card.querySelector(".btn-roles");
+      btnRoles.addEventListener("click", () => {
+        editor.hidden = !editor.hidden;
+        btnRoles.setAttribute("aria-expanded", String(!editor.hidden));
+        btnRoles.textContent = editor.hidden ? "Rolleri düzenle" : "Düzenlemeyi kapat";
+      });
+
+      card.querySelector(".btn-save-roles").addEventListener("click", async (e) => {
+        const positions = {};
+        editor.querySelectorAll("select[data-player]").forEach(sel => {
+          if (sel.value !== sel.dataset.original)
+            positions[sel.dataset.player] = sel.value === "" ? null : sel.value;
+        });
+        if (!Object.keys(positions).length) { toast("Değişen rol yok.", "warn"); return; }
+        const btn = e.target;
+        btn.disabled = true;
+        btn.textContent = "Kaydediliyor…";
+        try {
+          const res = await api(`/matches/${m.id}/positions`, { method: "PUT", body: { positions } });
+          toast(`${res.updated} rol güncellendi · rol evreninde ${res.role_matches_replayed} maç yeniden işlendi.`, "ok");
+          state.roster = []; // rol ratingleri değişti → roster önbelleği geçersiz
+          loadMatches().catch(err => toast(err.message));
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "Rolleri Kaydet";
+          toast(err.message);
+        }
+      });
+
       if (!voided) {
         card.querySelector(".btn-void").addEventListener("click", async (e) => {
           const ok = confirm("Bu maç void işaretlenecek ve tüm rating'ler yeniden hesaplanacak. Bu işlem geri alınamaz. Emin misin?");

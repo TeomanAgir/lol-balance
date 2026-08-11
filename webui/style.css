@@ -72,7 +72,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 /* ── Oyuncu kartları (dengeleme) ── */
 .roster-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
   gap: 10px;
 }
 .player-card {
@@ -99,6 +99,51 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   box-shadow: inset 3px 0 0 var(--brass);
 }
 .player-card.selected .p-meta { color: var(--brass); }
+
+/* ── Rol ratingleri şeridi (role_ratings) ── */
+.role-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.role-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.role-cell.zero { opacity: 0.38; }   /* hiç oynanmamış rol: default prior, gerçek veri değil */
+.rc-role {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.rc-score { font-size: 12px; font-weight: 600; }
+.rc-matches { font-size: 9px; color: var(--muted); }
+.player-card.selected .rc-score { color: var(--brass); }
+
+/* Geniş yerleşim: sıralama tablosundaki açılır satır */
+.role-strip.long {
+  gap: 6px;
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.role-strip.long .role-cell {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 4px;
+}
+.role-strip.long .rc-role { font-size: 10px; text-transform: uppercase; }
+.role-strip.long .rc-score { font-size: 15px; }
+.role-strip.long .rc-matches { font-size: 10px; }
 
 /* ── Yapışkan aksiyon barı ── */
 .action-bar {
@@ -188,6 +233,18 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 }
 .team.blue li { border-left: 3px solid var(--blue); padding-left: 8px; }
 .team.red li { border-left: 3px solid var(--red); padding-left: 8px; }
+/* Rol etiketi + oyuncu adı (dengeleme önerileri ve maç kartları) */
+.team li .p-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-tag {
+  flex: 0 0 auto;
+  min-width: 44px;
+  font-family: var(--display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  align-self: center;
+}
 .sug-mid { text-align: center; }
 .quality {
   font-family: var(--display);
@@ -248,6 +305,18 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   white-space: nowrap;
   margin-top: 2px;
 }
+/* Rol ratinglerini açan satır butonu */
+.row-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-weight: inherit;
+  text-align: left;
+}
+.row-toggle .chev { font-size: 11px; color: var(--muted); transition: transform 0.12s; }
+.row-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); color: var(--brass); }
+.board-roles td { padding-top: 0; }
 
 /* ── Maç geçmişi ── */
 .match-card {
@@ -297,8 +366,8 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--red); }
 .delta.none { color: var(--muted); }
-.btn-void {
-  margin-top: 12px;
+.match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.btn-void, .btn-roles {
   font-size: 13px;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -307,6 +376,40 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   min-height: 40px;
 }
 .btn-void:hover { color: var(--red); border-color: var(--red); }
+.btn-roles:hover { color: var(--brass); border-color: var(--brass-dim); }
+
+/* ── Rol düzeltme paneli (PUT /matches/{id}/positions) ── */
+.role-editor {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.re-list { list-style: none; display: grid; gap: 6px; }
+@media (min-width: 560px) { .re-list { grid-template-columns: 1fr 1fr; column-gap: 12px; } }
+.re-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 8px;
+  font-size: 14px;
+}
+.re-row .p-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.re-row.blue { border-left: 3px solid var(--blue); }
+.re-row.red { border-left: 3px solid var(--red); }
+.re-row select {
+  flex: 0 0 auto;
+  min-height: 40px;
+  min-width: 104px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 8px;
+}
+.btn-save-roles { margin-top: 12px; font-size: 14px; padding: 10px 20px; min-height: 44px; }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
 
 /* ── Manuel giriş ── */
@@ -445,7 +548,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 /* ── Geniş ekran ── */
 @media (min-width: 768px) {
   main { padding: 24px; }
-  .roster-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .roster-grid { grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
