@@ -7,9 +7,14 @@ Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (te
 
 ## 2. Oyuncular
 ```
-GET  /players                      → [{id, display_name, riot_id, matches_played,
+GET  /players                      → [{id, display_name, riot_id, puuid,
+                                       matches_played,
                                        rating: {mu, sigma, ordinal}}]   -- roster listesi; web UI'ın
                                                                         -- seçim ekranının kaynağı
+                                     -- puuid nullable'dır (manuel eklenen oyuncu ilk maçına kadar
+                                     -- NULL). Collector'ın backfill roster filtresi puuid ile
+                                     -- eşleştirir; riot_id değişebilir, puuid kalıcıdır.
+                                     -- (CHANGE_REQUESTS: lcu-collector 2026-08-11)
 POST /players                      → {display_name, riot_id?}  → 201 {id}
                                      -- oyuncuyu ilk maçından önce roster'a eklemek için;
                                      -- ilk maçında puuid, riot_id eşleşmesiyle bu kayda bağlanır
@@ -24,6 +29,26 @@ Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluştu
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
 POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
 ```
+
+`GET /matches` yanıt örneği (CHANGE_REQUESTS: web-ui 2026-08-11 — kanonik şekil budur):
+```json
+[{
+  "id": 42, "source_game_id": "6874231955", "played_at": "2026-08-11T20:41:03Z",
+  "duration_s": 1874, "winner_team": 100, "status": "valid",
+  "participants": [{
+    "player_id": 1, "display_name": "Teoman", "team": 100,
+    "position": "MIDDLE", "champion": "Ahri",
+    "stats": {"kills": 7, "deaths": 2, "assists": 9, "gold": 13250,
+              "cs": 201, "damage_to_champs": 24810, "vision_score": 21},
+    "rating_change": {"mu_before": 25.0, "sigma_before": 8.333,
+                      "mu_after": 26.1, "sigma_after": 7.9}
+  }]
+}]
+```
+- `stats` alanları nullable (ingest_contract ile tutarlı).
+- `rating_change` **nullable**: maç `void` ise veya bu maç için rating satırı yoksa `null` gelir.
+  Rating değişimi düz alan olarak DEĞİL, bu iç nesnede taşınır — `null`, "rating'e girmedi"
+  durumunu ifade edebilmek için gereklidir.
 
 ## 4. Dengeleme (çekirdek özellik)
 ```
