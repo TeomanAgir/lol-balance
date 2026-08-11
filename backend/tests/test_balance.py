@@ -13,7 +13,7 @@ def test_balance_contract_response(client):
     r = client.post("/api/v1/balance", json={"player_ids": ids, "top_n": 3})
     assert r.status_code == 200
     body = r.json()
-    assert body["engine_version"] == "openskill-pl-perf-v1"
+    assert body["engine_version"] == "openskill-pl-blend50-v1"
     assert len(body["suggestions"]) == 3
     for s in body["suggestions"]:
         assert len(s["team_100"]) == 5

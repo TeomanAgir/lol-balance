@@ -58,9 +58,14 @@ class PlayerPatch(BaseModel):
 
 
 class RatingOut(BaseModel):
+    # mu/sigma/ordinal: W/L çekirdeğinin ham değerleri. perf_avg/score harman
+    # engine alanlarıdır (api_contract §2): harman olmayan version'da
+    # perf_avg=None, score=ordinal; alanlar her zaman mevcut.
     mu: float
     sigma: float
     ordinal: float
+    perf_avg: Optional[float]
+    score: float
 
 
 class PlayerOut(BaseModel):

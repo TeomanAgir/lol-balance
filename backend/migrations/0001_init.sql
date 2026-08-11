@@ -50,6 +50,8 @@ CREATE TABLE rating_history (
     engine_version TEXT NOT NULL,               -- ör. 'openskill-pl-v1'
     mu_before  REAL NOT NULL, sigma_before REAL NOT NULL,
     mu_after   REAL NOT NULL, sigma_after  REAL NOT NULL,
+    -- perf_score REAL kolonu 0002_perf_score.sql'de eklenir; buraya EKLEME —
+    -- runner taze kurulumda 0002'yi de koşar ve ALTER "duplicate column" verir.
     UNIQUE (player_id, match_id, engine_version)
 );
 

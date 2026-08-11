@@ -2,6 +2,9 @@
 
 Çarpan matematiğinin kendisi rating paketinde test edilir; buradaki testler
 yalnızca backend'in statları DB'den doğru taşıyıp Engine'e geçirdiğini doğrular.
+
+Default ENGINE_VERSION artık blend50 olduğundan (çarpan YOK), bu dosyadaki
+testler perf-v1'i AÇIKÇA seçer. Blend50 testleri: tests/test_blend_rating.py.
 """
 from __future__ import annotations
 
@@ -81,15 +84,18 @@ def _client(db_path, monkeypatch, engine_version: str | None = None):
         get_settings.cache_clear()
 
 
-def test_good_stats_winner_gains_more_than_bad_stats_winner(client, db):
-    r = client.post(
-        "/api/v1/ingest/match",
-        json=_varied_stats_payload("perf-varied-1", "2026-08-11T20:00:00Z"),
-    )
-    assert r.status_code == 201
-    match_id = r.json()["match_id"]
+def test_good_stats_winner_gains_more_than_bad_stats_winner(tmp_path, monkeypatch):
+    db_path = tmp_path / "perf.db"
+    with _client(db_path, monkeypatch, engine_version="openskill-pl-perf-v1") as c:
+        r = c.post(
+            "/api/v1/ingest/match",
+            json=_varied_stats_payload("perf-varied-1", "2026-08-11T20:00:00Z"),
+        )
+        assert r.status_code == 201
+        match_id = r.json()["match_id"]
 
-    conn = db()
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
 
     def gain(puuid: str) -> float:
         row = conn.execute(
@@ -117,7 +123,7 @@ def test_null_stats_match_identical_to_plain_v1(tmp_path, monkeypatch):
     payload = _null_stats_payload()
 
     db_perf = tmp_path / "perf.db"
-    with _client(db_perf, monkeypatch) as c:  # default = openskill-pl-perf-v1
+    with _client(db_perf, monkeypatch, engine_version="openskill-pl-perf-v1") as c:
         r = c.post("/api/v1/ingest/match", json=payload)
         assert r.status_code == 201
 
@@ -132,7 +138,7 @@ def test_null_stats_match_identical_to_plain_v1(tmp_path, monkeypatch):
     assert rows_perf == rows_v1  # yuvarlama yok: bit-bit aynı olmalı
 
 
-def test_replay_deterministic_with_varied_stats(client, db):
+def test_replay_deterministic_with_varied_stats(tmp_path, monkeypatch):
     """Perf-v1'de statlı maçlar replay'de incremental ile birebir aynı sonucu verir."""
     payloads = [
         _varied_stats_payload("perf-r1", "2026-08-11T20:00:00Z", winner_team=100),
@@ -140,36 +146,26 @@ def test_replay_deterministic_with_varied_stats(client, db):
         _null_stats_payload("manual:perf-r3"),
     ]
     payloads[2]["played_at"] = "2026-08-13T20:00:00Z"
-    for p in payloads:
-        assert client.post("/api/v1/ingest/match", json=p).status_code == 201
 
-    conn = db()
-    versions = {
-        row["engine_version"]
-        for row in conn.execute("SELECT DISTINCT engine_version FROM rating_history")
-    }
-    assert versions == {"openskill-pl-perf-v1"}
-    incremental = [
-        tuple(row)
-        for row in conn.execute(
-            "SELECT player_id, match_id, mu_before, sigma_before,"
-            " mu_after, sigma_after "
-            "FROM rating_history ORDER BY match_id, player_id"
-        )
-    ]
-    assert len(incremental) == 30
+    db_path = tmp_path / "perf.db"
+    with _client(db_path, monkeypatch, engine_version="openskill-pl-perf-v1") as c:
+        for p in payloads:
+            assert c.post("/api/v1/ingest/match", json=p).status_code == 201
 
-    r = client.post("/api/v1/admin/replay")
-    assert r.status_code == 200
-    assert r.json()["matches_replayed"] == 3
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        versions = {
+            row["engine_version"]
+            for row in conn.execute(
+                "SELECT DISTINCT engine_version FROM rating_history"
+            )
+        }
+        assert versions == {"openskill-pl-perf-v1"}
+        incremental = _history_rows(db_path)
+        assert len(incremental) == 30
 
-    conn = db()
-    replayed = [
-        tuple(row)
-        for row in conn.execute(
-            "SELECT player_id, match_id, mu_before, sigma_before,"
-            " mu_after, sigma_after "
-            "FROM rating_history ORDER BY match_id, player_id"
-        )
-    ]
-    assert replayed == incremental
+        r = c.post("/api/v1/admin/replay")
+        assert r.status_code == 200
+        assert r.json()["matches_replayed"] == 3
+
+    assert _history_rows(db_path) == incremental

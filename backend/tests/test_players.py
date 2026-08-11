@@ -22,6 +22,10 @@ def test_create_and_list_with_default_prior(client):
     assert p["rating"]["mu"] == DEFAULT_MU
     assert abs(p["rating"]["sigma"] - DEFAULT_SIGMA) < 1e-9
     assert abs(p["rating"]["ordinal"] - (DEFAULT_MU - 3 * DEFAULT_SIGMA)) < 1e-9
+    # Harman default'ta (blend50): maçsız oyuncu P_avg=1.0 → mu_eff=25 (nötr),
+    # score = 25 - 3*sigma = ordinal.
+    assert p["rating"]["perf_avg"] == 1.0
+    assert abs(p["rating"]["score"] - p["rating"]["ordinal"]) < 1e-9
 
 
 def test_patch_display_name(client):
@@ -46,10 +50,15 @@ def test_matches_played_and_rating_after_ingest(client):
         assert p["puuid"] is not None  # ingest'ten gelen oyuncularda puuid dolu
 
 
-def test_leaderboard_sorted_by_ordinal(client):
+def test_leaderboard_sorted_by_score(client):
+    # api_contract §5: leaderboard score'a göre sıralanır.
     client.post("/api/v1/ingest/match", json=make_payload())
     board = client.get("/api/v1/leaderboard").json()
-    ordinals = [p["rating"]["ordinal"] for p in board]
-    assert ordinals == sorted(ordinals, reverse=True)
-    # Kazanan takım üstte olmalı: winner_team=100 → ilk 5 participant.
+    scores = [p["rating"]["score"] for p in board]
+    assert scores == sorted(scores, reverse=True)
+    # Herkes aynı statlarla oynadı (P_avg ~1 civarı, takım içinde eşit) →
+    # kazanan takım üstte olmalı: winner_team=100 → ilk 5 participant.
     assert board[0]["rating"]["mu"] > DEFAULT_MU
+    for p in board:
+        assert p["rating"]["perf_avg"] is not None
+        assert "score" in p["rating"]

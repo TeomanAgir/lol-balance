@@ -1,0 +1,12 @@
+-- rating_history.perf_score: maç performans skoru (docs/db_schema.md;
+-- docs/rating_contract.md "Harman Engine" §2). Harman engine
+-- (openskill-pl-blend50-v1) P_avg hesabında kullanır; eski version
+-- satırlarında NULL kalır.
+--
+-- NOT: Kolon bilinçli olarak 0001'e EKLENMEDİ. Runner yeni kurulumda tüm
+-- migration'ları sırayla koşar ve SQLite'ta "ADD COLUMN IF NOT EXISTS"
+-- olmadığından, kolon 0001'de de tanımlı olsaydı bu ALTER taze DB'de
+-- "duplicate column" hatasıyla patlardı. Tek kaynak burasıdır: taze kurulum
+-- 0001+0002 ile, mevcut DB yalnız 0002 ile aynı şemaya ulaşır
+-- (bkz. tests/test_migrations.py).
+ALTER TABLE rating_history ADD COLUMN perf_score REAL;

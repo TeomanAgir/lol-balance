@@ -34,6 +34,45 @@ def current_ratings(
     }
 
 
+def perf_averages(
+    conn: sqlite3.Connection, engine_version: str
+) -> dict[int, float]:
+    """Oyuncu id → kariyer performans ortalaması P_avg (harman engine girdisi).
+
+    Yalnız valid maçların, yalnız verilen engine_version'ın satırları sayılır
+    (rating_contract "Harman Engine" §3). AVG, NULL perf_score satırlarını
+    zaten atlar; hiç satırı olmayan oyuncu dict'te YOKTUR — çağıran 1.0
+    (nötr) varsayar.
+    """
+    rows = conn.execute(
+        "SELECT rh.player_id, AVG(rh.perf_score) AS p_avg "
+        "FROM rating_history rh "
+        "JOIN matches m ON m.id = rh.match_id "
+        "WHERE rh.engine_version = ? AND m.status = 'valid' "
+        "GROUP BY rh.player_id",
+        (engine_version,),
+    )
+    return {
+        row["player_id"]: row["p_avg"]
+        for row in rows
+        if row["p_avg"] is not None
+    }
+
+
+def is_blend(engine: Engine) -> bool:
+    """Engine harman (efektif rating) destekliyor mu?
+
+    Rating paketi bunu yalnızca `effective()`ın ValueError'ıyla bildirir;
+    private alana bakmak yerine nötr girdiyle probe edilir (saf fonksiyon,
+    yan etkisiz).
+    """
+    try:
+        engine.effective(25.0, 25.0 / 3.0, 1.0)
+    except ValueError:
+        return False
+    return True
+
+
 def _match_teams(
     conn: sqlite3.Connection, match_id: int
 ) -> tuple[
@@ -95,16 +134,23 @@ def _apply_and_record(
         stats200=stats200,
         duration_s=duration_s,
     )
+    # perf_score her version'da yazılır (kolon nullable, tanımı version'dan
+    # bağımsız); harman engine P_avg'i bu kolondan türetir. Statsız katılımcı
+    # rating paketinde 1.0 (nötr) alır.
+    perf100, perf200 = engine.perf_scores(stats100, stats200, duration_s)
 
-    for player_id, before, after in zip(
-        team100 + team200, before100 + before200, after100 + after200
+    for player_id, before, after, perf in zip(
+        team100 + team200,
+        before100 + before200,
+        after100 + after200,
+        perf100 + perf200,
     ):
         ratings[player_id] = after
         conn.execute(
             "INSERT INTO rating_history "
             "(player_id, match_id, engine_version,"
-            " mu_before, sigma_before, mu_after, sigma_after) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " mu_before, sigma_before, mu_after, sigma_after, perf_score) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 player_id,
                 match_id,
@@ -113,6 +159,7 @@ def _apply_and_record(
                 before.sigma,
                 after.mu,
                 after.sigma,
+                perf,
             ),
         )
 
