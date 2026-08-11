@@ -63,6 +63,8 @@ CREATE TABLE rating_history (
     engine_version TEXT NOT NULL,               -- ör. 'openskill-pl-v1'
     mu_before  REAL NOT NULL, sigma_before REAL NOT NULL,
     mu_after   REAL NOT NULL, sigma_after  REAL NOT NULL,
+    perf_score REAL,                            -- maç performans skoru (migration 0002;
+                                                -- harman engine kullanır, eski satırlarda NULL)
     UNIQUE (player_id, match_id, engine_version)
 );
 

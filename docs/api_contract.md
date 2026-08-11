@@ -9,7 +9,8 @@ Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (te
 ```
 GET  /players                      → [{id, display_name, riot_id, puuid,
                                        matches_played,
-                                       rating: {mu, sigma, ordinal}}]   -- roster listesi; web UI'ın
+                                       rating: {mu, sigma, ordinal,
+                                                perf_avg, score}}]      -- roster listesi; web UI'ın
                                                                         -- seçim ekranının kaynağı
                                      -- puuid nullable'dır (manuel eklenen oyuncu ilk maçına kadar
                                      -- NULL). Collector'ın backfill roster filtresi puuid ile
@@ -21,7 +22,10 @@ POST /players                      → {display_name, riot_id?}  → 201 {id}
                                      -- (bkz. db_schema "Yeni oyuncu")
 PATCH /players/{id}                → kısmi güncelleme (display_name)
 ```
-`ordinal = mu - 3*sigma` (muhafazakâr güç tahmini; leaderboard bu değerle sıralanır).
+`ordinal = mu - 3*sigma` (W/L çekirdeğinin muhafazakâr tahmini). `perf_avg` ve `score`
+harman engine alanlarıdır (bkz. rating_contract.md "Harman Engine"): aktif version
+`openskill-pl-blend50-v1` iken `score` efektif rating'dir ve **leaderboard `score` ile
+sıralanır**; harman olmayan version'larda `perf_avg = null`, `score = ordinal`.
 Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluşturur (bkz. db_schema).
 
 ## 3. Maçlar
@@ -78,7 +82,8 @@ Body: {
 POST /admin/replay                 → tüm rating_history'yi siler, valid maçları
                                      kronolojik sırayla rating engine'den geçirir.
                                      Dönen: {matches_replayed, engine_version}
-GET  /leaderboard                  → ordinal'a göre sıralı oyuncu listesi
+GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
+                                     (harman olmayan version'da score = ordinal)
 ```
 `replay`, engine parametresi/versiyonu değiştiğinde ve `void` işlemlerinden sonra çağrılır. Ingest sırasındaki normal akışta replay DEĞİL, incremental update yapılır (son rating'in üstüne tek maç uygulanır) — replay O(n_maç) olduğundan sadece gerektiğinde koşar.
 
