@@ -6,6 +6,7 @@ import httpx
 from collector.live import LiveRunner
 from collector.sender import Sender
 
+from .conftest import load_fixture
 from .fakes import FakeLcu
 
 NOW = lambda: datetime(2026, 8, 11, 20, 41, 3, tzinfo=timezone.utc)
@@ -57,6 +58,30 @@ def test_dedupe_survives_restart(config, eog_custom, champion_summary):
     fresh_runner = make_runner(config, lcu, sender)
     assert fresh_runner.on_end_of_game() is False
     assert len(sent) == 1
+
+
+def test_played_at_is_game_end_not_processing_time(config, champion_summary):
+    """Geç işleme senaryosu: proses gecikmesi/retry yüzünden maç bitiminden saatler
+    sonra işlenen bir EOG'de bile played_at maçın GERÇEK bitiş anını taşımalı
+    (payload'daki endOfGameTimestamp), yakalama anını değil."""
+    eog = load_fixture("eog_custom_real.json")  # endOfGameTimestamp: 2026-08-11T21:43:20.652Z
+    lcu = FakeLcu(eog=eog, champions=champion_summary)
+    sender, sent = capturing_sender(config)
+    much_later = lambda: datetime(2026, 8, 12, 9, 0, 0, tzinfo=timezone.utc)
+    runner = LiveRunner(config, lcu, sender, sleep=NO_SLEEP, now=much_later)
+
+    assert runner.on_end_of_game() is True
+    assert sent[0]["source_game_id"] == "1734664864"
+    assert sent[0]["played_at"] == "2026-08-11T21:43:20Z"
+
+
+def test_played_at_falls_back_to_now_without_timestamp(config, eog_custom, champion_summary):
+    """Alan taşımayan (eski/sentetik) blokta yakalama anı kullanılmaya devam eder."""
+    lcu = FakeLcu(eog=eog_custom, champions=champion_summary)
+    sender, sent = capturing_sender(config)
+
+    assert make_runner(config, lcu, sender).on_end_of_game() is True
+    assert sent[0]["played_at"] == "2026-08-11T20:41:03Z"
 
 
 def test_non_custom_skipped(config, eog_custom):
