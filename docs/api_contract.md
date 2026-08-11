@@ -41,6 +41,36 @@ Hiç oynanmamış rol default döner (mu=25, sigma=25/3, perf_avg=1.0, score=0.0
 Harman olmayan aktif version'da ana rating kuralının aynısı geçerlidir: `perf_avg = null`,
 `score = mu - 3*sigma` (rol çekirdeğinin ordinal'i). Spec: rating_contract.md "Rol Rating Evreni".
 
+### Oyuncu profili (GÖREV 1)
+```
+GET /players/{id}/stats
+→ 200 {
+  "player": {"id": 3, "display_name": "Teoman", "riot_id": "Teoman#TR1"},
+  "totals": {"matches": 10, "wins": 6, "losses": 4, "winrate": 0.6},
+  "kda": {"kills_avg": 5.2, "deaths_avg": 3.1, "assists_avg": 7.4, "ratio": 4.06},
+  "favorite_champion": {"champion": "Ahri", "matches": 4, "winrate": 0.75},
+  "favorite_role": {"role": "MIDDLE", "matches": 5},
+  "synergy": [
+    {"player_id": 7, "display_name": "Fugori",
+     "matches_together": 5, "wins_together": 4, "winrate": 0.8}
+  ]
+}
+```
+Kurallar (tümü yalnız `status='valid'` maçlar üzerinden; GÖSTERİM istatistiğidir,
+rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dışıdır):
+- `totals`: oyuncunun valid maç sayısı ve W/L; `winrate = wins / matches` (maçsız oyuncuda
+  `matches: 0`, `winrate: null`).
+- `kda`: yalnız kills/deaths/assists ÜÇÜ DE null olmayan maçlardan; `*_avg` maç başına
+  ortalama, `ratio = (ΣK + ΣA) / max(1, ΣD)`. Hiç statlı maç yoksa `kda: null`.
+- `favorite_champion`: champion null olanlar hariç en çok oynanan; eşitlikte ad alfabetik
+  küçük olan; `winrate` o şampiyonla oynanan maçlardaki W/L. Hiç yoksa `null`.
+- `favorite_role`: position null hariç en çok oynanan rol; eşitlikte kanonik sıra
+  (TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY); hiç yoksa `null`.
+- `synergy`: AYNI TAKIMDA birlikte oynanan valid maçlar; en az 2 ortak maç; sıralama
+  winrate azalan → matches_together azalan → display_name alfabetik; en fazla 3 kayıt
+  döner (UI ilkini "en yüksek sinerji" olarak vurgular). Uygun kimse yoksa `[]`.
+- Bilinmeyen oyuncu → `404`.
+
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
