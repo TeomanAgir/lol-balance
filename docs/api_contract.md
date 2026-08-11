@@ -38,7 +38,8 @@ Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluştu
 }
 ```
 Hiç oynanmamış rol default döner (mu=25, sigma=25/3, perf_avg=1.0, score=0.0, matches=0).
-Spec: rating_contract.md "Rol Rating Evreni".
+Harman olmayan aktif version'da ana rating kuralının aynısı geçerlidir: `perf_avg = null`,
+`score = mu - 3*sigma` (rol çekirdeğinin ordinal'i). Spec: rating_contract.md "Rol Rating Evreni".
 
 ## 3. Maçlar
 ```

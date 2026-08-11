@@ -8,3 +8,5 @@ GOREV 2- Haftanin enleri ekrani olacak. Haftanin en iyi oyuncusu (en iyi rating)
 
 GOREV 3- Nemessis ekrani olacak. Koridor ratingleri hesaplandiktan sonra, birbirine karsi en cok oynayan ve en cekismeli (başa baş) maclari cikartan koridor oyunculari nemessiz olarak isaretlenecek. Bu sadece 2 oyuncuyu icerecek ve devamli olarak guncellenecek.
 Nemessis maclari olacak. O haftanin en kapışmalı 2 oyuncusunun yanına 4'er kişi koyup ciddi anlamda sert bir maç oluşturmak için sistem öneri sunacak. Sistem otomatik oldugu icin bu macın sonuclarına gore tekrar ratingler oynayacak zaten.
+
+GOREV IMPOSSIBLE- Proje sonunda bir mobil web appe donusecek ve her kullanicinin kendi hesabi olacak. Insanlar bu aksam lol oynayalim demek icin o uygulamadan aksam lobi kurmaya oy verecekler. Tam bir arkadas ici turniva sistemi olacak.
