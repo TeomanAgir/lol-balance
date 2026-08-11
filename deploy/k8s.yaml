@@ -1,0 +1,151 @@
+# lol-balance — Kubernetes manifests (VPS cluster'a uyarlanmış)
+# Uygulayan: VPS agent, 2026-08-11. Kaynak brief: deploy/VPS_AGENT_BRIEF.md
+# NOT: Secret'lar bu dosyada DEĞİL — imperatif oluşturulur:
+#   kubectl -n lol-balance create secret generic lol-balance-secrets --from-literal=API_KEY=<değer>
+#   kubectl -n lol-balance create secret docker-registry ghcr-pull ... (apps ns'inden kopyalandı)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lol-balance
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lol-balance-data
+  namespace: lol-balance
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lol-balance
+  namespace: lol-balance
+spec:
+  replicas: 1                    # SQLite tek yazar — asla artırma
+  strategy:
+    type: Recreate               # eski pod ölmeden yenisi DB'ye dokunmasın
+  selector:
+    matchLabels:
+      app: lol-balance
+  template:
+    metadata:
+      labels:
+        app: lol-balance
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/teomanagir/lol-balance:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: lol-balance-secrets
+          # DB_PATH ve WEBUI_DIR image içinde tanımlı (/data/lol_balance.db, /app/webui)
+          # ENGINE_VERSION verilmez: image default'u aktif version'dır
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "500m"
+              memory: 512Mi
+      imagePullSecrets:
+        - name: ghcr-pull
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: lol-balance-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lol-balance
+  namespace: lol-balance
+spec:
+  selector:
+    app: lol-balance
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lol-balance
+  namespace: lol-balance
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"   # API key düz metin — HTTPS zorunlu
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: lol.teomanagir.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lol-balance
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - lol.teomanagir.com
+      secretName: lol-balance-tls
+---
+# Günlük SQLite yedeği — aynı PVC'ye /data/backup altına .backup; 7 günden eskiler silinir.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lol-balance-backup
+  namespace: lol-balance
+spec:
+  schedule: "30 3 * * *"         # her gün 03:30 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: alpine:3.20
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache sqlite >/dev/null
+                  mkdir -p /data/backup
+                  sqlite3 /data/lol_balance.db ".backup /data/backup/lol_balance-$(date +%F).db"
+                  find /data/backup -name 'lol_balance-*.db' -mtime +7 -delete
+                  ls -lh /data/backup
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: lol-balance-data
