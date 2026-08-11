@@ -14,10 +14,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Bağımlılıklar
+      - name: Backend bağımlılıkları
+        # requirements.txt './rating' yolunu içerir — backend/ dizininden koşmalı
+        working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Rating (dev) + collector bağımlılıkları
+        run: |
           pip install "backend/rating[dev]"
           pip install -r collector/requirements.txt
       - name: Rating testleri
