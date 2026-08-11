@@ -83,13 +83,13 @@ challenge'ı kendiliğinden geçti, elle müdahale gerekmedi.
    - ufw'de **6443/tcp açıldı** (GitHub runner'ları API server'a erişebilsin; TLS + token
      + dar RBAC ile korunuyor. GitHub IP aralıkları değişken olduğundan IP kısıtı pratik değil).
 
-   ⚠️ **Kalan tek adım:** `.github/workflows/ci.yml`'e `deploy` job'unun eklenmesi.
-   VPS'teki PAT'ta `workflow` scope olmadığı için workflow dosyası push edilemedi
-   (GitHub reddi). Hazır diff: **`deploy/ci-deploy-job.patch`** — lokal tarafta:
-   ```bash
-   git apply deploy/ci-deploy-job.patch && git add .github/workflows/ci.yml && git commit && git push
-   ```
-   Alternatif: `workflow` scope'lu bir PAT verilirse VPS agent'ı kendisi push'lar.
+   ✅ **TAMAMLANDI (2026-08-11):** `deploy` job'u Teoman'ın verdiği `workflow` scope'lu
+   PAT ile push'landı (`8d2ca7b`; PAT tek seferlik kullanıldı, hiçbir yere kaydedilmedi —
+   iptal edilebilir). İlk canlı koşu (run 31529166564): **test ✓ → image ✓ → deploy ✓**.
+   Kanıt: pod `lol-balance-7494dbc5f6-mnrgk` (19:28) → `lol-balance-6f7c94494c-fz6xw`
+   (19:43, CI deploy anı), image digest `58080e6f…` → `576bab70…` (yeni build çekildi),
+   site 200. 6443'ün GitHub runner'larından erişilebilirliği de bu koşuyla doğrulanmış oldu.
+   Artık her main push'u otomatik olarak canlıya çıkar.
 
 ## Güvenlik notu
 
