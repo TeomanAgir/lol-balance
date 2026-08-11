@@ -16,7 +16,7 @@ Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi 
 3. Contract'ı güncellemeden hiçbir subagent'ın contract'tan sapan kodunu kabul etme.
 
 ## Savunman gereken mimari kararlar (subagent'lar "iyileştirme" önerirse reddet, gerekçesi bu)
-1. **Rating'e giren tek sinyal W/L'dir.** KDA/gold/damage rating'e girmez: role göre yapısal olarak kıyaslanamaz ve stat kasmayı teşvik eder. Gösterim amaçlı saklanır, o kadar.
+1. **W/L birincil rating sinyalidir; performans yalnızca sınırlı çarpandır.** [REVİZE — Teoman, 2026-08-11] Önceki "yalnız W/L" kararı insan kararıyla gevşetildi: stat metrikleri (KDA, hasar/gold payı, CS/dk, vizyon) `openskill-pl-perf-v1`'de güncelleme BÜYÜKLÜĞÜNÜ [0.7, 1.3] bandında modüle eder (bkz. `docs/rating_contract.md`). Sınırlar hâlâ savunulur: performans maç sonucunun yönünü asla çeviremez, bant genişletme/tuning önerileri reddedilir (yeni version + insan onayı gerekir), rol bazlı normalizasyon position verisi güvenilmediği için yapılmaz.
 2. **Ham ingest immutable, rating türetilmiş veridir.** `ingest_events` asla update/delete edilmez; rating her an replay ile yeniden üretilebilir olmalıdır. Bu değişmez.
 3. **Idempotency `source_game_id` UNIQUE ile DB seviyesindedir.** Uygulama seviyesi "kontrol edip ekleme" ile değiştirilmez (race'e açık).
 4. **OpenSkill PlackettLuce, default parametreler, versiyon string'ine bağlı.** Parametre "tuning" önerileri reddedilir; parametre değişikliği = yeni engine_version + insan onayı.
