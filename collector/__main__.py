@@ -2,6 +2,7 @@
 
 Canlı mod:   python -m collector
 Backfill:    python -m collector --backfill [--since YYYY-MM-DD]
+Rol backfill: python -m collector backfill-positions [--dry-run]
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import time
 from datetime import date
 
 from .backfill import run_backfill
+from .backfill_positions import run_position_backfill
 from .config import load_config
 from .lcu import HttpLcuClient
 from .live import LcuConnectionLost, LiveRunner
@@ -34,10 +36,15 @@ def _parse_since(value: str) -> date:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="collector", description="LoL custom maç toplayıcı")
+    parser.add_argument("command", nargs="?", choices=["backfill-positions"], default=None,
+                        help="backfill-positions: raw_archive'daki maçların rollerini "
+                             "tahmin edip backend'e yazar")
     parser.add_argument("--backfill", action="store_true",
                         help="Match history'yi geriye tara (roster filtresiyle)")
     parser.add_argument("--since", type=_parse_since, default=None, metavar="YYYY-MM-DD",
                         help="Backfill'de bu tarihten eski maçlara bakma")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="backfill-positions: ne gönderileceğini yazdır, gönderme")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -47,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     config = load_config()
+
+    if args.command == "backfill-positions":
+        # LCU'ya ihtiyaç yok: kaynak raw_archive, hedef backend.
+        stats = run_position_backfill(config, dry_run=args.dry_run)
+        return 0 if not stats.errors else 1
+
     sender = Sender(config)
 
     if args.backfill:
