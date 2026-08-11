@@ -1,0 +1,5 @@
+# Paketleme (GÖREV 5) — build çıktıları ve build venv'i repo'ya girmez
+packaging/.build_venv/
+packaging/build/
+packaging/dist/
+packaging/*.spec.bak

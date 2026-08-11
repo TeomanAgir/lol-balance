@@ -298,6 +298,9 @@ def test_cli_wiring(config, monkeypatch, dry_run):
 
     monkeypatch.setattr(cli, "load_config", lambda: config)
     monkeypatch.setattr(cli, "run_position_backfill", fake_run)
+    # GÖREV 5: CLI artık .env kontrolü + backend ön-doğrulaması yapıyor; testte ikisi de devre dışı
+    monkeypatch.setattr(cli, "_ensure_env", lambda force_setup=False: None)
+    monkeypatch.setattr(cli, "report_backend_check", lambda url, key: None)
 
     argv = ["backfill-positions"] + (["--dry-run"] if dry_run else [])
     assert cli.main(argv) == 0
