@@ -20,7 +20,7 @@ def _player_list(
     default = Engine(version=engine_version).default_rating()
     ratings = current_ratings(conn, engine_version)
     rows = conn.execute(
-        "SELECT p.id, p.display_name, p.riot_id,"
+        "SELECT p.id, p.display_name, p.riot_id, p.puuid,"
         " (SELECT COUNT(*) FROM match_participants mp"
         "  JOIN matches m ON m.id = mp.match_id"
         "  WHERE mp.player_id = p.id AND m.status = 'valid') AS matches_played "
@@ -34,6 +34,7 @@ def _player_list(
                 id=row["id"],
                 display_name=row["display_name"],
                 riot_id=row["riot_id"],
+                puuid=row["puuid"],
                 matches_played=row["matches_played"],
                 rating=RatingOut(mu=r.mu, sigma=r.sigma, ordinal=r.ordinal),
             )

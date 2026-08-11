@@ -17,6 +17,7 @@ def test_create_and_list_with_default_prior(client):
     assert p["id"] == pid
     assert p["display_name"] == "Teo"
     assert p["riot_id"] == "Teoman#TR1"
+    assert p["puuid"] is None  # manuel oluşturulan oyuncuda puuid ilk maça kadar NULL
     assert p["matches_played"] == 0
     assert p["rating"]["mu"] == DEFAULT_MU
     assert abs(p["rating"]["sigma"] - DEFAULT_SIGMA) < 1e-9
@@ -42,6 +43,7 @@ def test_matches_played_and_rating_after_ingest(client):
     for p in players:
         assert p["matches_played"] == 1
         assert p["rating"]["mu"] != DEFAULT_MU
+        assert p["puuid"] is not None  # ingest'ten gelen oyuncularda puuid dolu
 
 
 def test_leaderboard_sorted_by_ordinal(client):

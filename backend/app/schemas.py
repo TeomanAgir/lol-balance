@@ -67,6 +67,7 @@ class PlayerOut(BaseModel):
     id: int
     display_name: str
     riot_id: Optional[str]
+    puuid: Optional[str]
     matches_played: int
     rating: RatingOut
 
