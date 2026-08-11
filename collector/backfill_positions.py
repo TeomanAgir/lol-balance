@@ -3,7 +3,11 @@
 `python -m collector backfill-positions [--dry-run]`
 
 Akış:
-1. `raw_archive/*.json` içindeki her ham maç için `role_infer` zinciri koşulur.
+1. `raw_archive/*.json` içindeki her ham maç için roller çözülür
+   (`normalizer.positions_from_raw`: açık `selectedPosition` alanı kazanır, yoksa
+   `role_infer` kısıt zinciri). Arşivde iki format bulunur — backfill'den gelen
+   match-history kaydında açık alan yoktur (zincir koşar), canlı EOG bloğunda
+   vardır (10/10 rol doğrudan okunur).
 2. `GET /api/v1/matches` ile `source_game_id → match.id` eşlenir.
 3. `GET /api/v1/players` ile `puuid → player_id` eşlenir (api_contract §2).
 4. `PUT /api/v1/matches/{id}/positions` ile `{"positions": {"<player_id>": "ROL"}}`
@@ -25,7 +29,7 @@ from typing import Any, Optional
 import httpx
 
 from .config import Config
-from .role_infer import infer_positions
+from .normalizer import positions_from_raw
 
 log = logging.getLogger("collector.backfill_positions")
 
@@ -155,7 +159,7 @@ def run_position_backfill(
             stats.matched += 1
 
             positions: dict[str, str] = {}
-            for key, role in infer_positions(raw).items():
+            for key, role in positions_from_raw(raw).items():
                 if role is None:
                     stats.unresolved += 1
                     continue

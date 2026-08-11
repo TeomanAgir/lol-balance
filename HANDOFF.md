@@ -29,10 +29,12 @@ aktif değil. Sabitler version'a dondurulmuş — tuning = yeni version + Teoman
 
 ## Açık maddeler
 
-1. **Canlı EOG doğrulaması** (Faz 1'in son maddesi): normalizer'ın EOG yolu hâlâ
-   sentetik fixture'la test ediliyor (match-history yolu gerçek veriyle kanıtlı).
-   İlk custom gecesinde collector `collector/raw_archive/{gameId}.json` yazacak;
-   o dosya fixture yapılıp EOG yolu doğrulanmalı.
+1. ~~**Canlı EOG doğrulaması**~~ **KAPANDI (2026-08-12):** İlk gerçek custom gecesi
+   (gameId 1734664864) canlı EOG hattı uçtan uca insansız çalıştı; payload
+   `collector/fixtures/eog_custom_real.json` yapılıp EOG yolu 12 regresyon testiyle
+   gerçek şemaya kilitlendi. Bulgular: gerçek EOG'de `selectedPosition` dolu geliyor
+   (rol tahmini canlıda gerekmedi); `played_at` artık `endOfGameTimestamp`'ten
+   (CHANGE_REQUESTS 2026-08-12).
 2. **ERTELENDİ (Teoman):** sıra-dışı ingest'te backend auto-replay — çoklu-PC
    kurulumu gündeme gelince (bkz. CHANGE_REQUESTS).
 3. Kozmetik: webui mock'unda `puuid` alanı yok; CI action'larında Node 20

@@ -13,6 +13,8 @@ import pytest
 
 from collector.backfill_positions import run_position_backfill
 
+from .conftest import load_fixture
+
 # Riot'un custom'da tipik etiketleri: TOP etiketi yok, ormancı Smite ile bulunur
 LANES = [
     ("JUNGLE", "NONE"), ("JUNGLE", "NONE"), ("MIDDLE", "SOLO"),
@@ -100,6 +102,62 @@ def test_sends_inferred_positions(config):
     }
     assert stats.matched == 1 and stats.updated == 1 and stats.positions_sent == 10
     assert stats.errors == [] and stats.unmatched_matches == []
+
+
+def eog_players(raw):
+    """EOG arşivindeki 10 oyuncu (takım sırasıyla)."""
+    return [p for team in raw["teams"] for p in team["players"]]
+
+
+def test_eog_archive_uses_explicit_selected_position(config):
+    """Canlı EOG arşivi (teams[].players[]) açık `selectedPosition` taşır →
+    10/10 rol gönderilir. Tahmin zinciri tek başına burada yalnızca Smite'çıyı
+    (takım başına 1 JUNGLE) çözebilirdi; açık alan kazanır."""
+    raw = load_fixture("eog_custom_real.json")  # gameId 1734664864
+    write_archive(config, raw)
+    players = {p["puuid"]: pid for pid, p in enumerate(eog_players(raw), start=1)}
+    matches = [{
+        "id": 42, "source_game_id": "1734664864", "status": "valid",
+        "participants": [{"player_id": pid} for pid in players.values()],
+    }]
+    transport, calls = backend(matches, players)
+
+    stats = run_position_backfill(config, transport=transport)
+
+    body = json.loads(put_requests(calls)[0].content)
+    assert body["positions"] == {
+        str(players[p["puuid"]]): p["selectedPosition"] for p in eog_players(raw)
+    }
+    assert len(body["positions"]) == 10
+    assert stats.matched == 1 and stats.updated == 1 and stats.positions_sent == 10
+    assert stats.unresolved == 0 and stats.unknown_players == 0 and stats.errors == []
+    # her takımda 5 farklı rol
+    for team_slice in (slice(0, 5), slice(5, 10)):
+        sent_roles = [body["positions"][str(players[p["puuid"]])]
+                      for p in eog_players(raw)[team_slice]]
+        assert sorted(sent_roles) == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+
+def test_eog_archive_without_explicit_position_falls_back_to_inference(config):
+    """Açık alan boş/geçersizse (eski LCU sürümü) zincir devreye girer: EOG'de
+    lane/role olmadığından yalnızca Smite taşıyanlar JUNGLE olarak gider."""
+    raw = load_fixture("eog_custom_real.json")
+    for p in eog_players(raw):
+        p["selectedPosition"] = "NONE"
+    write_archive(config, raw)
+    players = {p["puuid"]: pid for pid, p in enumerate(eog_players(raw), start=1)}
+    matches = [{
+        "id": 42, "source_game_id": "1734664864", "status": "valid",
+        "participants": [{"player_id": pid} for pid in players.values()],
+    }]
+    transport, calls = backend(matches, players)
+
+    stats = run_position_backfill(config, transport=transport)
+
+    body = json.loads(put_requests(calls)[0].content)
+    assert set(body["positions"].values()) == {"JUNGLE"}
+    assert len(body["positions"]) == 2  # takım başına 1 Smite taşıyıcı
+    assert stats.unresolved == 8
 
 
 def test_dry_run_sends_nothing(config):

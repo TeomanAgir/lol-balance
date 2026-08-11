@@ -256,11 +256,21 @@ def resolved_by_team(raw) -> dict[int, list]:
 
 @pytest.fixture(scope="module")
 def archives():
-    """10 gerçek custom maç (raw_archive/). CI'da arşiv olmayabilir → skip."""
+    """10 gerçek custom maç (raw_archive/), MATCH-HISTORY formatında olanlar.
+
+    `raw_archive/` iki farklı format barındırır: backfill match-history kaydı
+    (`participants` + `participantIdentities`) ve canlı EOG bloğu
+    (`teams[].players[]`). Buradaki ölçüm testleri match-history zincirini
+    (lane/role etiketleri) sabitler, bu yüzden EOG kayıtları elenir — EOG yolu
+    `tests/test_real_fixtures.py::TestNormalizeRealEog` ile kilitlenmiştir.
+    CI'da arşiv olmayabilir → skip.
+    """
     files = sorted(RAW_ARCHIVE_DIR.glob("*.json")) if RAW_ARCHIVE_DIR.is_dir() else []
-    if not files:
-        pytest.skip("collector/raw_archive/ boş — gerçek maç verisi yok")
-    return [json.loads(f.read_text(encoding="utf-8")) for f in files]
+    raws = [json.loads(f.read_text(encoding="utf-8")) for f in files]
+    match_history = [r for r in raws if r.get("participantIdentities")]
+    if not match_history:
+        pytest.skip("collector/raw_archive/ boş — gerçek match-history verisi yok")
+    return match_history
 
 
 class TestRealArchive:

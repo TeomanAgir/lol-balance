@@ -69,6 +69,59 @@ def normalize_position(value: Any) -> Optional[str]:
     return upper if upper in VALID_POSITIONS else None
 
 
+def _explicit_position(raw_player: dict[str, Any]) -> Optional[str]:
+    """Bir katılımcının AÇIK position alanı (tahmin yok)."""
+    return normalize_position(raw_player.get("selectedPosition") or raw_player.get("position"))
+
+
+def _explicit_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
+    """Ham maçtaki açık position alanları → `{key: rol}`.
+
+    Anahtarlama `role_infer.infer_positions` ile BİREBİR aynıdır (puuid varsa
+    puuid, yoksa participantId/index) — iki sözlük bu sayede birleştirilebilir.
+    """
+    explicit: dict[Any, Optional[str]] = {}
+
+    if raw.get("participants"):  # match-history formatı
+        identities: dict[int, dict[str, Any]] = {}
+        for identity in raw.get("participantIdentities") or []:
+            try:
+                identities[int(identity.get("participantId", -1))] = identity.get("player") or {}
+            except (TypeError, ValueError):
+                continue
+        for index, p in enumerate(raw["participants"]):
+            try:
+                participant_id = int(p.get("participantId", index))
+            except (TypeError, ValueError):
+                participant_id = index
+            player = identities.get(participant_id, {})
+            key = player.get("puuid") or p.get("puuid") or participant_id
+            explicit[key] = _explicit_position(p)
+        return explicit
+
+    index = 0  # EOG formatı
+    for team in raw.get("teams") or []:
+        for player in team.get("players") or []:
+            explicit[player.get("puuid") or index] = _explicit_position(player)
+            index += 1
+    return explicit
+
+
+def positions_from_raw(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
+    """Ham maç (EOG veya match-history) → `{key: rol veya None}`.
+
+    Öncelik kuralı TEK YERDE burada durur: **açık position alanı kazanır**, yoksa
+    `role_infer` kısıt zincirinin sonucu kullanılır, o da çözemezse None kalır
+    (tahmin ZORLANMAZ — GÖREV 0). `normalize_eog`, `normalize_match_history_game`
+    ve `backfill_positions` aynı sonucu almak için bu fonksiyonu kullanır.
+    """
+    resolved = dict(infer_positions(raw))
+    for key, position in _explicit_positions(raw).items():
+        if position:
+            resolved[key] = position
+    return resolved
+
+
 def _riot_id(gamename: Any, tagline: Any, fallback_name: Any = None) -> Optional[str]:
     if gamename and tagline:
         return f"{gamename}#{tagline}"
@@ -107,6 +160,26 @@ def is_custom(raw: dict[str, Any]) -> bool:
     return False
 
 
+def eog_end_datetime(raw: dict[str, Any]) -> Optional[datetime]:
+    """EOG bloğundaki `endOfGameTimestamp` (epoch ms) → maçın gerçek bitiş anı.
+
+    Gerçek LCU EOG payload'ı bu alanı taşır (bkz. `fixtures/eog_custom_real.json`);
+    yakalama anından (`captured_at`) bağımsız olduğu için geç işlemede (retry,
+    outbox, proses gecikmesi) `played_at`'in kaymasını engeller. Alan yoksa/bozuksa
+    None döner ve çağıran `captured_at`'e düşer.
+
+    Match-history kayıtlarında bu alan YOKTUR (gerçek fixture'da da yok); orada
+    zaman `gameCreationDate + gameDuration` ile zaten mutlak olarak hesaplanır.
+    """
+    epoch_ms = raw.get("endOfGameTimestamp")
+    if epoch_ms is None:
+        return None
+    try:
+        return datetime.fromtimestamp(int(epoch_ms) / 1000, tz=timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
 def game_creation_datetime(raw: dict[str, Any]) -> Optional[datetime]:
     iso = raw.get("gameCreationDate")
     if isinstance(iso, str) and iso:
@@ -129,7 +202,12 @@ def normalize_eog(
     captured_at: datetime,
     champion_map: dict[int, str] | None = None,
 ) -> MatchPayload:
-    """EOG stats block → contract. `captured_at`: maçın yakalandığı an (≈ bitiş anı)."""
+    """EOG stats block → contract.
+
+    `captured_at`: maçın yakalandığı an. `played_at` için YEDEKTİR — payload
+    `endOfGameTimestamp` taşıyorsa (gerçek LCU şeması taşır) maçın gerçek bitiş
+    anı kullanılır; böylece geç işlemede (retry/outbox) zaman kaymaz.
+    """
     game_id = raw.get("gameId")
     if not game_id:
         raise NormalizeError("EOG bloğunda gameId yok")
@@ -141,9 +219,9 @@ def normalize_eog(
     teams = raw.get("teams") or []
     winner_team: Optional[int] = None
     participants: list[Participant] = []
-    # Açık position yoksa kullanılacak kısıt-çözümlü rol tahmini (GÖREV 0).
+    # Açık position kazanır, yoksa kısıt-çözümlü rol tahmini (GÖREV 0).
     # `views_from_eog` ile aynı sırada gezildiğimiz için index anahtarı tutar.
-    inferred = infer_positions(raw)
+    resolved_positions = positions_from_raw(raw)
     player_index = 0
 
     for team in teams:
@@ -172,10 +250,7 @@ def normalize_eog(
                     ),
                     team=int(player.get("teamId") or team_id),
                     # Açık position varsa o kazanır; yoksa kısıt-çözümlü tahmin
-                    position=normalize_position(
-                        player.get("selectedPosition") or player.get("position")
-                    )
-                    or position_for(inferred, puuid, index_key),
+                    position=position_for(resolved_positions, puuid, index_key),
                     champion=champion or None,
                     stats=_extract_stats(player.get("stats") or {}),
                 )
@@ -186,7 +261,7 @@ def normalize_eog(
 
     return MatchPayload(
         source_game_id=str(game_id),
-        played_at=to_utc_z(captured_at),
+        played_at=to_utc_z(eog_end_datetime(raw) or captured_at),
         duration_s=_duration_seconds(duration_raw),
         winner_team=winner_team,
         participants=participants,
@@ -258,7 +333,8 @@ def normalize_match_history_game(
     for identity in raw.get("participantIdentities") or []:
         identities[int(identity.get("participantId", -1))] = identity.get("player") or {}
 
-    inferred = infer_positions(raw)  # kısıt-çözümlü rol tahmini (GÖREV 0)
+    # açık position kazanır, yoksa kısıt-çözümlü rol tahmini (GÖREV 0)
+    resolved_positions = positions_from_raw(raw)
 
     participants: list[Participant] = []
     for p in raw.get("participants") or []:
@@ -283,8 +359,7 @@ def normalize_match_history_game(
                 # timeline.lane tek başına custom'larda güvenilmez (Riot tahmini);
                 # açık position alanı varsa O kazanır, yoksa Smite + lane/role
                 # kısıt zincirinin sonucu kullanılır — belirsizse null kalır.
-                position=normalize_position(p.get("selectedPosition") or p.get("position"))
-                or position_for(inferred, puuid, participant_id),
+                position=position_for(resolved_positions, puuid, participant_id),
                 champion=champion,
                 stats=_extract_stats(p.get("stats") or {}),
             )

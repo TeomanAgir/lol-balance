@@ -38,10 +38,16 @@ py -m collector
 
 - `gameflow-phase`'i poll'lar; `EndOfGame` fazına **geçişte** bir kez tetiklenir
   (aynı maç için gameId ile dedupe — restart'a dayanıklı, `raw_archive/` üzerinden).
-- Yalnızca custom maçlar gönderilir (`gameType == "CUSTOM_GAME"` / `queueId == 0`);
-  normal/ranked maçlar sessizce atlanır. Canlı modda roster filtresi **yoktur**;
+- Yalnızca custom maçlar gönderilir. Karar `gameType == "CUSTOM_GAME"` ile verilir;
+  `queueId == 0` yalnızca fallback'tir ve **gerçek veride güvenilmezdir** (canlı EOG
+  bloğunda `queueId` alanı hiç gelmez ve `queueType` "NORMAL" yazar; match-history
+  liste sayfasında custom'lar 3110/3100/3130 gibi queueId'lerle döner).
+  Normal/ranked maçlar sessizce atlanır. Canlı modda roster filtresi **yoktur**;
   yanlışlıkla yakalanan bir custom, web UI'dan void edilebilir.
 - Ham EOG payload'ı her durumda `collector/raw_archive/{gameId}.json` olarak saklanır.
+- `played_at` maçın **gerçek bitiş anıdır**: payload'daki `endOfGameTimestamp`'ten okunur
+  (gerçek LCU şeması bu alanı taşır). Böylece proses gecikmesi, outbox retry ya da geç
+  işleme maç zamanını kaydırmaz. Alan gelmeyen eski sürümlerde yakalama anına düşülür.
 - Client kapalıysa bekler, bağlantı koparsa yeniden bağlanır.
 
 ### Backfill modu
@@ -78,8 +84,11 @@ py -m collector backfill-positions --dry-run   # ne gönderileceğini göster
 py -m collector backfill-positions             # backend'e yaz
 ```
 
-`raw_archive/` altındaki **daha önce toplanmış** maçların rollerini tahmin edip canlı
-backend'e yazar (LCU client'a ihtiyaç duymaz). Akış: her ham maç için rol tahmini →
+`raw_archive/` altındaki **daha önce toplanmış** maçların rollerini çözüp canlı
+backend'e yazar (LCU client'a ihtiyaç duymaz). Arşivde iki format bulunur ve ikisi de
+desteklenir: backfill'den gelen match-history kaydında açık position alanı yoktur
+(tahmin zinciri koşar), canlı EOG bloğunda vardır (`selectedPosition` doğrudan okunur,
+10/10 rol). Akış: her ham maç için rol çözümü →
 `GET /matches` ile `source_game_id → match.id` → `GET /players` ile `puuid → player_id`
 → `PUT /matches/{id}/positions`. Sadece çözülebilen roller gönderilir (kısmi güncelleme),
 `null` kalanlar gönderilmez; böylece web UI'dan elle düzeltilmiş bir rol ezilmez.
@@ -111,12 +120,18 @@ adaylar havuzda kalır — **tahmin zorlanmaz**. Kısmi sonuç geçerlidir; eksi
 roller web UI'daki maç detayından düzeltilir (`PUT /matches/{id}/positions`).
 
 - Ham veride **açık** bir position alanı (`selectedPosition`/`position`) varsa o kazanır.
+  Bu öncelik kuralı tek yerde, `normalizer.positions_from_raw()` içinde durur; hem
+  normalize yolu hem `backfill-positions` onu kullanır.
 - 10 gerçek maçta ölçüm: 20 takımın **19'u** 5/5 çözüldü (**98/100 pozisyon**), 20/20
   Smite taşıyıcısı doğru JUNGLE. Tek istisna 1734450310 / takım 200: kalan iki oyuncunun
   ikisi de `TOP/DUO` etiketli, ayırt edilemez → MIDDLE ve TOP null (bkz.
   `tests/test_role_infer.py`, ölçüm testle sabitlenmiştir).
-- EOG bloğunda lane/role alanı yoktur → canlı modda genelde yalnızca JUNGLE çözülür;
-  aynı maç match-history üzerinden (`--backfill` / `backfill-positions`) tam çözülür.
+- EOG bloğunda lane/role alanı yoktur → tahmin zinciri orada yalnızca JUNGLE'ı çözer.
+  Ancak **gerçek EOG bloğu açık `selectedPosition` alanı taşır** (2026-08-11 tarihli
+  canlı maç 1734664864'te 10/10 dolu ve `detectedTeamPosition` ile tutarlı), bu yüzden
+  canlı modda pozisyonlar pratikte tahmine hiç düşmeden tam gelir; zincir yalnızca
+  emniyet ağıdır. Match-history yolunda (`--backfill` / `backfill-positions`) açık alan
+  yoktur, orada zincir çalışır.
 
 ## Teslimat garantisi (outbox)
 
@@ -147,10 +162,17 @@ sorunu giderdikten sonra dosyayı `outbox/`'a geri taşıyarak yeniden deneyebil
   yakalayabilir. Tam kapsam için grubun düzenli oynayan **2-3 oyuncusunun PC'sine**
   kurulması önerilir — idempotency sayesinde aynı maçın birden çok PC'den gönderilmesi
   güvenlidir, çift kayıt oluşmaz.
-- **Canlı doğrulama:** LCU endpoint'leri ve alan adları patch'lerde değişebilir.
-  Yeni bir kurulumda ilk custom maçtan sonra `raw_archive/`'daki ham JSON'a bakıp alan
-  adlarının `collector/fixtures/` örnekleriyle uyuştuğunu doğrulayın; normalizer hem
-  eski `UPPER_SNAKE` hem yeni `camelCase` stat anahtarlarını dener.
+- **Canlı doğrulama (TAMAMLANDI):** EOG yolu 2026-08-11 gecesi oynanan gerçek custom
+  maçla (gameId **1734664864**) uçtan uca doğrulandı: 10/10 pozisyon, 7/7 stat alanı,
+  kazanan takım ve süre doğru işlendi. Ham payload `fixtures/eog_custom_real.json`
+  olarak dondurularak `tests/test_real_fixtures.py::TestNormalizeRealEog` ile regresyona
+  kapatıldı. Match-history yolu daha önce `mh_game_custom_real.json` (gameId 1734450310)
+  ile doğrulanmıştı. Artık **bekleyen canlı doğrulama yoktur**.
+- **Patch kırılganlığı:** LCU endpoint'leri ve alan adları patch'lerde yine de
+  değişebilir. Yeni bir kurulumda ilk custom maçtan sonra `raw_archive/`'daki ham JSON'a
+  bakıp alan adlarının `collector/fixtures/*_real.json` örnekleriyle uyuştuğunu
+  doğrulayın; normalizer hem eski `UPPER_SNAKE` hem yeni `camelCase` stat anahtarlarını
+  dener. Uyuşmazlık görürseniz yeni ham maçı fixture olarak ekleyip testi çoğaltın.
 - Nadir bir pencerede (maç arşivlendi ama gönderim öncesi proses öldü) canlı maç
   atlanmış olabilir; `--backfill` bu boşluğu telafi eder.
 
@@ -163,6 +185,20 @@ LCU'ya bağımlı her şey `LcuClient` interface'inin arkasında; testler
 cd lol-balance
 py -m pytest collector -q
 ```
+
+Fixture'lar iki sınıftır:
+
+| Dosya | Ne belgeler |
+|---|---|
+| `eog_custom.json`, `mh_game_custom.json`, ... | **sentetik** — yapıyı ve uç durumları (eksik stat, ms süre, dengesiz takım) belgeler |
+| `eog_custom_real.json` (gameId 1734664864) | **gerçek** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu |
+| `mh_game_custom_real.json` (gameId 1734450310) | **gerçek** match-history kaydı: camelCase statlar, açık position yok |
+| `mh_list_page_real.json`, `champion_summary_real.json` | **gerçek** liste sayfası / champion özeti |
+
+`*_real.json` dosyaları gerçek puuid ve riot_id içerir; repo private olduğu için
+olduğu gibi tutulur (anonimleştirme, gerçek şemayı belgeleme amacını bozardı).
+Sentetik fixture'lar mevcut davranışı sabitler — gerçek şemayla farkları bilinçlidir,
+gerçek doğrulama `tests/test_real_fixtures.py` üzerinden yapılır.
 
 ## Dizin yapısı
 

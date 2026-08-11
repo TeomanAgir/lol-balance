@@ -72,6 +72,33 @@ class TestNormalizeEog:
         payload = normalize_eog(eog_custom, CAPTURED_AT)
         assert all(p.position is None for p in payload.participants)
 
+    def test_played_at_falls_back_to_captured_at(self, eog_custom):
+        """Sentetik blokta `endOfGameTimestamp` yok → yakalama anı kullanılır.
+        (Eski LCU sürümleri bu alanı vermeyebilir; fallback korunmalı.)"""
+        assert "endOfGameTimestamp" not in eog_custom
+        assert normalize_eog(eog_custom, CAPTURED_AT).played_at == "2026-08-11T20:41:03Z"
+
+    def test_end_of_game_timestamp_wins_over_captured_at(self, eog_custom):
+        """Alan varsa maçın gerçek bitiş anı kazanır — geç işlemede (retry/outbox)
+        played_at kaymaz."""
+        eog_custom["endOfGameTimestamp"] = 1786484600652  # 2026-08-11T21:43:20.652Z
+        late = datetime(2026, 8, 12, 9, 0, 0, tzinfo=timezone.utc)
+        assert normalize_eog(eog_custom, late).played_at == "2026-08-11T21:43:20Z"
+
+    @pytest.mark.parametrize("bad", ["bozuk", None, ""])
+    def test_broken_end_of_game_timestamp_falls_back(self, eog_custom, bad):
+        eog_custom["endOfGameTimestamp"] = bad
+        assert normalize_eog(eog_custom, CAPTURED_AT).played_at == "2026-08-11T20:41:03Z"
+
+    def test_explicit_selected_position_wins_over_inference(self, eog_custom):
+        """Gerçek EOG şemasındaki gibi açık alan doldurulursa tahmin ezilir."""
+        roles = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
+        for team in eog_custom["teams"]:
+            for role, player in zip(roles, team["players"]):
+                player["selectedPosition"] = role
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert [p.position for p in payload.participants] == roles * 2
+
     def test_duration_ms_heuristic(self, eog_custom):
         eog_custom["gameLength"] = 1_874_000  # ms dönen patch'ler
         payload = normalize_eog(eog_custom, CAPTURED_AT)

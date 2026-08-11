@@ -3,6 +3,12 @@
 Sentetik fixture'lar (`mh_game_custom.json` vb.) yapıyı belgeler; buradaki
 `*_real.json` fixture'ları gerçek şemayı belgeler:
 
+- `eog_custom_real.json`: canlı LCU'dan yakalanmış gerçek EOG bloğu
+  (gameId 1734664864, 2026-08-11 gecesi oynandı, `raw_archive/1734664864.json`
+  kopyası). Statlar UPPER_SNAKE, `selectedPosition` + `detectedTeamPosition`
+  İKİSİ DE dolu ve tutarlı, `championName` payload'ın içinde (champion_map
+  gerekmez), `queueId` alanı HİÇ YOK ve `queueType` "NORMAL" — custom tespiti
+  yalnızca `gameType == "CUSTOM_GAME"` ile mümkün.
 - `mh_game_custom_real.json`: 10 kişilik gerçek custom maç (gameId 1734450310).
   Statlar camelCase, açık position alanı yok, puuid'ler participantIdentities'te.
 - `mh_list_page_real.json`: gerçek match-history liste sayfası (21 maç).
@@ -13,17 +19,36 @@ Sentetik fixture'lar (`mh_game_custom.json` vb.) yapıyı belgeler; buradaki
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 from collector.normalizer import (
     champion_map_from_summary,
     is_custom,
+    normalize_eog,
     normalize_match_history_game,
+    to_utc_z,
 )
+from collector.role_infer import SMITE_SPELL_ID
 
 from .conftest import load_fixture
 
 STAT_FIELDS = ("kills", "deaths", "assists", "gold", "cs", "damage_to_champs", "vision_score")
+
+#: Gerçek EOG bloğundaki `endOfGameTimestamp` (1786484600652 ms) → maçın bitiş anı.
+#: `normalize_eog` played_at'i ÖNCE bu alandan üretir; `captured_at` yalnızca alan
+#: yoksa devreye girer (CHANGE_REQUESTS, 2026-08-11).
+REAL_EOG_END_TS_MS = 1786484600652
+
+#: Bilerek maç bitişinden ~1 gün sonrası: played_at'in yakalama anından DEĞİL,
+#: payload'daki bitiş anından geldiğini kanıtlar.
+REAL_EOG_CAPTURED_AT = datetime(2026, 8, 12, 9, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def eog_custom_real():
+    return load_fixture("eog_custom_real.json")
 
 
 @pytest.fixture
@@ -44,6 +69,156 @@ def champion_summary_real():
 @pytest.fixture
 def real_champion_map(champion_summary_real):
     return champion_map_from_summary(champion_summary_real)
+
+
+#: gameId 1734664864'ün gerçek kadrosu: riot_id → (team, selectedPosition, championName)
+REAL_EOG_ROSTER = {
+    "YANSIMA#TR1": (100, "TOP", "Riven"),
+    "II RYUKEN II#PNTHR": (100, "JUNGLE", "Quinn"),
+    "SauronunAgzi#3791": (100, "MIDDLE", "Hwei"),
+    "Śhade#TR1": (100, "BOTTOM", "Jhin"),
+    "Kati#TR22": (100, "UTILITY", "Vex"),
+    "DEPRESSED THUGG#1616": (200, "TOP", "Renekton"),
+    "kimsesiz34#7823": (200, "JUNGLE", "Viego"),
+    "Konna Netlaka#1703": (200, "MIDDLE", "Aurelion Sol"),
+    "Çizgi Hükümdarı#PNTHR": (200, "BOTTOM", "Caitlyn"),
+    "YETİ VE PİÇİ#TR1": (200, "UTILITY", "Seraphine"),
+}
+
+
+class TestNormalizeRealEog:
+    """Canlı yakalanmış gerçek EOG bloğuna karşı regresyon (gameId 1734664864).
+
+    Bu maç canlı sistemde uçtan uca doğru işlendi (pozisyonlar + 7 stat alanı DB'de
+    dolu); buradaki testler o davranışı gerçek şemaya karşı KİLİTLER.
+    """
+
+    def test_contract_shape(self, eog_custom_real):
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        assert payload.source == "lcu_eog"
+        assert payload.source_game_id == "1734664864"
+        assert payload.duration_s == 2070  # gameLength saniye cinsinden geliyor
+        assert payload.winner_team == 100
+        assert len(payload.participants) == 10
+        assert sum(1 for p in payload.participants if p.team == 100) == 5
+        assert sum(1 for p in payload.participants if p.team == 200) == 5
+
+    def test_played_at_from_end_of_game_timestamp(self, eog_custom_real):
+        """played_at, payload'daki `endOfGameTimestamp`'ten gelir (ms → saniye,
+        UTC 'Z'). Yakalama anı burada bilerek ~11 saat sonrası verildi: sonuç
+        değişmiyorsa zaman gerçekten maçın bitişinden okunuyor demektir."""
+        assert eog_custom_real["endOfGameTimestamp"] == REAL_EOG_END_TS_MS
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        assert payload.played_at == "2026-08-11T21:43:20Z"
+        assert payload.played_at != to_utc_z(REAL_EOG_CAPTURED_AT)
+
+    def test_is_custom_despite_normal_queue_type(self, eog_custom_real):
+        """Gerçek EOG bloğunda `queueId` alanı HİÇ YOK ve `queueType` "NORMAL"
+        geliyor; custom tespiti yalnızca gameType üzerinden yürümek zorunda."""
+        assert "queueId" not in eog_custom_real
+        assert eog_custom_real["queueType"] == "NORMAL"
+        assert eog_custom_real["gameType"] == "CUSTOM_GAME"
+        assert is_custom(eog_custom_real) is True
+
+    def test_all_positions_match_selected_position(self, eog_custom_real):
+        """10 pozisyonun TAMAMI dolu ve ham `selectedPosition` ile birebir aynı —
+        açık alan tahmini ezer (GÖREV 0 kuralı)."""
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        actual = {p.riot_id: p.position for p in payload.participants}
+        expected = {rid: pos for rid, (_, pos, _) in REAL_EOG_ROSTER.items()}
+        assert actual == expected
+        assert all(p.position is not None for p in payload.participants)
+
+    def test_selected_and_detected_position_agree_in_raw(self, eog_custom_real):
+        """Gerçek şema iki position alanı taşıyor ve ikisi de dolu/tutarlı.
+        Normalizer `selectedPosition`'ı okur; bu test ikisinin ayrışmadığını,
+        yani seçilen alanın doğru alan olduğunu belgeler."""
+        for team in eog_custom_real["teams"]:
+            for player in team["players"]:
+                selected = player["selectedPosition"]
+                detected = player["detectedTeamPosition"]
+                assert selected and detected
+                assert selected == detected, player.get("riotIdGameName")
+
+    def test_smite_carriers_are_jungle(self, eog_custom_real):
+        """Smite (spellId 11) kusursuz sinyal: tam 2 taşıyıcı, ikisi de JUNGLE."""
+        carriers = {
+            f"{p['riotIdGameName']}#{p['riotIdTagLine']}"
+            for team in eog_custom_real["teams"]
+            for p in team["players"]
+            if SMITE_SPELL_ID in (p["spell1Id"], p["spell2Id"])
+        }
+        assert carriers == {"II RYUKEN II#PNTHR", "kimsesiz34#7823"}
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        for p in payload.participants:
+            if p.riot_id in carriers:
+                assert p.position == "JUNGLE"
+
+    def test_all_stats_populated_from_upper_snake_keys(self, eog_custom_real):
+        """Gerçek EOG statları UPPER_SNAKE gelir; 7 alanın 7'si de dolmalı."""
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        for p in payload.participants:
+            for field in STAT_FIELDS:
+                assert getattr(p.stats, field) is not None, (
+                    f"{field} None kaldı ({p.riot_id!r}) — UPPER_SNAKE stat eşlemesi kırılmış"
+                )
+
+    def test_exact_stats_for_yansima(self, eog_custom_real):
+        """Fixture'dan okunan gerçek değerler (kaymayı yakalamak için elle sabit)."""
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        p = next(p for p in payload.participants if p.riot_id == "YANSIMA#TR1")
+        assert p.team == 100
+        assert p.champion == "Riven"
+        assert p.position == "TOP"
+        assert p.stats.kills == 13
+        assert p.stats.deaths == 9
+        assert p.stats.assists == 7
+        assert p.stats.gold == 18254
+        assert p.stats.cs == 236  # 224 lane (MINIONS_KILLED) + 12 neutral
+        assert p.stats.damage_to_champs == 35600
+        assert p.stats.vision_score == 36
+
+    def test_exact_stats_for_zero_kill_support(self, eog_custom_real):
+        """0 değeri None'a düşmemeli (falsy tuzağı) — bu maçta destek 0/9/17."""
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        p = next(p for p in payload.participants if p.riot_id == "YETİ VE PİÇİ#TR1")
+        assert p.stats.kills == 0
+        assert p.stats.deaths == 9
+        assert p.stats.assists == 17
+        assert p.stats.gold == 10014
+        assert p.stats.cs == 44  # 44 lane + 0 neutral
+        assert p.stats.damage_to_champs == 18216
+        assert p.stats.vision_score == 91
+
+    def test_champions_come_from_payload_without_champion_map(self, eog_custom_real):
+        """EOG bloğu `championName` taşır → champion_map olmadan da hepsi çözülür."""
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        actual = {p.riot_id: p.champion for p in payload.participants}
+        expected = {rid: champ for rid, (_, _, champ) in REAL_EOG_ROSTER.items()}
+        assert actual == expected
+
+    def test_identities_are_complete(self, eog_custom_real):
+        """puuid dolu; riot_id "Ad#TAG" biçiminde (gerçek şemada `summonerName`
+        BOŞ string geliyor — fallback'e düşülseydi kimlik kaybolurdu)."""
+        assert all(
+            p["summonerName"] == ""
+            for team in eog_custom_real["teams"]
+            for p in team["players"]
+        )
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        for p in payload.participants:
+            assert p.puuid, f"puuid boş: {p.riot_id!r}"
+            assert p.riot_id and "#" in p.riot_id
+            name, _, tag = p.riot_id.partition("#")
+            assert name and tag
+        assert {p.riot_id for p in payload.participants} == set(REAL_EOG_ROSTER)
+        assert len({p.puuid for p in payload.participants}) == 10
+
+    def test_teams_assigned_from_player_team_id(self, eog_custom_real):
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        actual = {p.riot_id: p.team for p in payload.participants}
+        expected = {rid: team for rid, (team, _, _) in REAL_EOG_ROSTER.items()}
+        assert actual == expected
 
 
 class TestNormalizeRealMatchHistoryGame:
