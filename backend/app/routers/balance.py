@@ -1,19 +1,27 @@
-"""POST /balance — 126 ayrımın brute force değerlendirmesi (api_contract §4).
+"""POST /balance — rol atamalı 126 ayrımın brute force değerlendirmesi
+(api_contract §4 + rating_contract "Rol Rating Evreni → Dengeleme").
 
-Ayrım üretimi ve kazanma olasılığı rating paketinden gelir; burada yalnızca
-oyuncu id eşlemesi ve contract'taki quality formülü (1 - 2*|p - 0.5|) vardır.
+Ayrım/atama üretimi ve kazanma olasılığı rating paketinden gelir; burada
+yalnızca harman uygulaması, oyuncu id eşlemesi ve contract'taki quality
+formülü (1 - 2*|p - 0.5| = 1 - 2*imbalance) vardır.
 """
 from __future__ import annotations
 
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException
-from rating import Engine, Rating, enumerate_splits
+from rating import ROLES, Engine, Rating, balance_roles
 
 from ..config import Settings, get_settings
 from ..deps import get_db
-from ..schemas import BalanceRequest, BalanceResponse, BalanceSuggestionOut
-from ..services.ratings import current_ratings, is_blend, perf_averages
+from ..schemas import (
+    BalanceRequest,
+    BalanceResponse,
+    BalanceSuggestionOut,
+    TeamSlotOut,
+)
+from ..services.ratings import is_blend
+from ..services.role_ratings import current_role_ratings, role_perf_averages
 
 router = APIRouter()
 
@@ -46,37 +54,45 @@ def balance(
         )
 
     engine = Engine(version=settings.engine_version)
-    known = current_ratings(conn, settings.engine_version)
-    # 0 maçlı oyuncu default prior ile hesaba katılır (api_contract §4).
-    ratings = [known.get(i, engine.default_rating()) for i in ids]
-    if is_blend(engine):
-        # Harman version'da öneriler efektif mu üzerinden hesaplanır
-        # (rating_contract "Harman Engine" §5). Rating'i olmayan oyuncu:
-        # default mu/sigma + P_avg=1.0 → mu_eff = 25 (nötr).
-        p_avgs = perf_averages(conn, settings.engine_version)
-        ratings = [
-            Rating(
-                mu=engine.effective(r.mu, r.sigma, p_avgs.get(i, 1.0)).mu_eff,
-                sigma=r.sigma,
-            )
-            for i, r in zip(ids, ratings)
-        ]
+    default = engine.default_rating()
+    known = current_role_ratings(conn, settings.engine_version)
+    blend = is_blend(engine)
+    # Harman version'da rating paketine mu_eff_role geçilir (rating paketi
+    # harmanı bilmez; mevcut desenle tutarlı). Hiç oynanmamış rol: default
+    # prior + P_avg=1.0 → mu_eff = 25, score 0 (nötr).
+    role_p_avgs = role_perf_averages(conn, settings.engine_version) if blend else {}
 
-    suggestions = []
-    for idx100, idx200 in enumerate_splits(10):
-        p = engine.predict_win(
-            [ratings[i] for i in idx100], [ratings[i] for i in idx200]
+    ratings_by_role: list[dict[str, Rating]] = []
+    for pid in ids:
+        by_role: dict[str, Rating] = {}
+        for role in ROLES:
+            key = (pid, role)
+            r = known.get(key, default)
+            if blend:
+                mu_eff = engine.effective(
+                    r.mu, r.sigma, role_p_avgs.get(key, 1.0)
+                ).mu_eff
+                by_role[role] = Rating(mu=mu_eff, sigma=r.sigma)
+            else:
+                by_role[role] = r
+        ratings_by_role.append(by_role)
+
+    suggestions = [
+        BalanceSuggestionOut(
+            team_100=[
+                TeamSlotOut(player_id=ids[i], position=pos)
+                for i, pos in zip(s.team100, s.positions100)
+            ],
+            team_200=[
+                TeamSlotOut(player_id=ids[i], position=pos)
+                for i, pos in zip(s.team200, s.positions200)
+            ],
+            p_win_team_100=s.p_team100,
+            quality=1.0 - 2.0 * s.imbalance,
         )
-        suggestions.append(
-            BalanceSuggestionOut(
-                team_100=[ids[i] for i in idx100],
-                team_200=[ids[i] for i in idx200],
-                p_win_team_100=p,
-                quality=1.0 - 2.0 * abs(p - 0.5),
-            )
-        )
-    suggestions.sort(key=lambda s: s.quality, reverse=True)
+        # balance_roles zaten (imbalance, team100) artan sıralar → quality azalan.
+        for s in balance_roles(ratings_by_role, body.top_n)
+    ]
     return BalanceResponse(
-        engine_version=settings.engine_version,
-        suggestions=suggestions[: body.top_n],
+        engine_version=settings.engine_version, suggestions=suggestions
     )

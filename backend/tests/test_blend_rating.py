@@ -126,7 +126,9 @@ def test_balance_works_under_blend(client):
     for s in body["suggestions"]:
         assert len(s["team_100"]) == 5
         assert len(s["team_200"]) == 5
-        assert sorted(s["team_100"] + s["team_200"]) == sorted(ids)
+        # GÖREV 0: takımlar (player_id, position) çiftleri döner (api_contract §4).
+        got = [slot["player_id"] for slot in s["team_100"] + s["team_200"]]
+        assert sorted(got) == sorted(ids)
         assert 0.0 <= s["p_win_team_100"] <= 1.0
 
 

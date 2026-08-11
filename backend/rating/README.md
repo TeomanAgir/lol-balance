@@ -109,3 +109,27 @@ rating için mu_eff=25, score=0 (nötr); perf terimi mu_eff'e en fazla ±10 kata
 - `balance(ratings, top_n)`: 126 ayrımın hepsi için `predict_win` hesaplar,
   `imbalance = |p - 0.5|` değerine göre artan sıralar, ilk `top_n` öneriyi
   döner. Ayrımlar index bazlıdır; oyuncu listesinin sırasını çağıran korur.
+
+### Rol atamalı dengeleme (`balance_roles`)
+
+```python
+from rating import ROLES, balance_roles   # ROLES = TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY
+
+# ratings_by_role[i] = i. oyuncunun {rol: Rating} haritası; 5 rolün TAMAMI zorunlu.
+suggestions = balance_roles(ratings_by_role, top_n=3)
+s = suggestions[0]
+s.team100, s.positions100   # hizalı: team100[k] oyuncusu positions100[k] rolünde
+s.p_team100, s.imbalance
+```
+
+- Her ayrımda, her takım için 120 rol atamasından atanan `Rating.ordinal`
+  TOPLAMINI maksimize eden atama seçilir. Permütasyonlar `ROLES` sırasıyla
+  gezilir ve strict-greater karşılaştırma kullanılır → eşitlikte ilk bulunan
+  atama korunur (deterministik). Alt küme başına atama memoize edilir.
+- `p_team100`, seçilen atamanın Rating'leriyle `predict_win`'dir; sıralama
+  `balance()` ile aynıdır (`(imbalance, team100)` artan).
+- Geçilen `Rating.mu`, çağıran tarafından ZATEN harmanlanmış `mu_eff_role`
+  kabul edilir — fonksiyon harmanı bilmez (engine-agnostik, `balance()` deseni).
+  Backend `Engine.effective(...)` ile harmanlayıp buraya geçirir.
+- Doğrulama: tam 10 oyuncu, her oyuncuda tam 5 rol anahtarı, `top_n >= 1`;
+  aksi `ValueError`. Spec: `docs/rating_contract.md` "Rol Rating Evreni → Dengeleme".

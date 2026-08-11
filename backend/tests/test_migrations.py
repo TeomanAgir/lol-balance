@@ -22,18 +22,44 @@ def _columns(db_path, table: str) -> set[str]:
         conn.close()
 
 
+def _objects(db_path) -> set[str]:
+    conn = connect(str(db_path))
+    try:
+        return {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master")
+        }
+    finally:
+        conn.close()
+
+
 def test_fresh_db_applies_all_migrations_in_name_order(tmp_path):
     db_path = tmp_path / "fresh.db"
     applied = run_migrations(str(db_path))
-    assert applied == ["0001_init.sql", "0002_perf_score.sql"]  # sıra garantisi
+    assert applied == [
+        "0001_init.sql",
+        "0002_perf_score.sql",
+        "0003_role_ratings.sql",
+    ]  # sıra garantisi
     assert "perf_score" in _columns(db_path, "rating_history")
     # Tekrar koşmak güvenli ve no-op.
     assert run_migrations(str(db_path)) == []
 
 
-def test_existing_db_gets_only_0002(tmp_path):
-    """0001'i zaten uygulanmış (perf_score'suz) mevcut kurulum simülasyonu."""
-    db_path = tmp_path / "existing.db"
+def test_0003_creates_role_rating_objects(tmp_path):
+    """GÖREV 0: rol evreni tablosu + view'ü (db_schema migration 0003)."""
+    db_path = tmp_path / "roles.db"
+    run_migrations(str(db_path))
+    assert {"role_rating_history", "current_role_ratings"} <= _objects(db_path)
+    assert _columns(db_path, "role_rating_history") == {
+        "id", "player_id", "match_id", "role", "engine_version",
+        "mu_before", "sigma_before", "mu_after", "sigma_after", "perf_score",
+    }
+
+
+def test_existing_db_gets_0002_and_0003(tmp_path):
+    """0001'i zaten uygulanmış kurulum eksik migration'ları sırayla alır."""
+    db_path = tmp_path / "old.db"
     conn = connect(str(db_path))
     try:
         conn.executescript(
@@ -52,9 +78,13 @@ def test_existing_db_gets_only_0002(tmp_path):
         conn.close()
     assert "perf_score" not in _columns(db_path, "rating_history")
 
-    applied = run_migrations(str(db_path))
-    assert applied == ["0002_perf_score.sql"]  # 0001 atlandı, çakışma yok
+    # 0001 atlandı, çakışma yok.
+    assert run_migrations(str(db_path)) == [
+        "0002_perf_score.sql",
+        "0003_role_ratings.sql",
+    ]
     assert "perf_score" in _columns(db_path, "rating_history")
+    assert "role_rating_history" in _objects(db_path)
 
 
 def test_0001_does_not_define_perf_score():

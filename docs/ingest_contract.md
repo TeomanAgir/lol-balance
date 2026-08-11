@@ -37,6 +37,7 @@ Content-Type: application/json
 ## Kurallar
 - `participants` tam 10 eleman içermelidir; 5 tanesi `team=100`, 5 tanesi `team=200`. Aksi halde backend `422` döner.
 - `position` LCU'dan güvenilir alınamazsa `null` gönderilebilir (custom'larda position bazen boş gelir). `stats` alanları da nullable.
+- **Rol tahmini (GÖREV 0):** LCU custom maçlarda gerçek rol atamasını hiç vermez; collector, position'ı KISIT-ÇÖZÜMLÜ tahminle doldurur. Takım başına deterministik zincir: (1) Smite taşıyan tam 1 kişi → JUNGLE; (2) Riot lane/role etiketleriyle UTILITY → BOTTOM → MIDDLE; (3) kalanlar içinde `lane=TOP` etiketli tam 1 kişi → TOP; (4) atanmamış tam 1 kişi ve boş tam 1 rol kaldıysa eleme ile eşle. Herhangi bir adım belirsizse (0 veya 2+ aday) ilgili slotlar null bırakılır — tahmin ZORLANMAZ. Backend değeri olduğu gibi kaydeder; düzeltme `PUT /matches/{id}/positions` iledir (api_contract §3). (Zincir revizyonu: CHANGE_REQUESTS lcu-collector 2026-08-11.)
 - Tüm zamanlar UTC ISO8601.
 - Collector, gönderim başarısız olursa (network/5xx) payload'ı lokal `outbox/` klasörüne JSON olarak yazar ve bir sonraki çalışmada yeniden dener (at-least-once delivery). Idempotency backend tarafında `source_game_id` ile sağlanır, bu yüzden çift gönderim güvenlidir.
 

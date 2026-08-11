@@ -27,7 +27,9 @@ python -m http.server 8080
 # http://localhost:8080
 ```
 
-Mock, 14 kişilik gerçekçi bir roster, 8 maçlık geçmiş ve 3 dengeleme önerisi döner; API anahtarı olarak boş olmayan herhangi bir değer kabul eder (401 akışını denemek için anahtar istemini boş geçebilirsin).
+Mock, 14 kişilik gerçekçi bir roster (her oyuncuda 5 anahtarlı `role_ratings`), 8 maçlık geçmiş ve rol atamalı 3 dengeleme önerisi döner; API anahtarı olarak boş olmayan herhangi bir değer kabul eder (401 akışını denemek için anahtar istemini boş geçebilirsin).
+
+Mock'ta bilerek bırakılmış kenar durumlar: bir maçta iki katılımcının `rating_change`'i `null` (delta "—"), başka bir maçta iki katılımcının `position`'ı `null` (rol "—", o maç rol evrenine girmez). `PUT /matches/{id}/positions` mock'u yerel maç state'ini günceller ve `{updated, role_matches_replayed}` döner — rol ratinglerini yeniden hesaplamaz (gerçek replay backend'de).
 
 ## Backend'e bağlama
 
@@ -40,6 +42,9 @@ Mock, 14 kişilik gerçekçi bir roster, 8 maçlık geçmiş ve 3 dengeleme öne
 ## Notlar
 
 - Gösterilen birincil rating değeri `rating.score`'dur (harman engine); sıralama tablosunda skorun altında W/L çekirdeği (`ordinal`) ve `perf_avg` soluk ikincil satır olarak görünür, `perf_avg` null ise (harman-dışı version, score = ordinal) bu satır gizlenir.
+- Rol ratingleri (`role_ratings`, GÖREV 0) iki yerde görünür: dengeleme ekranındaki oyuncu kartlarında kompakt şerit, sıralama tablosunda oyuncu adına dokununca açılan satır. Her kutu rol · puan (1 ondalık) · o roldeki maç sayısıdır; `matches = 0` olan rol soluk gösterilir (default prior, gerçek veri değil). Alan yoksa şerit hiç çizilmez.
+- Dengeleme yanıtı her zaman rol atamalıdır: `team_100`/`team_200` = `[{player_id, position}]`. Takımlar TOP → JUNGLE → MIDDLE → BOTTOM → UTILITY sırasıyla, Türkçe etiketlerle (Üst/Orman/Orta/Alt/Destek) listelenir.
+- Rol düzeltme: maç kartındaki "Rolleri düzenle" 10 katılımcı için rol seçici açar; "Rolleri Kaydet" yalnız **değişen** rolleri `PUT /api/v1/matches/{id}/positions` ile gönderir (`{"positions": {"<player_id>": "TOP"|null}}`) ve yanıttaki `updated` / `role_matches_replayed` bilgisini toast'ta gösterir. Ana rating etkilenmez; kaydedince maç listesi ve roster önbelleği tazelenir. Manuel girilen maçlarda roller boş geldiğinden bu panel o maçları rol evrenine sokmanın yoludur.
 - "Dengele" butonu tam 10 seçim olmadan aktifleşmez (asıl doğrulama backend'de, `422`).
 - Maç void etme onay dialogu ile korunur; void geri alınamaz ve rating replay tetikler.
 - Hata yanıtlarındaki `detail` alanı kullanıcıya aynen gösterilir (backend Türkçe döner).

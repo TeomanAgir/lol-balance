@@ -4,14 +4,52 @@ from __future__ import annotations
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException
-from rating import Engine
+from rating import ROLES, Engine, Rating
 
 from ..config import Settings, get_settings
 from ..deps import get_db
-from ..schemas import PlayerCreate, PlayerOut, PlayerPatch, RatingOut
+from ..schemas import PlayerCreate, PlayerOut, PlayerPatch, RatingOut, RoleRatingOut
 from ..services.ratings import current_ratings, is_blend, perf_averages
+from ..services.role_ratings import (
+    current_role_ratings,
+    role_match_counts,
+    role_perf_averages,
+)
 
 router = APIRouter()
+
+
+def _role_ratings_out(
+    engine: Engine,
+    blend: bool,
+    default: Rating,
+    player_id: int,
+    role_ratings: dict[tuple[int, str], Rating],
+    role_p_avgs: dict[tuple[int, str], float],
+    role_counts: dict[tuple[int, str], int],
+) -> dict[str, RoleRatingOut]:
+    """5 rolün tamamı için rol rating nesnesi (api_contract §2).
+
+    Hiç oynanmamış rol default prior + P_avg=1.0 alır → score 0 (nötr).
+    """
+    out: dict[str, RoleRatingOut] = {}
+    for role in ROLES:
+        key = (player_id, role)
+        r = role_ratings.get(key, default)
+        if blend:
+            p_avg = role_p_avgs.get(key, 1.0)
+            score = engine.effective(r.mu, r.sigma, p_avg).score
+        else:
+            p_avg = None
+            score = r.ordinal
+        out[role] = RoleRatingOut(
+            mu=r.mu,
+            sigma=r.sigma,
+            perf_avg=p_avg,
+            score=score,
+            matches=role_counts.get(key, 0),
+        )
+    return out
 
 
 def _player_list(
@@ -22,6 +60,9 @@ def _player_list(
     ratings = current_ratings(conn, engine_version)
     blend = is_blend(engine)
     p_avgs = perf_averages(conn, engine_version) if blend else {}
+    role_ratings = current_role_ratings(conn, engine_version)
+    role_p_avgs = role_perf_averages(conn, engine_version) if blend else {}
+    role_counts = role_match_counts(conn, engine_version)
     rows = conn.execute(
         "SELECT p.id, p.display_name, p.riot_id, p.puuid,"
         " (SELECT COUNT(*) FROM match_participants mp"
@@ -53,6 +94,15 @@ def _player_list(
                     ordinal=r.ordinal,
                     perf_avg=p_avg,
                     score=score,
+                ),
+                role_ratings=_role_ratings_out(
+                    engine,
+                    blend,
+                    default,
+                    row["id"],
+                    role_ratings,
+                    role_p_avgs,
+                    role_counts,
                 ),
             )
         )

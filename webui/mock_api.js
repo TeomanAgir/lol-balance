@@ -35,6 +35,37 @@
   const CHAMPS = ["Ahri", "Lee Sin", "Jinx", "Thresh", "Darius", "Yasuo", "Lux", "Ezreal", "Vi", "Orianna"];
   const POS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 
+  // ── Rol rating evreni (GÖREV 0) ──
+  // Contract §2: 5 anahtar HER ZAMAN mevcut; hiç oynanmamış rol default prior döner.
+  // Mock'ta her oyuncunun bir ana + bir ikincil rolü maç görmüş, kalan 3 rol default.
+  const defaultRole = () => ({ mu: 25.0, sigma: 8.333, perf_avg: 1.0, score: 0.0, matches: 0 });
+  const roleScoreOf = (mu, sigma, perf) =>
+    +(0.5 * mu + 0.5 * (25 + 20 * (perf - 1)) - 3 * sigma).toFixed(1);
+
+  players.forEach(p => {
+    const rr = {};
+    POS.forEach((role, i) => {
+      const main = i === p.id % 5;
+      const second = i === (p.id + 2) % 5;
+      const matches = Math.round(p.matches_played * (main ? 0.6 : second ? 0.25 : 0));
+      if (!matches) { rr[role] = defaultRole(); return; }
+      const mu = +(p.rating.mu + (main ? 0.6 : -0.9)).toFixed(2);
+      const sigma = +Math.max(1.5, p.rating.sigma + (main ? 0.4 : 1.8)).toFixed(3);
+      const perf = +((p.rating.perf_avg == null ? 1.0 : p.rating.perf_avg) + (main ? 0.04 : -0.06)).toFixed(2);
+      rr[role] = { mu, sigma, perf_avg: perf, score: roleScoreOf(mu, sigma, perf), matches };
+    });
+    p.role_ratings = rr;
+  });
+
+  // Rol evreni uygunluğu (rating_contract "Rol Rating Evreni" §3): 10 katılımcının
+  // hepsinde position dolu VE her takımda 5 farklı rolden tam 1'er tane.
+  const roleEligible = (m) =>
+    m.participants.length === 10 &&
+    [100, 200].every(team => {
+      const set = new Set(m.participants.filter(p => p.team === team).map(p => p.position));
+      return set.size === 5 && POS.every(r => set.has(r));
+    });
+
   // Deterministik sahte maç geçmişi üret (Date.now/random'a gerek yok).
   let nextMatchId = 100;
   const matches = [];
@@ -60,7 +91,9 @@
           player_id: pid,
           display_name: p.display_name,
           team,
-          position: POS[i % 5],
+          // m === 1 maçında iki katılımcının rolü boş: UI'ın "—" gösterimi ve rol
+          // düzeltme akışı denenebilsin (bu maç rol evrenine girmez).
+          position: (m === 1 && (i === 1 || i === 6)) ? null : POS[i % 5],
           champion: CHAMPS[(pid + m) % CHAMPS.length],
           stats: {
             kills: (pid + m) % 12,
@@ -89,8 +122,31 @@
   const err = (status, detail) => json({ detail }, status);
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Takıma rol atar: açgözlü (en yüksek rol skoru önce), eşitlikte ilk bulunan kalır.
+  // Gerçek atama backend'de (126 ayrım × 120 atama); burada sadece şekil doğru olsun diye.
+  function assignRoles(teamIds) {
+    const free = POS.slice();
+    const rest = [...teamIds];
+    const out = [];
+    while (rest.length) {
+      let best = null;
+      for (const pid of rest) {
+        const rr = (players.find(p => p.id === pid) || {}).role_ratings;
+        for (const role of free) {
+          const s = rr && rr[role] ? rr[role].score : 0;
+          if (!best || s > best.s) best = { pid, role, s };
+        }
+      }
+      out.push({ player_id: best.pid, position: best.role });
+      free.splice(free.indexOf(best.role), 1);
+      rest.splice(rest.indexOf(best.pid), 1);
+    }
+    return out.sort((a, b) => POS.indexOf(a.position) - POS.indexOf(b.position));
+  }
+
   function balanceSuggestions(ids) {
     // Mock partisyonlar: gerçek hesap backend'de; burada sadece makul görünen 3 örnek.
+    // Contract §4: dengeleme HER ZAMAN rol bazlı → takımlar {player_id, position} nesneleri.
     const sorted = [...ids].sort((a, b) => {
       const pa = players.find(p => p.id === a), pb = players.find(p => p.id === b);
       return pb.rating.score - pa.rating.score;
@@ -100,10 +156,17 @@
     const half = ids.slice(0, 5);
     const other = (side) => ids.filter(id => !side.includes(id));
     return [
-      { team_100: snake, team_200: other(snake), p_win_team_100: 0.508, quality: 0.984 },
-      { team_100: evens, team_200: other(evens), p_win_team_100: 0.541, quality: 0.918 },
-      { team_100: half,  team_200: other(half),  p_win_team_100: 0.469, quality: 0.938 },
-    ].sort((a, b) => b.quality - a.quality);
+      { side: snake, p_win_team_100: 0.508, quality: 0.984 },
+      { side: evens, p_win_team_100: 0.541, quality: 0.918 },
+      { side: half,  p_win_team_100: 0.469, quality: 0.938 },
+    ]
+      .map(s => ({
+        team_100: assignRoles(s.side),
+        team_200: assignRoles(other(s.side)),
+        p_win_team_100: s.p_win_team_100,
+        quality: s.quality,
+      }))
+      .sort((a, b) => b.quality - a.quality);
   }
 
   // ── fetch stub ──
@@ -127,6 +190,31 @@
       const ids = [...new Set(body.player_ids || [])];
       if (ids.length !== 10) return err(422, "Dengeleme için tam 10 farklı oyuncu seçilmelidir.");
       return json({ engine_version: "openskill-pl-blend50-v1", suggestions: balanceSuggestions(ids) });
+    }
+
+    // Rol düzeltme (GÖREV 0): yalnız match_participants.position değişir,
+    // ham ingest ve ana rating evreni etkilenmez.
+    const posMatch = path.match(/^\/matches\/(\d+)\/positions$/);
+    if (method === "PUT" && posMatch) {
+      const match = matches.find(m => m.id === Number(posMatch[1]));
+      if (!match) return err(404, "Maç bulunamadı.");
+      let body = {};
+      try { body = JSON.parse(opts.body); } catch { /* gövde JSON değil */ }
+      const positions = (body && body.positions) || {};
+      const pending = [];
+      for (const [pid, pos] of Object.entries(positions)) {
+        const part = match.participants.find(p => String(p.player_id) === String(pid));
+        if (!part) return err(422, `Bu maçta ${pid} numaralı oyuncu yok.`);
+        if (pos !== null && !POS.includes(pos)) return err(422, `Geçersiz rol: ${pos}`);
+        pending.push([part, pos]);
+      }
+      let updated = 0;
+      for (const [part, pos] of pending) {
+        if (part.position !== pos) { part.position = pos; updated++; }
+      }
+      // Rol evreni replay'i: uygun tüm valid maçlar yeniden işlenir.
+      const replayed = matches.filter(m => m.status === "valid" && roleEligible(m)).length;
+      return json({ updated, role_matches_replayed: replayed });
     }
 
     const voidMatch = path.match(/^\/matches\/(\d+)\/void$/);

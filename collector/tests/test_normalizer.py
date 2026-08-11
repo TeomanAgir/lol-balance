@@ -132,7 +132,9 @@ class TestNormalizeMatchHistory:
         assert teoman.stats.cs == 201
         assert teoman.stats.vision_score == 21
 
-    def test_timeline_lane_not_guessed(self, mh_game_custom):
+    def test_ambiguous_signals_stay_null(self, mh_game_custom):
+        """Sentetik fixture'da lane/role hep NONE ve Smite yok → zincir hiçbir
+        rolü çözemez; tahmin ZORLANMAZ, hepsi null kalır."""
         payload = normalize_match_history_game(mh_game_custom)
         assert all(p.position is None for p in payload.participants)
 
@@ -140,6 +142,83 @@ class TestNormalizeMatchHistory:
         pairs = mh_identity_pairs(mh_game_custom)
         assert len(pairs) == 10
         assert ("puuid-t1", "Teoman#TR1") in pairs
+
+
+class TestPositionInferenceIntegration:
+    """GÖREV 0: açık position alanı VARSA kazanır, yoksa kısıt-çözümlü tahmin
+    payload'a yazılır. Her iki normalize yolu için de geçerlidir."""
+
+    LANES = [
+        ("JUNGLE", "NONE"), ("JUNGLE", "NONE"),  # 1: aslında TOP (Riot yanlış etiketi)
+        ("MIDDLE", "SOLO"), ("BOTTOM", "CARRY"), ("BOTTOM", "SUPPORT"),
+    ]
+
+    def _label(self, mh_game_custom):
+        """Her takımın 2. oyuncusuna Smite, kalanlara tipik Riot etiketleri ver."""
+        for p in mh_game_custom["participants"]:
+            index = (int(p["participantId"]) - 1) % 5
+            lane, role = self.LANES[index]
+            p["timeline"] = {"lane": lane, "role": role}
+            p["spell1Id"] = 11 if index == 1 else 4
+            p["spell2Id"] = 14
+        return mh_game_custom
+
+    def test_mh_inferred_positions_written_to_payload(self, mh_game_custom):
+        payload = normalize_match_history_game(self._label(mh_game_custom))
+        for team in (100, 200):
+            roles = sorted(p.position for p in payload.participants if p.team == team)
+            assert roles == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+    def test_mh_explicit_position_overrides_inference(self, mh_game_custom):
+        """Smite taşıyan oyuncuya açık 'MIDDLE' verilirse tahmin ezilir."""
+        raw = self._label(mh_game_custom)
+        smite_player = next(p for p in raw["participants"] if p["participantId"] == 2)
+        smite_player["selectedPosition"] = "MID"  # alias da çözülmeli
+        payload = normalize_match_history_game(raw)
+        puuid = next(
+            i["player"]["puuid"]
+            for i in raw["participantIdentities"]
+            if i["participantId"] == 2
+        )
+        assert next(p for p in payload.participants if p.puuid == puuid).position == "MIDDLE"
+
+    def test_mh_invalid_explicit_position_falls_back_to_inference(self, mh_game_custom):
+        raw = self._label(mh_game_custom)
+        for p in raw["participants"]:
+            p["selectedPosition"] = "NONE"  # geçersiz/boş → tahmine düşer
+        payload = normalize_match_history_game(raw)
+        assert all(p.position is not None for p in payload.participants)
+
+    def test_eog_smite_resolves_jungle_others_null(self, eog_custom):
+        """Gerçek EOG bloğunda lane/role yoktur → yalnızca Smite adımı çözülür."""
+        for team in eog_custom["teams"]:
+            for index, player in enumerate(team["players"]):
+                player["spell1Id"] = 11 if index == 1 else 4
+                player["spell2Id"] = 14
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert sum(1 for p in payload.participants if p.position == "JUNGLE") == 2
+        assert sum(1 for p in payload.participants if p.position is None) == 8
+
+    def test_eog_with_lane_hints_resolves_full_team(self, eog_custom):
+        """LCU bir sürümde lane/role verirse (timeline bloğu) zincir tam çözer."""
+        for team in eog_custom["teams"]:
+            for index, player in enumerate(team["players"]):
+                lane, role = TestPositionInferenceIntegration.LANES[index]
+                player["timeline"] = {"lane": lane, "role": role}
+                player["spell1Id"] = 11 if index == 1 else 4
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        for team in (100, 200):
+            roles = sorted(p.position for p in payload.participants if p.team == team)
+            assert roles == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+    def test_eog_explicit_position_overrides_inference(self, eog_custom):
+        for team in eog_custom["teams"]:
+            for index, player in enumerate(team["players"]):
+                player["spell1Id"] = 11 if index == 1 else 4
+            team["players"][1]["selectedPosition"] = "TOP"
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert sum(1 for p in payload.participants if p.position == "TOP") == 2
+        assert all(p.position != "JUNGLE" for p in payload.participants)
 
 
 class TestMhIsRemake:

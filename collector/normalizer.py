@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from .models import VALID_POSITIONS, MatchPayload, Participant, Stats
+from .role_infer import infer_positions, position_for
 
 
 class NormalizeError(Exception):
@@ -58,8 +59,9 @@ def _extract_stats(raw_stats: dict[str, Any]) -> Stats:
 
 
 def normalize_position(value: Any) -> Optional[str]:
-    """Custom'larda position güvenilmezdir: yalnızca geçerli, açık bir değer varsa
-    kullanılır; boş/NONE/tanınmayan her şey null'a düşer — tahmin edilmez."""
+    """Açık position alanının normalizasyonu: yalnızca geçerli, açık bir değer
+    kabul edilir; boş/NONE/tanınmayan her şey null'a düşer. Bu fonksiyon TAHMİN
+    YAPMAZ — tahmin `role_infer` modülünün işidir (bkz. GÖREV 0)."""
     if not value or not isinstance(value, str):
         return None
     upper = value.strip().upper()
@@ -139,12 +141,18 @@ def normalize_eog(
     teams = raw.get("teams") or []
     winner_team: Optional[int] = None
     participants: list[Participant] = []
+    # Açık position yoksa kullanılacak kısıt-çözümlü rol tahmini (GÖREV 0).
+    # `views_from_eog` ile aynı sırada gezildiğimiz için index anahtarı tutar.
+    inferred = infer_positions(raw)
+    player_index = 0
 
     for team in teams:
         team_id = team.get("teamId")
         if team.get("isWinningTeam"):
             winner_team = int(team_id)
         for player in team.get("players") or []:
+            index_key = player_index
+            player_index += 1
             puuid = player.get("puuid")
             if not puuid:
                 raise NormalizeError(
@@ -163,9 +171,11 @@ def normalize_eog(
                         player.get("summonerName"),
                     ),
                     team=int(player.get("teamId") or team_id),
+                    # Açık position varsa o kazanır; yoksa kısıt-çözümlü tahmin
                     position=normalize_position(
                         player.get("selectedPosition") or player.get("position")
-                    ),
+                    )
+                    or position_for(inferred, puuid, index_key),
                     champion=champion or None,
                     stats=_extract_stats(player.get("stats") or {}),
                 )
@@ -248,9 +258,12 @@ def normalize_match_history_game(
     for identity in raw.get("participantIdentities") or []:
         identities[int(identity.get("participantId", -1))] = identity.get("player") or {}
 
+    inferred = infer_positions(raw)  # kısıt-çözümlü rol tahmini (GÖREV 0)
+
     participants: list[Participant] = []
     for p in raw.get("participants") or []:
-        player = identities.get(int(p.get("participantId", -1)), {})
+        participant_id = int(p.get("participantId", -1))
+        player = identities.get(participant_id, {})
         puuid = player.get("puuid") or p.get("puuid")
         if not puuid:
             raise NormalizeError(
@@ -267,9 +280,11 @@ def normalize_match_history_game(
                     player.get("gameName"), player.get("tagLine"), player.get("summonerName")
                 ),
                 team=int(p.get("teamId")),
-                # timeline.lane custom'larda Riot'un tahminidir, güvenilmez → yalnızca
-                # açık position alanı varsa kullan, yoksa null (tahmin etme)
-                position=normalize_position(p.get("selectedPosition") or p.get("position")),
+                # timeline.lane tek başına custom'larda güvenilmez (Riot tahmini);
+                # açık position alanı varsa O kazanır, yoksa Smite + lane/role
+                # kısıt zincirinin sonucu kullanılır — belirsizse null kalır.
+                position=normalize_position(p.get("selectedPosition") or p.get("position"))
+                or position_for(inferred, puuid, participant_id),
                 champion=champion,
                 stats=_extract_stats(p.get("stats") or {}),
             )

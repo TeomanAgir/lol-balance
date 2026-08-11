@@ -32,8 +32,11 @@ def test_replay_deterministic_equals_incremental(client, db):
 
     r = client.post("/api/v1/admin/replay")
     assert r.status_code == 200
+    # api_contract §5: iki evren de raporlanır. make_payload rol evrenine
+    # uygun değildir (team100'de MIDDLE iki kez) → role_matches_replayed = 0.
     assert r.json() == {
         "matches_replayed": 3,
+        "role_matches_replayed": 0,
         "engine_version": "openskill-pl-blend50-v1",
     }
 

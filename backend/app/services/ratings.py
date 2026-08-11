@@ -10,7 +10,8 @@ import sqlite3
 from rating import Engine, ParticipantStats, Rating
 
 # match_participants'taki stat kolonları — ParticipantStats alanlarıyla birebir.
-_STAT_FIELDS = (
+# Rol evreni (role_ratings.py) aynı kolonları okur, bu yüzden public.
+STAT_FIELDS = (
     "kills",
     "deaths",
     "assists",
@@ -99,7 +100,7 @@ def _match_teams(
         (match_id,),
     )
     for row in rows:
-        stats = ParticipantStats(**{f: row[f] for f in _STAT_FIELDS})
+        stats = ParticipantStats(**{f: row[f] for f in STAT_FIELDS})
         if row["team"] == 100:
             team100.append(row["player_id"])
             stats100.append(stats)

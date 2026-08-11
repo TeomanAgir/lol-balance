@@ -87,16 +87,40 @@ class TestNormalizeRealMatchHistoryGame:
         for p in payload.participants:
             assert p.champion, f"champion çözülemedi ({p.riot_id!r})"
 
-    def test_positions_are_none_in_real_custom(self, mh_game_custom_real, real_champion_map):
-        """Gerçek custom kaydında açık position alanı yok; timeline.lane Riot
-        tahminidir ve kullanılmamalı → tüm position'lar None beklenir."""
+    def test_positions_come_from_constraint_solver(
+        self, mh_game_custom_real, real_champion_map
+    ):
+        """Gerçek custom kaydında açık position alanı yok (GÖREV 0 öncesi hepsi
+        None kalıyordu). Artık kısıt zinciri koşar: takım 100 tam çözülür; takım
+        200'de iki oyuncu da 'TOP/DUO' etiketli olduğundan MIDDLE ve TOP
+        belirsizdir → o iki slot None kalır (tahmin ZORLANMAZ)."""
         payload = normalize_match_history_game(
             mh_game_custom_real, champion_map=real_champion_map
         )
-        for p in payload.participants:
-            assert p.position is None, (
-                f"position {p.position!r} geldi ({p.riot_id!r}) — custom'da tahmin yasak"
-            )
+        team_100 = {p.riot_id: p.position for p in payload.participants if p.team == 100}
+        assert sorted(v for v in team_100.values() if v) == [
+            "BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"
+        ]
+        assert team_100["SoSiSwithSaLaM#TR1"] == "JUNGLE"  # Smite taşıyan
+
+        team_200 = {p.riot_id: p.position for p in payload.participants if p.team == 200}
+        assert team_200["YANSIMANIN OĞLU#4634"] == "JUNGLE"
+        assert team_200["Fugori#3818"] == "BOTTOM"
+        assert team_200["Çizgi Hükümdarı#PNTHR"] == "UTILITY"
+        # belirsiz kalan iki oyuncu — null gider, insan UI'dan düzeltir
+        assert team_200["ıııııMMAMMıııııı#TR1"] is None
+        assert team_200["Śhade#TR1"] is None
+
+    def test_no_duplicate_position_within_team(self, mh_game_custom_real):
+        """Zincir aynı rolü bir takımda iki kez atamamalı."""
+        payload = normalize_match_history_game(mh_game_custom_real)
+        for team_id in (100, 200):
+            assigned = [
+                p.position
+                for p in payload.participants
+                if p.team == team_id and p.position
+            ]
+            assert len(assigned) == len(set(assigned))
 
 
 class TestIsCustomOnRealListPage:
