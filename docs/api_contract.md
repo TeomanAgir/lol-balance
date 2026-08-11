@@ -109,6 +109,9 @@ Kurallar (tümü valid maçlar; salt-okur, rating'e etkisi yok):
   `display_name` alfabetik.
 - `matches_in_window` = ilgili oyuncunun penceredeki valid maç sayısı (rol
   kartlarında o roldeki maç sayısı).
+- Hiç valid maç yokken `window` rolling pencereyi (`now−7g`, `now`) ve
+  `fallback: false` döner (çapalanacak maç yok). `score` ve `delta` 2 ondalığa
+  yuvarlanır; sıralama/kırılımlar yuvarlanmamış değerle.
 - UI: kartlara tıklanınca oyuncu profiline gider (GÖREV 1 görünümü).
 
 ## 3. Maçlar
