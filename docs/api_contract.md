@@ -114,6 +114,36 @@ Kurallar (tümü valid maçlar; salt-okur, rating'e etkisi yok):
   yuvarlanır; sıralama/kırılımlar yuvarlanmamış değerle.
 - UI: kartlara tıklanınca oyuncu profiline gider (GÖREV 1 görünümü).
 
+### Nemesis (GÖREV 3)
+```
+GET /nemesis
+→ 200 {
+  "all_time": <pair | null>,
+  "weekly":   <pair | null>,
+  "active":   "weekly" | "all_time" | null    // maç önerisinin kullanacağı çift
+}
+pair = {
+  "role": "MIDDLE",
+  "players": [{"player_id": 1, "display_name": "A", "wins": 3},
+              {"player_id": 7, "display_name": "B", "wins": 2}],
+  "encounters": 5,
+  "closeness": 0.8            // 1 - 2*|wins[0]/encounters - 0.5|; 1.0 = tam başa baş
+}
+```
+Kurallar (salt-okur; Teoman kararları 2026-08-12, CHANGE_REQUESTS):
+- **Karşılaşma:** valid bir maçta KARŞI takımlarda ve İKİSİ DE AYNI (non-null) position.
+  Aday birim (çift, rol) üçlüsüdür; `encounters` o roldeki karşılaşma sayısıdır (aynı
+  iki oyuncu farklı rollerde karşılaşmışsa bunlar ayrı adaylardır).
+- **Uygunluk eşiği:** `encounters >= 3`. `all_time` tüm valid maçlardan; `weekly`,
+  `GET /highlights/weekly` pencere kuralının AYNISI ile (son 7 gün + boşsa son maça
+  çapa) pencere içi karşılaşmalardan hesaplanır.
+- **Sıralama (önce başa-başlık):** `closeness` azalan → `encounters` azalan → rol
+  kanonik sıra (TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY) → (küçük player_id, büyük
+  player_id) artan. `players` dizisi player_id küçük olan önce gelir.
+- **active:** `weekly` doluysa "weekly", değilse `all_time` doluysa "all_time",
+  ikisi de boşsa `null`.
+- `closeness` 2 ondalığa yuvarlanır; sıralama ham değerle.
+
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
@@ -184,6 +214,21 @@ Body: {
 - Hiç rol verisi olmayan oyuncu her rolde default prior (score 0, nötr) ile hesaba
   katılır — az veriyle sistem "dümdüz" çalışır.
 - Backend 126 ayrımın tamamını değerlendirir (brute force), `quality` azalan sırada döner.
+
+### Nemesis maçı (GÖREV 3)
+```
+POST /balance/nemesis
+Body: {"player_ids": [10 farklı id], "top_n": 3}
+→ 200 { /balance yanıtının aynısı } + "nemesis": {"source": "weekly"|"all_time",
+                                                  "role": "MIDDLE",
+                                                  "player_ids": [1, 7]}
+```
+- Aktif nemesis çifti yoksa (`GET /nemesis.active == null`) → `409` (Türkçe detail).
+- Çiftin iki üyesi de `player_ids` içinde değilse → `422`.
+- Kısıt: çift KARŞI takımlara ayrılır ve İKİSİ DE nemesis rolüne sabitlenir; kalan
+  8 oyuncu ve rol slotu normal rol-bazlı optimizasyonla dağıtılır (rating_contract
+  "Dengeleme" kuralları; ayrım uzayı çifti ayıran 70 ayrım, atama araması takım
+  başına kalan 4 rolün 24 permütasyonu). Sıralama/quality tanımı değişmez.
 
 ## 5. Rating yönetimi
 ```
