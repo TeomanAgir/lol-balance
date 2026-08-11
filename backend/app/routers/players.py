@@ -17,7 +17,12 @@ from ..schemas import (
     RoleRatingOut,
 )
 from ..services.player_stats import player_stats
-from ..services.ratings import current_ratings, is_blend, perf_averages
+from ..services.ratings import (
+    current_ratings,
+    effective_score,
+    is_blend,
+    perf_averages,
+)
 from ..services.role_ratings import (
     current_role_ratings,
     role_match_counts,
@@ -44,12 +49,8 @@ def _role_ratings_out(
     for role in ROLES:
         key = (player_id, role)
         r = role_ratings.get(key, default)
-        if blend:
-            p_avg = role_p_avgs.get(key, 1.0)
-            score = engine.effective(r.mu, r.sigma, p_avg).score
-        else:
-            p_avg = None
-            score = r.ordinal
+        p_avg = role_p_avgs.get(key, 1.0) if blend else None
+        score = effective_score(engine, blend, r, p_avg)
         out[role] = RoleRatingOut(
             mu=r.mu,
             sigma=r.sigma,
@@ -81,14 +82,10 @@ def _player_list(
     out = []
     for row in rows:
         r = ratings.get(row["id"], default)
-        if blend:
-            # Harman: score efektif rating'tir; maçsız oyuncuda P_avg=1.0
-            # (nötr) kabul edilir (rating_contract "Harman Engine" §4).
-            p_avg = p_avgs.get(row["id"], 1.0)
-            score = engine.effective(r.mu, r.sigma, p_avg).score
-        else:
-            p_avg = None
-            score = r.ordinal
+        # Harman: score efektif rating'tir; maçsız oyuncuda P_avg=1.0 (nötr)
+        # kabul edilir (rating_contract "Harman Engine" §4).
+        p_avg = p_avgs.get(row["id"], 1.0) if blend else None
+        score = effective_score(engine, blend, r, p_avg)
         out.append(
             PlayerOut(
                 id=row["id"],

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import get_settings
 from .db import run_migrations
 from .deps import require_api_key
-from .routers import admin, balance, ingest, matches, players
+from .routers import admin, balance, highlights, ingest, matches, players
 
 
 def _validation_detail(exc: RequestValidationError) -> str:
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
 
     api_deps = [Depends(require_api_key)]
     for router in (ingest.router, players.router, matches.router,
-                   balance.router, admin.router):
+                   balance.router, admin.router, highlights.router):
         app.include_router(router, prefix="/api/v1", dependencies=api_deps)
 
     webui = Path(settings.webui_dir)

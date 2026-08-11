@@ -40,7 +40,13 @@
     </table>
   </section>
 
-  <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralamadan açılan detay görünümü ═══ -->
+  <!-- ═══ Haftanın enleri (GÖREV 2) ═══ -->
+  <section id="view-highlights" class="view" hidden>
+    <p class="view-hint">Son 7 günün öne çıkanları. Karta dokununca o oyuncunun istatistik sayfası açılır.</p>
+    <div id="highlights-body" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralama/enler'den açılan detay görünümü ═══ -->
   <section id="view-profile" class="view" hidden>
     <button id="btn-profile-back" class="back-btn" type="button">← Sıralamaya dön</button>
     <div id="profile-body" aria-live="polite"></div>
@@ -75,6 +81,7 @@
 <nav class="tabbar">
   <button class="tab active" data-view="balance"     type="button">Dengele</button>
   <button class="tab"        data-view="leaderboard" type="button">Sıralama</button>
+  <button class="tab"        data-view="highlights"  type="button">Enler</button>
   <button class="tab"        data-view="matches"     type="button">Geçmiş</button>
   <button class="tab"        data-view="manual"      type="button">Manuel</button>
 </nav>

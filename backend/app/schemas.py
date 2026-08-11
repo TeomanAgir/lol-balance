@@ -143,6 +143,39 @@ class PlayerStatsOut(BaseModel):
     synergy: list[SynergyOut]
 
 
+class HighlightsWindowOut(BaseModel):
+    # api_contract §2 "Haftanın enleri": UTC ISO8601, `start < played_at <= end`.
+    # fallback=True → pencere boştu, end en son valid maça çapalandı.
+    start: str
+    end: str
+    fallback: bool
+
+
+class HighlightPlayerOut(BaseModel):
+    # best_player ve best_by_role kartları: GÜNCEL score + pencere maç sayısı.
+    player_id: int
+    display_name: str
+    score: float
+    matches_in_window: int
+
+
+class HighlightRisingStarOut(BaseModel):
+    # "Yıldız rukisi": pencere içi ordinal (mu−3σ) artışı; negatif olabilir.
+    player_id: int
+    display_name: str
+    delta: float
+    matches_in_window: int
+
+
+class WeeklyHighlightsOut(BaseModel):
+    # api_contract §2 "Haftanın enleri (GÖREV 2)". best_by_role 5 rolün
+    # tamamını içerir; o rolde pencerede kimse oynamadıysa değeri null.
+    window: HighlightsWindowOut
+    best_player: Optional[HighlightPlayerOut]
+    rising_star: Optional[HighlightRisingStarOut]
+    best_by_role: dict[str, Optional[HighlightPlayerOut]]
+
+
 class PositionsUpdate(BaseModel):
     # api_contract §3: anahtarlar bu maçın player_id'leri (JSON nesne anahtarı
     # olduğu için string), değerler rol adı veya null. Kısmi güncelleme serbest.
