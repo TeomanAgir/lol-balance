@@ -8,6 +8,7 @@ from collector.normalizer import (
     game_creation_datetime,
     is_custom,
     mh_identity_pairs,
+    mh_is_remake,
     normalize_eog,
     normalize_match_history_game,
     normalize_position,
@@ -139,6 +140,25 @@ class TestNormalizeMatchHistory:
         pairs = mh_identity_pairs(mh_game_custom)
         assert len(pairs) == 10
         assert ("puuid-t1", "Teoman#TR1") in pairs
+
+
+class TestMhIsRemake:
+    def test_no_winner_short_game_is_remake(self, mh_game_custom):
+        mh_game_custom["gameDuration"] = 185
+        for team in mh_game_custom["teams"]:
+            team["win"] = "Fail"
+        assert mh_is_remake(mh_game_custom) is True
+
+    def test_no_winner_long_game_is_not_remake(self, mh_game_custom):
+        for team in mh_game_custom["teams"]:
+            team["win"] = "Fail"  # gameDuration 2011 kalır
+        assert mh_is_remake(mh_game_custom) is False
+        with pytest.raises(NormalizeError, match="Kazanan"):
+            normalize_match_history_game(mh_game_custom)
+
+    def test_short_game_with_winner_is_not_remake(self, mh_game_custom):
+        mh_game_custom["gameDuration"] = 185
+        assert mh_is_remake(mh_game_custom) is False
 
 
 class TestIsCustom:

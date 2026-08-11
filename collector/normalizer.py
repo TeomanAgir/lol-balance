@@ -183,6 +183,33 @@ def normalize_eog(
     )
 
 
+REMAKE_MAX_DURATION_S = 300
+
+
+def _mh_winner_team(raw: dict[str, Any]) -> Optional[int]:
+    """Match-history kaydından kazanan takım; belirlenemiyorsa None."""
+    winner_team: Optional[int] = None
+    for team in raw.get("teams") or []:
+        win = team.get("win")
+        if win is True or (isinstance(win, str) and win.strip().lower() == "win"):
+            winner_team = int(team.get("teamId"))
+    return winner_team if winner_team in (100, 200) else None
+
+
+def mh_is_remake(raw: dict[str, Any]) -> bool:
+    """Kazananı olmayan kısa maç (< 300 sn) remake'tir: normalize edilemez ama bu
+    bir hata değildir — backend zaten duration < 300 maçları void'ler, göndermeye
+    gerek yok. Kazanan yok ama süre >= 300 ise gerçekten anormaldir (remake değil)."""
+    duration_raw = raw.get("gameDuration")
+    if duration_raw is None:
+        return False
+    try:
+        duration_s = _duration_seconds(duration_raw)
+    except (TypeError, ValueError):
+        return False
+    return duration_s < REMAKE_MAX_DURATION_S and _mh_winner_team(raw) is None
+
+
 def mh_identity_pairs(raw: dict[str, Any]) -> list[tuple[Optional[str], Optional[str]]]:
     """Match-history kaydından (puuid, riot_id) çiftleri — roster filtresi için."""
     pairs: list[tuple[Optional[str], Optional[str]]] = []
@@ -213,12 +240,8 @@ def normalize_match_history_game(
         raise NormalizeError(f"Match history kaydında gameDuration yok (gameId={game_id})")
     duration_s = _duration_seconds(duration_raw)
 
-    winner_team: Optional[int] = None
-    for team in raw.get("teams") or []:
-        win = team.get("win")
-        if win is True or (isinstance(win, str) and win.strip().lower() == "win"):
-            winner_team = int(team.get("teamId"))
-    if winner_team not in (100, 200):
+    winner_team = _mh_winner_team(raw)
+    if winner_team is None:
         raise NormalizeError(f"Kazanan takım belirlenemedi (gameId={game_id})")
 
     identities: dict[int, dict[str, Any]] = {}

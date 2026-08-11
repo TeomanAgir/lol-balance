@@ -9,4 +9,5 @@ build/
 *.sqlite3
 .env
 collector/outbox/
-collector/archive/
+collector/raw_archive/
+collector/.env

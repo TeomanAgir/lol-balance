@@ -63,6 +63,13 @@ Kendi hesabının LCU match history'sini sayfalayarak geriye tarar; custom olan 
   gönderilir. Bilinmeyen katılımcılar backend'de otomatik oyuncu kaydı oluşturur.
 - Çift gönderim zararsızdır: idempotency backend'de `source_game_id` ile sağlanır;
   backfill'i istediğiniz kadar tekrar koşabilirsiniz.
+- Gönderim kronolojiktir: adaylar önce toplanır, tarama bitince `played_at`'e göre
+  eskiden-yeniye gönderilir; böylece incremental rating doğru sırayla işler ve
+  backfill sonrası manuel `POST /admin/replay` gerekmez.
+- Kazananı olmayan ve 300 saniyeden kısa süren maçlar **remake** sayılıp sessizce
+  atlanır (hata değildir; backend zaten < 300 sn maçları void'ler).
+- Bazı LCU sürümleri sayfalama indekslerini yok sayıp hep aynı listeyi döndürür;
+  görülen gameId'ler izlenir ve yeni maç içermeyen ilk sayfada tarama sonlanır.
 
 ## Teslimat garantisi (outbox)
 

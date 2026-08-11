@@ -3,6 +3,14 @@ custom + roster filtresinden geçen maçları normalize edip gönderir.
 
 Çift gönderim zararsızdır (backend `source_game_id` ile idempotent), bu yüzden
 daha önce gönderilmiş maçlar tekrar gönderilebilir.
+
+Sağlamlık notları:
+- Gerçek LCU bazı sürümlerde begIndex/endIndex'i yok sayıp hep aynı listeyi
+  döndürür; görülen gameId'ler set'te tutulur ve yeni maç içermeyen sayfada
+  tarama biter.
+- Kazananı olmayan < 300 sn maçlar remake sayılır ve sessizce atlanır (hata değil).
+- Gönderim, tarama bittikten sonra played_at'e göre eskiden-yeniye yapılır ki
+  backend incremental rating doğru sırayla işlesin (manuel replay gerekmesin).
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ from .normalizer import (
     game_creation_datetime,
     is_custom,
     mh_identity_pairs,
+    mh_is_remake,
     normalize_match_history_game,
 )
 from .roster import KnownRoster, build_known_roster
@@ -38,6 +47,7 @@ class BackfillStats:
     customs: int = 0
     sent: int = 0
     skipped_roster: int = 0
+    skipped_remake: int = 0
     errors: list[str] = field(default_factory=list)
 
 
@@ -70,13 +80,25 @@ def run_backfill(
         log.warning("Champion listesi alınamadı (champion=null gidecek): %s", exc)
         champion_map = None
 
+    seen_game_ids: set = set()
+    candidates = []  # normalize edilmiş MatchPayload'lar; tarama sonunda sıralanıp gönderilir
+
     stop = False
     for page in range(_MAX_PAGES):
         beg = page * PAGE_SIZE
         games = lcu.get_match_list(puuid, beg, beg + PAGE_SIZE)
         if not games:
             break
+        # Gerçek LCU bazı sürümlerde begIndex/endIndex'i yok sayıp hep aynı listeyi
+        # döndürür: sayfa hiç yeni gameId içermiyorsa liste ilerlemiyordur.
+        if all(g.get("gameId") in seen_game_ids for g in games):
+            log.info("Sayfa %d yeni maç içermiyor: liste ilerlemiyor, tarama bitti", page)
+            break
         for game_summary in games:
+            game_id = game_summary.get("gameId")
+            if game_id in seen_game_ids:
+                continue  # aynı maç önceki bir sayfada işlendi
+            seen_game_ids.add(game_id)
             stats.scanned += 1
             created = game_creation_datetime(game_summary)
             if since and created and created.date() < since:
@@ -85,7 +107,6 @@ def run_backfill(
             if not is_custom(game_summary):
                 continue
             stats.customs += 1
-            game_id = game_summary.get("gameId")
             try:
                 full = lcu.get_game(game_id)
             except Exception as exc:
@@ -101,6 +122,11 @@ def run_backfill(
                          config.min_known)
                 continue
 
+            if mh_is_remake(full):
+                stats.skipped_remake += 1
+                log.info("Remake atlandı (%s): kazanan yok ve süre < 300 sn", game_id)
+                continue
+
             try:
                 payload = normalize_match_history_game(full, champion_map)
             except NormalizeError as exc:
@@ -109,14 +135,21 @@ def run_backfill(
                 continue
 
             archive_raw(config, str(game_id), full)
-            sender.send_or_outbox(payload.model_dump())
-            stats.sent += 1
+            candidates.append(payload)
         if stop:
             break
 
+    # Kronolojik gönderim: backend incremental rating'in doğru sırayla işlemesi
+    # için eskiden-yeniye gönder (played_at UTC "Z" formatında, string sırası =
+    # kronolojik sıra). Böylece backfill sonrası manuel replay gerekmez.
+    for payload in sorted(candidates, key=lambda p: p.played_at):
+        sender.send_or_outbox(payload.model_dump())
+        stats.sent += 1
+
     log.info(
         "Backfill bitti: %d maç tarandı, %d custom, %d gönderildi, "
-        "%d roster filtresine takıldı, %d hata",
-        stats.scanned, stats.customs, stats.sent, stats.skipped_roster, len(stats.errors),
+        "%d roster filtresine takıldı, %d remake atlandı, %d hata",
+        stats.scanned, stats.customs, stats.sent, stats.skipped_roster,
+        stats.skipped_remake, len(stats.errors),
     )
     return stats
