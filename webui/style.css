@@ -525,6 +525,124 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .hl-role .hl-sub { font-size: 12px; }
 
+/* ── Nemesis (GÖREV 3) ── */
+/* Enler ekranının son bölümü: iki isim karşılıklı, ortada koridor + skor. */
+.nem-card {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 12px;
+}
+.nem-who {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 2px;
+  transition: color 0.12s;
+}
+.nem-card .nem-who { text-align: center; }
+.nem-who:hover { color: var(--brass); }
+.nem-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+  padding: 0 4px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+.nem-role {
+  font-family: var(--display);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.nem-score {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.nem-sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.nem-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+/* Maç kurmada kullanılacak çift (GET /nemesis.active) her iki yerde de bu etiketi taşır. */
+.nem-active {
+  font-family: var(--display);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--brass);
+  border: 1px solid var(--brass-dim);
+  border-radius: 6px;
+  padding: 1px 8px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.nem-weekly { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.nem-link { padding: 0; font-weight: 600; color: var(--text); transition: color 0.12s; }
+.nem-link:hover { color: var(--brass); }
+.btn-nemesis { display: block; width: 100%; margin-top: 12px; font-size: 15px; }
+
+/* Dengele ekranındaki mod rozeti */
+.nem-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 12px;
+  padding: 10px 8px 10px 14px;
+  margin-bottom: 12px;
+}
+.nem-mode-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nem-mode-title {
+  font-family: var(--display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--brass);
+}
+.nem-mode-pair { font-weight: 600; }
+.nem-mode-hint { font-size: 13px; color: var(--muted); }
+.nem-mode-hint.warn { color: var(--brass); }
+.nem-mode-off {
+  margin-left: auto;
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: 8px;
+}
+.nem-mode-off:hover { color: var(--brass); }
+/* Nemesis çiftinin roster kartları: seçilmeleri zorunlu olduğu için ayırt edilir. */
+.player-card.nem-pick { border-color: var(--brass-dim); border-style: dashed; }
+.player-card.nem-pick.selected { border-color: var(--brass); }  /* seçiliyken de kesik çizgi kalır */
+.player-card.nem-pick .p-name { color: var(--brass); }
+/* Öneri kartlarında çiftin satırları + üstteki not */
+.sug-note { font-size: 13px; color: var(--muted); margin: -4px 0 10px; }
+.team li.nem-row .p-who { color: var(--brass); font-weight: 600; }
+
 /* ── Maç geçmişi ── */
 .match-card {
   background: var(--surface);

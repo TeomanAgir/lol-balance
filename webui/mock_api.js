@@ -69,6 +69,39 @@
   // Deterministik sahte maç geçmişi üret (Date.now/random'a gerek yok).
   let nextMatchId = 100;
   const matches = [];
+
+  // Tek katılımcı üretici (ana geçmiş + nemesis senaryosu ortak kullanır).
+  // seed yalnız istatistikleri çeşitlendirir; hepsi deterministiktir.
+  function mkParticipant(pid, team, position, winner, seed) {
+    const p = players.find(x => x.id === pid);
+    const won = team === winner;
+    const delta = (won ? 1 : -1) * (0.4 + ((pid * 7 + seed * 3) % 10) / 12);
+    return {
+      player_id: pid,
+      display_name: p ? p.display_name : "?",
+      team,
+      position,
+      // Her oyuncu iki şampiyon arasında gidip gelir → profildeki "favori karakter"
+      // birden çok maça dayanır (tek maçlık beraberlik yerine anlamlı bir favori).
+      champion: CHAMPS[(pid * 3 + (seed % 2)) % CHAMPS.length],
+      stats: {
+        kills: (pid + seed) % 12,
+        deaths: (pid * 3 + seed) % 9,
+        assists: (pid * 5 + seed) % 15,
+        gold: 8000 + ((pid * 911 + seed * 137) % 8000),
+        cs: 90 + ((pid * 37 + seed * 11) % 160),
+        damage_to_champs: 9000 + ((pid * 1723 + seed * 431) % 22000),
+        vision_score: 5 + ((pid * 3 + seed) % 40),
+      },
+      rating_change: {
+        mu_before: +((p ? p.rating.mu : 25) - delta).toFixed(2),
+        sigma_before: +((p ? p.rating.sigma : 8.333) + 0.05).toFixed(3),
+        mu_after: +(p ? p.rating.mu : 25).toFixed(2),
+        sigma_after: +(p ? p.rating.sigma : 8.333).toFixed(3),
+      },
+    };
+  }
+
   // Maçsız oyuncu (Ece) hiçbir maça girmez: matches_played ile maç geçmişi tutarlı kalsın,
   // profil ekranında (GÖREV 1) boş/null senaryosu gerçekten boş görünsün.
   const matchPool = players.filter(p => p.matches_played).map(p => p.id);
@@ -84,42 +117,54 @@
       winner_team: winner,
       status: "valid",
       participants: uniq.map((pid, i) => {
-        const team = i < 5 ? 100 : 200;
-        const won = team === winner;
-        const delta = (won ? 1 : -1) * (0.4 + ((pid * 7 + m * 3) % 10) / 12);
-        const p = players.find(x => x.id === pid);
+        const part = mkParticipant(pid, i < 5 ? 100 : 200, POS[i % 5], winner, m);
+        // m === 1 maçında iki katılımcının rolü boş: UI'ın "—" gösterimi ve rol
+        // düzeltme akışı denenebilsin (bu maç rol evrenine girmez).
+        if (m === 1 && (i === 1 || i === 6)) part.position = null;
         // m === 0 maçında iki katılımcıda rating_change null: UI'ın "—" yolu test edilebilsin.
-        const noRating = m === 0 && (i === 2 || i === 7);
-        return {
-          player_id: pid,
-          display_name: p.display_name,
-          team,
-          // m === 1 maçında iki katılımcının rolü boş: UI'ın "—" gösterimi ve rol
-          // düzeltme akışı denenebilsin (bu maç rol evrenine girmez).
-          position: (m === 1 && (i === 1 || i === 6)) ? null : POS[i % 5],
-          // Her oyuncu iki şampiyon arasında gidip gelir → profildeki "favori karakter"
-          // birden çok maça dayanır (tek maçlık beraberlik yerine anlamlı bir favori).
-          champion: CHAMPS[(pid * 3 + (m % 2)) % CHAMPS.length],
-          stats: {
-            kills: (pid + m) % 12,
-            deaths: (pid * 3 + m) % 9,
-            assists: (pid * 5 + m) % 15,
-            gold: 8000 + ((pid * 911 + m * 137) % 8000),
-            cs: 90 + ((pid * 37 + m * 11) % 160),
-            damage_to_champs: 9000 + ((pid * 1723 + m * 431) % 22000),
-            vision_score: 5 + ((pid * 3 + m) % 40),
-          },
-          rating_change: noRating ? null : {
-            mu_before: +(p.rating.mu - delta).toFixed(2),
-            sigma_before: +(p.rating.sigma + 0.05).toFixed(3),
-            mu_after: +p.rating.mu.toFixed(2),
-            sigma_after: +p.rating.sigma.toFixed(3),
-          },
-        };
+        if (m === 0 && (i === 2 || i === 7)) part.rating_change = null;
+        return part;
       }),
     });
   }
-  matches.reverse(); // en yeni başta
+
+  // ── Nemesis senaryosu (GÖREV 3) ──
+  // Ana geçmişte her (çift, rol) yalnız 1 kez karşılaşıyor; nemesis eşiği ise
+  // encounters >= 3. Bu yüzden sabit kadrolu, tekrar eden 6 maç eklenir.
+  // Taban kadro: [rol, mavi oyuncu, kırmızı oyuncu]; "swap" o maçta taraf değiştirenler.
+  const RIVAL_BASE = [
+    ["TOP", 2, 4], ["JUNGLE", 5, 7], ["MIDDLE", 1, 3], ["BOTTOM", 6, 9], ["UTILITY", 8, 10],
+  ];
+  // İlk iki maç 7 günlük pencerenin DIŞINDA kalır → weekly çift all_time'dan farklı
+  // çıkar (UI'daki "Bu haftanın çifti" notu bu senaryoyla test edilir).
+  // Beklenen: all_time = Teoman–Kaan (Orta, 3–3, %100), weekly = Baran–Emir (Üst, 2–2, %100).
+  const RIVAL_MATCHES = [
+    { at: "2026-07-30T19:05:00Z", winner: 100, swap: ["BOTTOM"] },
+    { at: "2026-07-31T20:10:00Z", winner: 100, swap: [] },
+    { at: "2026-08-06T19:40:00Z", winner: 100, swap: [] },
+    { at: "2026-08-07T20:05:00Z", winner: 200, swap: [] },
+    { at: "2026-08-08T19:20:00Z", winner: 200, swap: ["JUNGLE"] },
+    { at: "2026-08-09T21:00:00Z", winner: 200, swap: ["JUNGLE", "TOP", "UTILITY"] },
+  ];
+  RIVAL_MATCHES.forEach((r, i) => {
+    const parts = [];
+    for (const [role, blue, red] of RIVAL_BASE) {
+      const flip = r.swap.includes(role);
+      parts.push(mkParticipant(flip ? red : blue, 100, role, r.winner, 20 + i));
+      parts.push(mkParticipant(flip ? blue : red, 200, role, r.winner, 20 + i));
+    }
+    matches.push({
+      id: nextMatchId++,
+      source_game_id: "687424" + (2000 + i),
+      played_at: r.at,
+      duration_s: 1620 + i * 94,
+      winner_team: r.winner,
+      status: "valid",
+      participants: parts,
+    });
+  });
+
+  matches.sort((a, b) => Date.parse(b.played_at) - Date.parse(a.played_at)); // en yeni başta
 
   // ── Yardımcılar ──
   const json = (obj, status = 200) =>
@@ -129,10 +174,11 @@
 
   // Takıma rol atar: açgözlü (en yüksek rol skoru önce), eşitlikte ilk bulunan kalır.
   // Gerçek atama backend'de (126 ayrım × 120 atama); burada sadece şekil doğru olsun diye.
-  function assignRoles(teamIds) {
-    const free = POS.slice();
-    const rest = [...teamIds];
-    const out = [];
+  // fixed = {player_id, position} verilirse o oyuncu o role sabitlenir (nemesis maçı).
+  function assignRoles(teamIds, fixed) {
+    const free = POS.filter(r => !fixed || r !== fixed.position);
+    const rest = teamIds.filter(id => !fixed || id !== fixed.player_id);
+    const out = fixed ? [{ player_id: fixed.player_id, position: fixed.position }] : [];
     while (rest.length) {
       let best = null;
       for (const pid of rest) {
@@ -292,16 +338,17 @@
   const ordinalOf = (mu, sigma) => mu - 3 * sigma;
   const emptyRoles = () => POS.reduce((o, r) => (o[r] = null, o), {});
 
-  function weeklyHighlights() {
+  // Pencere hesabı tek yerde: haftanın enleri ve nemesis.weekly AYNI kuralı kullanır
+  // (contract: "weekly, GET /highlights/weekly pencere kuralının AYNISI ile").
+  function weeklyWindow() {
     const valid = matches.filter(m => m.status === "valid");
     if (HL_EMPTY || !valid.length) {
       const end = Date.now();
       return {
-        window: { start: new Date(end - DAY7_MS).toISOString(), end: new Date(end).toISOString(), fallback: false },
-        best_player: null, rising_star: null, best_by_role: emptyRoles(),
+        valid, inWindow: [],
+        win: { start: new Date(end - DAY7_MS).toISOString(), end: new Date(end).toISOString(), fallback: false },
       };
     }
-
     let end = Date.now();
     let fallback = false;
     let inWindow = valid.filter(m => playedAt(m) > end - DAY7_MS && playedAt(m) <= end);
@@ -310,11 +357,21 @@
       inWindow = valid.filter(m => playedAt(m) > end - DAY7_MS && playedAt(m) <= end);
       fallback = true;
     }
-    const win = {   // global window'u gölgelememek için "win"
-      start: new Date(end - DAY7_MS).toISOString(),
-      end: new Date(end).toISOString(),
-      fallback,
+    return {
+      valid, inWindow,
+      win: {  // global window'u gölgelememek için "win"
+        start: new Date(end - DAY7_MS).toISOString(),
+        end: new Date(end).toISOString(),
+        fallback,
+      },
     };
+  }
+
+  function weeklyHighlights() {
+    const { valid, inWindow, win } = weeklyWindow();
+    if (HL_EMPTY || !valid.length) {
+      return { window: win, best_player: null, rising_star: null, best_by_role: emptyRoles() };
+    }
 
     // Oyuncu bazında topla: pencere maç sayısı, rol bazlı maç sayısı ve
     // ordinal'in pencere içi ilk "önce" / son "sonra" değerleri (rising_star için).
@@ -374,6 +431,87 @@
     return { window: win, best_player, rising_star, best_by_role };
   }
 
+  // ── Nemesis (GÖREV 3) ──
+  // api_contract §2 "Nemesis": aday birim (çift, rol). Karşılaşma = valid maçta KARŞI
+  // takımlarda ve İKİSİ DE aynı non-null position. Eşik encounters >= 3.
+  //
+  // SENARYO BAYRAKLARI (test için elle değiştir):
+  //   NEM_NONE = true       → all_time ve weekly null, active null (UI boş durumu + düğme yok).
+  //   NEM_WEEKLY_OFF = true → weekly bastırılır; active "all_time" olur (haftalık not çizilmez).
+  const NEM_NONE = false;
+  const NEM_WEEKLY_OFF = false;
+
+  // Verilen maç listesindeki en iyi (çift, rol) adayını döner; yoksa null.
+  // Sıralama: closeness ↓ → encounters ↓ → rol kanonik → (küçük id, büyük id) ↑.
+  function nemesisBest(list) {
+    const cand = new Map();
+    for (const m of list) {
+      if (m.status !== "valid") continue;
+      const parts = m.participants.filter(p => p.position);
+      for (let i = 0; i < parts.length; i++) {
+        for (let j = i + 1; j < parts.length; j++) {
+          const a = parts[i], b = parts[j];
+          if (a.team === b.team || a.position !== b.position) continue;
+          const lo = a.player_id < b.player_id ? a : b;
+          const hi = lo === a ? b : a;
+          const key = `${a.position}|${lo.player_id}|${hi.player_id}`;
+          let e = cand.get(key);
+          if (!e) {
+            e = { role: a.position, lo: lo.player_id, hi: hi.player_id, encounters: 0, loWins: 0, hiWins: 0 };
+            cand.set(key, e);
+          }
+          e.encounters++;
+          if (m.winner_team === lo.team) e.loWins++;
+          else if (m.winner_team === hi.team) e.hiWins++;
+        }
+      }
+    }
+    return [...cand.values()]
+      .filter(e => e.encounters >= 3)
+      .map(e => ({ ...e, closeness: 1 - 2 * Math.abs(e.loWins / e.encounters - 0.5) }))
+      .sort((x, y) =>
+        y.closeness - x.closeness ||
+        y.encounters - x.encounters ||
+        POS.indexOf(x.role) - POS.indexOf(y.role) ||
+        x.lo - y.lo || x.hi - y.hi)[0] || null;
+  }
+
+  const nemName = (id) => (players.find(p => p.id === id) || {}).display_name || ("#" + id);
+  const nemPair = (e) => e ? {
+    role: e.role,
+    players: [
+      { player_id: e.lo, display_name: nemName(e.lo), wins: e.loWins },
+      { player_id: e.hi, display_name: nemName(e.hi), wins: e.hiWins },
+    ],
+    encounters: e.encounters,
+    closeness: +e.closeness.toFixed(2),
+  } : null;
+
+  function nemesisPayload() {
+    if (NEM_NONE) return { all_time: null, weekly: null, active: null };
+    const all_time = nemPair(nemesisBest(matches));
+    const weekly = NEM_WEEKLY_OFF ? null : nemPair(nemesisBest(weeklyWindow().inWindow));
+    return { all_time, weekly, active: weekly ? "weekly" : all_time ? "all_time" : null };
+  }
+
+  // Nemesis maçı: çift KARŞI takımlara ayrılır ve İKİSİ DE nemesis rolüne sabitlenir;
+  // kalan 8 oyuncu normal (mock: açgözlü) atamayla dağıtılır.
+  function nemesisSuggestions(ids, pair) {
+    const [a, b] = pair.players.map(x => x.player_id);
+    const scoreOfId = (id) => ((players.find(p => p.id === id) || {}).rating || {}).score || 0;
+    const rest = ids.filter(id => id !== a && id !== b).sort((x, y) => scoreOfId(y) - scoreOfId(x));
+    return [
+      { blue: [rest[0], rest[3], rest[4], rest[7]], p_win_team_100: 0.506, quality: 0.988 },
+      { blue: [rest[0], rest[1], rest[6], rest[7]], p_win_team_100: 0.532, quality: 0.936 },
+      { blue: [rest[2], rest[3], rest[4], rest[5]], p_win_team_100: 0.474, quality: 0.948 },
+    ].map(s => ({
+      team_100: assignRoles([a, ...s.blue], { player_id: a, position: pair.role }),
+      team_200: assignRoles([b, ...rest.filter(id => !s.blue.includes(id))], { player_id: b, position: pair.role }),
+      p_win_team_100: s.p_win_team_100,
+      quality: s.quality,
+    })).sort((x, y) => y.quality - x.quality);
+  }
+
   // ── fetch stub ──
   window.mockFetch = async function (url, opts = {}) {
     await delay(250); // ağ hissi
@@ -396,6 +534,8 @@
 
     if (method === "GET" && path === "/highlights/weekly") return json(weeklyHighlights());
 
+    if (method === "GET" && path === "/nemesis") return json(nemesisPayload());
+
     if (method === "GET" && path.startsWith("/matches")) return json(matches);
 
     if (method === "POST" && path === "/balance") {
@@ -403,6 +543,27 @@
       const ids = [...new Set(body.player_ids || [])];
       if (ids.length !== 10) return err(422, "Dengeleme için tam 10 farklı oyuncu seçilmelidir.");
       return json({ engine_version: "openskill-pl-blend50-v1", suggestions: balanceSuggestions(ids) });
+    }
+
+    // Nemesis maçı (GÖREV 3): /balance ile aynı yanıt + "nemesis" nesnesi.
+    // 409 = aktif çift yok, 422 = 10 seçim hatalı ya da çift seçimin dışında.
+    if (method === "POST" && path === "/balance/nemesis") {
+      const body = JSON.parse(opts.body);
+      const ids = [...new Set(body.player_ids || [])];
+      if (ids.length !== 10) return err(422, "Dengeleme için tam 10 farklı oyuncu seçilmelidir.");
+      const nem = nemesisPayload();
+      if (!nem.active)
+        return err(409, "Aktif nemesis çifti yok: aynı koridorda en az 3 karşılaşma gerekiyor.");
+      const pair = nem[nem.active];
+      const pids = pair.players.map(x => x.player_id);
+      const missing = pair.players.filter(x => !ids.includes(x.player_id));
+      if (missing.length)
+        return err(422, `Nemesis çifti seçimin dışında: ${missing.map(x => x.display_name).join(" ve ")} de seçilmeli.`);
+      return json({
+        engine_version: "openskill-pl-blend50-v1",
+        suggestions: nemesisSuggestions(ids, pair),
+        nemesis: { source: nem.active, role: pair.role, player_ids: pids },
+      });
     }
 
     // Rol düzeltme (GÖREV 0): yalnız match_participants.position değişir,

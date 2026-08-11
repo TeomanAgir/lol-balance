@@ -20,6 +20,19 @@
   <section id="view-balance" class="view">
     <p class="view-hint">Bu gece oynayacak 10 kişiyi seç. Kartın altındaki kutular rol ratingleridir:
       rol · puan · o roldeki maç sayısı; hiç oynanmamış rol soluk görünür.</p>
+
+    <!-- Nemesis modu rozeti (GÖREV 3) — Enler ekranındaki "Nemesis maçı kur" açar,
+         sağdaki × kapatır. Açıkken "Dengele" POST /balance/nemesis'e gider. -->
+    <div id="nemesis-mode" class="nem-mode" hidden>
+      <div class="nem-mode-body">
+        <span class="nem-mode-title">Nemesis modu</span>
+        <span id="nem-mode-pair" class="nem-mode-pair"></span>
+        <span id="nem-mode-hint" class="nem-mode-hint"></span>
+      </div>
+      <button id="btn-nemesis-off" class="nem-mode-off" type="button"
+              title="Nemesis modunu kapat" aria-label="Nemesis modunu kapat">×</button>
+    </div>
+
     <div id="roster" class="roster-grid" aria-live="polite"></div>
 
     <div id="suggestions" class="suggestions"></div>
@@ -42,7 +55,8 @@
 
   <!-- ═══ Haftanın enleri (GÖREV 2) ═══ -->
   <section id="view-highlights" class="view" hidden>
-    <p class="view-hint">Son 7 günün öne çıkanları. Karta dokununca o oyuncunun istatistik sayfası açılır.</p>
+    <p class="view-hint">Son 7 günün öne çıkanları. Karta dokununca o oyuncunun istatistik sayfası açılır.
+      En altta, en çok başa baş geçen koridor rekabeti (nemesis) ve o çiftle maç kurma düğmesi var.</p>
     <div id="highlights-body" aria-live="polite"></div>
   </section>
 
