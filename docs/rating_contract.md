@@ -129,8 +129,9 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
    score   = mu_eff - 3 * sigma          # görünen/sıralanan değer
    ```
    - Hiç maçı olmayan oyuncu: P_avg = 1.0 kabul edilir → default'ta mu_eff = 25 (nötr).
-   - `P_avg` aralığı [0.5, 2.0] olduğundan perf terimi mu_eff'e en fazla ±10 (fiilen
-     ±%50 perf sapması ≈ ±5 puan) katar; W/L çekirdeğiyle aynı mertebede.
+   - `P_avg` aralığı [0.5, 2.0] olduğundan perf teriminin mu_eff katkısı en fazla +10,
+     en az −5'tir (taban 0.5 olduğu için −10'a ulaşılamaz). Bu asimetri perf-v1'deki
+     bilinçli asimetriyle tutarlıdır: kötü performans cezası ödülden hafiftir.
 5. **Dengeleme:** `predict_win`, (mu_eff, sigma) çiftleriyle çağrılır. Sıralama ve
    quality tanımı değişmez.
 

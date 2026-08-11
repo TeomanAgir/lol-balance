@@ -69,6 +69,30 @@ aynıdır — bu yüzden maç sonucunun yönü asla değişmez. Statlar
 `update(..., stats100=, stats200=, duration_s=)` ile `ParticipantStats`
 listeleri olarak geçirilir (`from rating import ParticipantStats`).
 
+## `openskill-pl-blend50-v1` — harman version (W/L %50 + performans %50)
+
+mu/sigma güncellemeleri `openskill-pl-v1` ile **bit-bit aynıdır** (çarpan yok:
+performans hem güncellemede hem harmanda sayılırsa çift sayım olur). Performansın
+tüm etkisi efektif rating harmanındadır; sabitler `MU_0=25`, `K=20`, `W=0.5`
+bu version'a dondurulmuştur:
+
+```python
+engine = Engine("openskill-pl-blend50-v1")
+
+# Maç başına perf skorları ([0.5, 2.0]; hesaplanamayan katılımcı 1.0).
+# Skor tanımı versiyondan bağımsızdır ve perf-v1 çarpanına giren perf ile
+# birebir aynıdır; her version'da çağrılabilir.
+p100, p200 = engine.perf_scores(stats100, stats200, duration_s)
+
+# Efektif rating (p_avg: kariyer perf ortalaması; maçsız oyuncuda 1.0):
+# mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)),  score = mu_eff - 3*sigma
+eff = engine.effective(mu, sigma, p_avg)   # EffectiveRating(mu_eff, sigma, score)
+```
+
+Leaderboard/dengeleme `score` (ve `mu_eff`, `sigma`) üzerinden çalışır;
+`effective()` harman olmayan version'da `ValueError` verir. p_avg=1'de default
+rating için mu_eff=25, score=0 (nötr); perf terimi mu_eff'e en fazla ±10 katar.
+
 ## Version'lama kuralı
 
 - Model parametreleri `version` string'ine bağlıdır (`openskill-pl-v1`).

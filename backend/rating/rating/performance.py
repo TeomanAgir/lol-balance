@@ -51,6 +51,14 @@ class PerfParams:
     share_baseline: float
 
 
+# Perf SKORU tanımı version'dan bağımsızdır (contract "Harman Engine" §2:
+# perf-v1'deki beş bileşen ve kurallarla aynı). Bu sabitler skor tanımına
+# aittir; perf-v1'in PerfParams kopyaları bunlarla aynı değerdedir.
+SCORE_RATIO_MIN = 0.5
+SCORE_RATIO_MAX = 2.0
+SCORE_SHARE_BASELINE = 0.2
+
+
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
@@ -86,17 +94,20 @@ def _team_total(stats: list[Optional[ParticipantStats]], field: str) -> int:
     )
 
 
-def compute_multipliers(
+def compute_perf_scores(
     stats100: list[Optional[ParticipantStats]],
     stats200: list[Optional[ParticipantStats]],
     duration_s: Optional[int],
-    params: PerfParams,
+    ratio_min: float = SCORE_RATIO_MIN,
+    ratio_max: float = SCORE_RATIO_MAX,
+    share_baseline: float = SCORE_SHARE_BASELINE,
 ) -> tuple[list[float], list[float]]:
-    """Her katılımcı için etkin çarpanı hesaplar.
+    """Her katılımcı için maç performans skorunu (perf) hesaplar.
 
     stats100/stats200: 5'er elemanlı liste; eleman ParticipantStats veya None
-    (None → o katılımcı için nötr çarpan 1.0, ortalamalara da girmez).
-    Dönüş: (carpan100, carpan200) — her değer [1-cap, 1+cap] bandındadır.
+    (None → o katılımcı için nötr skor 1.0, ortalamalara da girmez).
+    Dönüş: (perf100, perf200) — her değer [ratio_min, ratio_max] bandındadır
+    (kırpılmış bileşen oranlarının ortalaması; hiç bileşen yoksa 1.0).
     """
     all_stats: list[Optional[ParticipantStats]] = list(stats100) + list(stats200)
 
@@ -118,7 +129,7 @@ def compute_multipliers(
         "gold": (_team_total(stats100, "gold"), _team_total(stats200, "gold")),
     }
 
-    def multiplier(i: int) -> float:
+    def perf(i: int) -> float:
         s = all_stats[i]
         team_idx = 0 if i < len(stats100) else 1
         components: list[float] = []
@@ -128,11 +139,11 @@ def compute_multipliers(
         if s is not None and s.damage_to_champs is not None:
             total = totals["damage_to_champs"][team_idx]
             if total > 0:
-                components.append((s.damage_to_champs / total) / params.share_baseline)
+                components.append((s.damage_to_champs / total) / share_baseline)
         if s is not None and s.gold is not None:
             total = totals["gold"][team_idx]
             if total > 0:
-                components.append((s.gold / total) / params.share_baseline)
+                components.append((s.gold / total) / share_baseline)
         if cspms[i] is not None and cspm_mean:
             components.append(cspms[i] / cspm_mean)
         if visions[i] is not None and vision_mean:
@@ -140,9 +151,38 @@ def compute_multipliers(
 
         if not components:
             return 1.0
-        clamped = [_clamp(c, params.ratio_min, params.ratio_max) for c in components]
-        perf = sum(clamped) / len(clamped)
-        return _clamp(1.0 + params.alpha * (perf - 1.0), 1.0 - params.cap, 1.0 + params.cap)
+        clamped = [_clamp(c, ratio_min, ratio_max) for c in components]
+        return sum(clamped) / len(clamped)
 
-    mults = [multiplier(i) for i in range(len(all_stats))]
-    return mults[: len(stats100)], mults[len(stats100) :]
+    scores = [perf(i) for i in range(len(all_stats))]
+    return scores[: len(stats100)], scores[len(stats100) :]
+
+
+def compute_multipliers(
+    stats100: list[Optional[ParticipantStats]],
+    stats200: list[Optional[ParticipantStats]],
+    duration_s: Optional[int],
+    params: PerfParams,
+) -> tuple[list[float], list[float]]:
+    """Her katılımcı için etkin çarpanı hesaplar (`openskill-pl-perf-v1`).
+
+    Skor hesabı compute_perf_scores ile AYNI fonksiyondan gelir (contract:
+    blend50 perf_score == perf-v1 çarpanına giren perf, birebir). Nötr skor
+    (1.0) çarpanı da tam 1.0 yapar (alpha*(1-1) = 0.0, kırpma değiştirmez).
+    Dönüş: (carpan100, carpan200) — her değer [1-cap, 1+cap] bandındadır.
+    """
+    p100, p200 = compute_perf_scores(
+        stats100,
+        stats200,
+        duration_s,
+        ratio_min=params.ratio_min,
+        ratio_max=params.ratio_max,
+        share_baseline=params.share_baseline,
+    )
+
+    def mult(perf: float) -> float:
+        return _clamp(
+            1.0 + params.alpha * (perf - 1.0), 1.0 - params.cap, 1.0 + params.cap
+        )
+
+    return [mult(p) for p in p100], [mult(p) for p in p200]
