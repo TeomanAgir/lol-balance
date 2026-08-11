@@ -6,20 +6,40 @@ Python nesneleridir. openskill'in kendi rating tipi bu modülün dışına sızm
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from openskill.models import PlackettLuce
 
+from .performance import ParticipantStats, PerfParams, compute_multipliers
+
 TEAM_SIZE = 5
 
-# Bilinen version string'leri ve bağlı model parametreleri.
+# Taban model parametreleri (OpenSkill PlackettLuce default'ları).
+_BASE_PARAMS = {
+    "mu": 25.0,
+    "sigma": 25.0 / 3.0,
+    "beta": 25.0 / 6.0,
+    "tau": 25.0 / 300.0,
+}
+
+# Bilinen version string'leri ve bağlı parametreler.
 # Parametre değişikliği = YENİ version string (replay uyumluluğu için);
 # mevcut bir version'ın parametreleri asla değiştirilmez.
+# "perf" None ise performans katmanı yoktur (yalnızca W/L).
 _VERSIONS = {
     "openskill-pl-v1": {
-        "mu": 25.0,
-        "sigma": 25.0 / 3.0,
-        "beta": 25.0 / 6.0,
-        "tau": 25.0 / 300.0,
+        "model": dict(_BASE_PARAMS),
+        "perf": None,
+    },
+    "openskill-pl-perf-v1": {
+        "model": dict(_BASE_PARAMS),
+        "perf": PerfParams(
+            alpha=0.5,
+            cap=0.3,
+            ratio_min=0.5,
+            ratio_max=2.0,
+            share_baseline=0.2,
+        ),
     },
 }
 
@@ -36,14 +56,15 @@ class Rating:
 
 class Engine:
     def __init__(self, version: str = "openskill-pl-v1"):
-        params = _VERSIONS.get(version)
-        if params is None:
+        spec = _VERSIONS.get(version)
+        if spec is None:
             raise ValueError(
                 f"Bilinmeyen rating version: {version!r}. "
                 f"Geçerli: {sorted(_VERSIONS)}"
             )
         self.version = version
-        self._model = PlackettLuce(**params)
+        self._model = PlackettLuce(**spec["model"])
+        self._perf: Optional[PerfParams] = spec["perf"]
 
     def default_rating(self) -> Rating:
         r = self._model.rating()
@@ -54,18 +75,34 @@ class Engine:
         team100: list[Rating],
         team200: list[Rating],
         winner: int,
+        stats100: Optional[list[Optional[ParticipantStats]]] = None,
+        stats200: Optional[list[Optional[ParticipantStats]]] = None,
+        duration_s: Optional[int] = None,
     ) -> tuple[list[Rating], list[Rating]]:
         if winner not in (100, 200):
             raise ValueError(f"winner 100 veya 200 olmalı, geldi: {winner!r}")
         self._check_team(team100, "team100")
         self._check_team(team200, "team200")
+        self._check_stats(stats100, "stats100")
+        self._check_stats(stats200, "stats200")
         ranks = [1, 2] if winner == 100 else [2, 1]
         new100, new200 = self._model.rate(
             [self._to_model(team100), self._to_model(team200)], ranks=ranks
         )
+        base100 = [Rating(mu=r.mu, sigma=r.sigma) for r in new100]
+        base200 = [Rating(mu=r.mu, sigma=r.sigma) for r in new200]
+
+        # Performans katmanı yalnızca perf'li version'da ve stats verildiyse
+        # devreye girer; aksi halde taban modelle birebir aynı sonuç döner.
+        if self._perf is None or (stats100 is None and stats200 is None):
+            return base100, base200
+
+        s100 = stats100 if stats100 is not None else [None] * TEAM_SIZE
+        s200 = stats200 if stats200 is not None else [None] * TEAM_SIZE
+        m100, m200 = compute_multipliers(s100, s200, duration_s, self._perf)
         return (
-            [Rating(mu=r.mu, sigma=r.sigma) for r in new100],
-            [Rating(mu=r.mu, sigma=r.sigma) for r in new200],
+            self._modulate(team100, base100, m100, won=(winner == 100)),
+            self._modulate(team200, base200, m200, won=(winner == 200)),
         )
 
     def predict_win(self, team100: list[Rating], team200: list[Rating]) -> float:
@@ -76,10 +113,45 @@ class Engine:
         )
         return p100
 
+    @staticmethod
+    def _modulate(
+        old_team: list[Rating],
+        base_team: list[Rating],
+        mults: list[float],
+        won: bool,
+    ) -> list[Rating]:
+        """mu deltasını çarpanla ölçekler; sigma taban modelden aynen alınır.
+
+        Kazanan: mu_after = mu_before + delta_mu * carpan
+        Kaybeden: mu_after = mu_before + delta_mu * (2 - carpan)
+        Çarpan (1-cap, 1+cap) bandında pozitif kaldığı için delta'nın işareti
+        asla değişmez: kazanan her zaman kazanır, kaybeden her zaman kaybeder.
+        """
+        out: list[Rating] = []
+        for old, base, m in zip(old_team, base_team, mults):
+            factor = m if won else 2.0 - m
+            if factor == 1.0:
+                # Nötr çarpanda taban sonuç BİREBİR (bit-bit) korunur.
+                out.append(base)
+            else:
+                out.append(
+                    Rating(mu=old.mu + (base.mu - old.mu) * factor, sigma=base.sigma)
+                )
+        return out
+
     def _check_team(self, team: list[Rating], name: str) -> None:
         if len(team) != TEAM_SIZE:
             raise ValueError(
                 f"{name} tam {TEAM_SIZE} oyuncu olmalı (5v5), geldi: {len(team)}"
+            )
+
+    def _check_stats(
+        self, stats: Optional[list[Optional[ParticipantStats]]], name: str
+    ) -> None:
+        if stats is not None and len(stats) != TEAM_SIZE:
+            raise ValueError(
+                f"{name} verilirse tam {TEAM_SIZE} eleman olmalı "
+                f"(eksik katılımcı için None kullanın), geldi: {len(stats)}"
             )
 
     def _to_model(self, team: list[Rating]):

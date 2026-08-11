@@ -50,6 +50,12 @@ Kurallar:
 - Bir bileşen, katılımcıda ilgili stat null ise veya paydası 0/anlamsız ise (ör. maç
   ortalaması 0, takım toplamı 0, duration_s null/0) HESAPLANMAZ ve ortalamaya girmez.
 - Ortalamalar yalnızca ilgili statı null olmayan katılımcılar üzerinden alınır.
+- KDA bileşeni kills, deaths ve assists'in ÜÇÜNÜN DE null olmamasını gerektirir.
+- Kırpma sırası: her bileşen oranı ÖNCE tek tek [RATIO_MIN, RATIO_MAX]'a kırpılır,
+  `perf` ortalaması kırpılmış değerler üzerinden alınır.
+- Not: RATIO_MIN=0.5 nedeniyle ham çarpan minimumu 0.75'tir; [0.7, 1.3] bandının alt
+  sınırı yalnızca güvenlik kırpmasıdır (üst sınır 1.3 ise fiilen devreye girer). Bu
+  asimetri bilinçlidir: kötü performans cezası, iyi performans ödülünden hafif tutulur.
 
 ### Skor ve çarpan
 

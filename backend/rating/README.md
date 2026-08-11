@@ -34,10 +34,10 @@ Takımlar tam 5 kişi olmalıdır; aksi halde `ValueError` (sistem yalnızca 5v5
   `mu=25`, `sigma=25/3`, `beta=25/6`, `tau=25/300`.
 - TrueSkill yerine OpenSkill: patent yükü yok, saf Python, çok oyunculu takım
   desteği yerleşik ve Plackett-Luce modeli takım bazlı sonuçlarla iyi çalışır.
-- Rating güncellemesine giren **tek** bilgi maç sonucudur (W/L). KDA, gold vb.
-  metrikler bilinçli olarak kapsam dışıdır: role göre yapısal olarak
-  kıyaslanamazlar (support ile ADC'nin KDA'sı aynı ölçek değildir) ve rating'e
-  girerlerse stat kasmayı teşvik ederler.
+- `openskill-pl-v1`'de rating güncellemesine giren **tek** bilgi maç sonucudur
+  (W/L). `openskill-pl-perf-v1` bunun üzerine sınırlı bir performans
+  modülasyonu ekler (aşağıya bakın); W/L her iki version'da da birincil
+  sinyaldir ve sonucun yönünü yalnızca o belirler.
 - `Rating.ordinal = mu - 3*sigma`: sıralama/gösterim için muhafazakâr tek sayı;
   yeni oyuncu (sigma yüksek) listenin tepesine sıçramaz.
 
@@ -54,6 +54,20 @@ sigma_yeni <= sqrt(sigma_eski² + tau²)
 Default sigma'dan başlayan güncellemelerde azalma her zaman gözlenir; sigma
 tau dengesine yaklaştıkça salınım tau mertebesinde kalır. Testler bu doğru
 invariant'ı doğrular (`tests/test_engine.py`).
+
+## `openskill-pl-perf-v1` — performans ağırlıklı version
+
+Taban PlackettLuce güncellemesi `openskill-pl-v1` ile birebir aynı parametrelerle
+hesaplanır; ardından her katılımcının mu deltası bir performans çarpanıyla
+ölçeklenir (kazanan: `delta*carpan`, kaybeden: `delta*(2-carpan)`; sigma taban
+modelden aynen alınır). Çarpan, beş bileşenin (KDA, hasar payı, gold payı,
+CS/dk, vizyon — her biri [0.5, 2.0] aralığına kırpılmış oran) ortalamasından
+`clamp(1 + 0.5*(perf-1), 0.7, 1.3)` ile türetilir; formüller ve sabitler
+`docs/rating_contract.md`'de bu version'a dondurulmuştur. Null stat'lı bileşen
+atlanır; hiç bileşen yoksa çarpan 1.0'dır ve sonuç taban modelle birebir
+aynıdır — bu yüzden maç sonucunun yönü asla değişmez. Statlar
+`update(..., stats100=, stats200=, duration_s=)` ile `ParticipantStats`
+listeleri olarak geçirilir (`from rating import ParticipantStats`).
 
 ## Version'lama kuralı
 
