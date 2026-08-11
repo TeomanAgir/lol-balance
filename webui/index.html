@@ -47,6 +47,8 @@
   <section id="view-leaderboard" class="view" hidden>
     <p class="view-hint">Oyuncu adına dokununca istatistik sayfası açılır: maç dökümü, KDA,
       favori karakter/koridor, rol ratingleri ve en iyi anlaştığı takım arkadaşları.</p>
+    <!-- Harita (GÖREV 4) girişi: alt çubuk 320px'de 6. sekmeyi kaldırmıyor -->
+    <div class="map-entry"><button id="btn-map-from-board" class="map-link" type="button">Rol enleri haritası →</button></div>
     <table class="board">
       <thead><tr><th class="rank">#</th><th>Oyuncu</th><th class="num">Puan</th><th class="num">Maç</th></tr></thead>
       <tbody id="board-body"></tbody>
@@ -58,6 +60,101 @@
     <p class="view-hint">Son 7 günün öne çıkanları. Karta dokununca o oyuncunun istatistik sayfası açılır.
       En altta, en çok başa baş geçen koridor rekabeti (nemesis) ve o çiftle maç kurma düğmesi var.</p>
     <div id="highlights-body" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ Harita: rol enleri (GÖREV 4) — sekme değil, Enler/Sıralama'dan açılan detay görünümü ═══ -->
+  <!-- Harita ÖZGÜN, stilize bir illüstrasyondur: Riot varlığı/kopyası değildir,
+       dış görsel dosyası yoktur (satır içi SVG). Baloncuklar JS ile yerleştirilir. -->
+  <section id="view-map" class="view" hidden>
+    <button id="btn-map-back" class="back-btn" type="button">← Enlere dön</button>
+    <p class="view-hint">Her koridorda o rolün en iyisi. Baloncuğa dokununca o rolün tam
+      sıralaması açılır; sıralamadaki isim oyuncunun istatistik sayfasına gider.</p>
+
+    <div class="rift">
+      <svg class="rift-svg" viewBox="0 0 100 100" role="img"
+           aria-label="Stilize koridor haritası: iki üs, üç koridor, köşegen nehir ve orman bölgeleri"
+           focusable="false">
+        <defs>
+          <linearGradient id="rf-ground" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#0e1a27"/>
+            <stop offset="0.5" stop-color="#12202f"/>
+            <stop offset="1" stop-color="#0e1a27"/>
+          </linearGradient>
+          <linearGradient id="rf-river" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#123047"/>
+            <stop offset="1" stop-color="#0e2639"/>
+          </linearGradient>
+          <clipPath id="rf-clip"><rect x="1" y="1" width="98" height="98" rx="9"/></clipPath>
+        </defs>
+
+        <rect class="rf-frame" x="1" y="1" width="98" height="98" rx="9" fill="url(#rf-ground)"/>
+
+        <g clip-path="url(#rf-clip)">
+        <!-- orman bölgeleri: koridorlar, nehir ve üsler arasında kalan dört alan -->
+        <g class="rf-jungle">
+          <path d="M19 24 L44 49 L19 75 Z"/>
+          <path d="M26 80 L75 80 L50 55 Z"/>
+          <path d="M25 20 L74 20 L49 44 Z"/>
+          <path d="M81 26 L81 76 L55 50 Z"/>
+        </g>
+        <g class="rf-brush">
+          <ellipse cx="26" cy="37" rx="4.6" ry="2.4"/>
+          <ellipse cx="30" cy="57" rx="3.4" ry="2"/>
+          <ellipse cx="43" cy="72" rx="4.6" ry="2.4"/>
+          <ellipse cx="62" cy="73" rx="3.4" ry="2"/>
+          <ellipse cx="37" cy="26" rx="3.4" ry="2"/>
+          <ellipse cx="58" cy="27" rx="4.6" ry="2.4"/>
+          <ellipse cx="70" cy="43" rx="3.4" ry="2"/>
+          <ellipse cx="74" cy="62" rx="4.6" ry="2.4"/>
+        </g>
+
+        <!-- köşegen nehir + ortasındaki akıntı çizgisi -->
+        <path class="rf-river" d="M24 17 L83 76 L76 83 L17 24 Z" fill="url(#rf-river)"/>
+        <path class="rf-flow" d="M21.5 21.5 L79 79"/>
+        <g class="rf-pit">
+          <path d="M32 28.4 L35.6 32 L32 35.6 L28.4 32 Z"/>
+          <path d="M68 64.4 L71.6 68 L68 71.6 L64.4 68 Z"/>
+        </g>
+
+        <!-- üç koridor (üst / orta / alt): geniş kenar + dar iç yol -->
+        <g class="rf-lane">
+          <path d="M18 74 L18 26 Q18 18 26 18 L74 18"/>
+          <path d="M26 82 L74 82 Q82 82 82 74 L82 26"/>
+          <path d="M25 75 L75 25"/>
+        </g>
+        <g class="rf-lane-in">
+          <path d="M18 74 L18 26 Q18 18 26 18 L74 18"/>
+          <path d="M26 82 L74 82 Q82 82 82 74 L82 26"/>
+          <path d="M25 75 L75 25"/>
+        </g>
+
+        <!-- kuleler: koridor başına 3+3, taraf rengiyle -->
+        <g class="rf-turret blue">
+          <circle cx="18" cy="64"/><circle cx="18" cy="48"/><circle cx="18" cy="32"/>
+          <circle cx="31" cy="69"/><circle cx="38" cy="62"/><circle cx="45" cy="55"/>
+          <circle cx="32" cy="82"/><circle cx="48" cy="82"/><circle cx="64" cy="82"/>
+        </g>
+        <g class="rf-turret red">
+          <circle cx="34" cy="18"/><circle cx="50" cy="18"/><circle cx="66" cy="18"/>
+          <circle cx="55" cy="45"/><circle cx="62" cy="38"/><circle cx="69" cy="31"/>
+          <circle cx="82" cy="64"/><circle cx="82" cy="48"/><circle cx="82" cy="32"/>
+        </g>
+
+        <!-- iki üs: sol-alt mavi, sağ-üst kırmızı -->
+        <path class="rf-base blue" d="M3 77 A22 22 0 0 1 25 99 L3 99 Z"/>
+        <path class="rf-base red"  d="M97 23 A22 22 0 0 1 75 1 L97 1 Z"/>
+        <path class="rf-nexus blue" d="M13 84 L17 88 L13 92 L9 88 Z"/>
+        <path class="rf-nexus red"  d="M87 8 L91 12 L87 16 L83 12 Z"/>
+        </g>
+
+        <rect class="rf-edge" x="1" y="1" width="98" height="98" rx="9"/>
+      </svg>
+
+      <div id="rift-bubbles" class="rift-bubbles" aria-live="polite"></div>
+    </div>
+
+    <p class="rift-note">Baloncuktaki puan o rolün ratingidir (ana puandan ayrı hesaplanır).
+      Hiç oynanmamış rol soluk "—" görünür.</p>
   </section>
 
   <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralama/enler'den açılan detay görünümü ═══ -->
@@ -108,6 +205,15 @@
     <input id="key-input" type="password" autocomplete="off" placeholder="API anahtarı" required>
     <button class="btn-primary" type="submit">Kaydet</button>
   </form>
+</div>
+
+<!-- Rol sıralaması pop-up'ı (GÖREV 4) — API anahtarı modalıyla aynı backdrop deseni -->
+<div id="role-modal" class="modal-backdrop" hidden>
+  <div class="modal modal-list" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
+    <button id="role-modal-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+    <h2 id="role-modal-title"></h2>
+    <div id="role-modal-body"></div>
+  </div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
