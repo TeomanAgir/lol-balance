@@ -215,6 +215,13 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 5. Hiç rol verisi olmayan oyuncular her rolde nötr (score 0) olduğundan atamaları
    fiilen serbesttir — sistem az veriyle "dümdüz" çalışır, veri biriktikçe keskinleşir
    (kabul edilen davranış, Teoman 2026-08-11).
+6. **Kısıtlı dengeleme (GÖREV 3, Teoman 2026-08-12):** rating paketi aynı optimizasyonun
+   kısıtlı varyantını sunar: verilen iki oyuncu index'i KARŞI takımlara ayrılır ve her
+   ikisi verilen role sabitlenir; kalan oyuncular/roller normal aramayla dağıtılır.
+   Ayrım üretimi çifti ayıran ayrımlara daralır; atama aramasında sabit rol dışarıda
+   tutulur. Determinizm, eşitlik kırılımı ve sıralama kuralları §2-3 ile aynıdır.
+   API: `balance_roles`'un kısıt parametreli saf bir kardeş fonksiyonu (matematik
+   rating paketinde kalır; api_contract "Nemesis maçı" bunu tüketir).
 
 ## Test yükümlülükleri (rol evreni)
 

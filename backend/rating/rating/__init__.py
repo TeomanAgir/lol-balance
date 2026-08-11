@@ -5,6 +5,7 @@ from .balancer import (
     RoleBalanceSuggestion,
     balance,
     balance_roles,
+    balance_roles_constrained,
     enumerate_splits,
 )
 from .engine import EffectiveRating, Engine, Rating
@@ -20,5 +21,6 @@ __all__ = [
     "RoleBalanceSuggestion",
     "balance",
     "balance_roles",
+    "balance_roles_constrained",
     "enumerate_splits",
 ]

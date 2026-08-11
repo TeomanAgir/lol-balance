@@ -13,6 +13,8 @@
     manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
     profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler)
+    nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
+    nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -35,7 +37,11 @@
     if (!res.ok) {
       let detail = "";
       try { detail = (await res.json()).detail; } catch { /* gövde JSON değil */ }
-      throw new Error(detail || `Beklenmeyen hata (HTTP ${res.status}).`);
+      // status hata nesnesinde taşınır: çağıran yer duruma göre davranabilsin
+      // (ör. nemesis modunda 409 = aktif çift kalmadı → modu kapat).
+      const e = new Error(detail || `Beklenmeyen hata (HTTP ${res.status}).`);
+      e.status = res.status;
+      throw e;
     }
     return res.json();
   }
@@ -146,10 +152,13 @@
     await fetchRoster(force);
     const grid = $("#roster");
     grid.innerHTML = "";
+    // Nemesis modunda çiftin iki üyesi kartta işaretlenir (ikisi de seçilmek zorunda).
+    const nemIds = new Set(state.nemesisMode ? state.nemesisMode.players.map(x => x.player_id) : []);
     for (const p of state.roster) {
       const card = document.createElement("button");
       card.type = "button";
       card.className = "player-card";
+      card.classList.toggle("nem-pick", nemIds.has(p.id));
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
         `<span class="p-name">${p.display_name}</span>` +
@@ -171,20 +180,69 @@
     const n = state.selected.size;
     $("#pick-counter").innerHTML = `${n}<span>/10 seçildi</span>`;
     $("#btn-balance").disabled = n !== 10;
+    renderNemesisBadge();
   }
+
+  // ── 1b) Nemesis modu (GÖREV 3) ────────────────────────────────
+  // Mod yalnız Enler ekranındaki "Nemesis maçı kur" ile açılır; açıkken Dengele
+  // düğmesi POST /balance/nemesis'e gider (çift karşı takımlara + sabit rol).
+  function renderNemesisBadge() {
+    const box = $("#nemesis-mode");
+    const nm = state.nemesisMode;
+    if (!nm) { box.hidden = true; return; }
+    box.hidden = false;
+    const [a, b] = nm.players;
+    $("#nem-mode-pair").textContent =
+      `${a.display_name} vs ${b.display_name} — ${roleLabel(nm.role)}`;
+    const missing = nm.players.filter(x => !state.selected.has(x.player_id));
+    const hint = $("#nem-mode-hint");
+    hint.textContent = missing.length
+      ? `Çiftin ikisi de seçili olmalı — eksik: ${missing.map(x => x.display_name).join(", ")}`
+      : "Çift karşı takımlara ayrılıp bu koridora sabitlenecek.";
+    hint.classList.toggle("warn", missing.length > 0);
+  }
+
+  function startNemesisMode(n) {
+    const pair = n && n.active ? n[n.active] : null;
+    if (!pair) { toast("Aktif nemesis çifti yok.", "warn"); return; }
+    state.nemesisMode = {
+      source: n.active,
+      role: pair.role,
+      players: pair.players.map(x => ({ player_id: x.player_id, display_name: x.display_name })),
+    };
+    $("#suggestions").innerHTML = "";   // önceki (nemesissiz) öneriler artık geçersiz
+    showView("balance");
+  }
+
+  function exitNemesisMode() {
+    if (!state.nemesisMode) return;
+    state.nemesisMode = null;
+    $("#suggestions").innerHTML = "";
+    renderNemesisBadge();
+    if (currentView === "balance") loadBalance().catch(e => toast(e.message)); // işaretleri kaldır
+  }
+  $("#btn-nemesis-off").addEventListener("click", exitNemesisMode);
 
   $("#btn-balance").addEventListener("click", async () => {
     const btn = $("#btn-balance");
+    const nm = state.nemesisMode;
     btn.disabled = true;
     btn.textContent = "Hesaplanıyor…";
     try {
-      const res = await api("/balance", {
+      const res = await api(nm ? "/balance/nemesis" : "/balance", {
         method: "POST",
         body: { player_ids: [...state.selected], top_n: 3 },
       });
-      renderSuggestions(res.suggestions);
+      renderSuggestions(res.suggestions, res.nemesis);
     } catch (e) {
-      toast(e.message);
+      // 409 = backend'de artık aktif nemesis çifti yok (veri değişmiş olabilir);
+      // modda kalmanın anlamı kalmaz, kapatıp normal dengelemeye dönülür.
+      if (e.status === 409 && state.nemesisMode) {
+        exitNemesisMode();
+        toast(e.message + " Nemesis modu kapatıldı.");
+      } else {
+        toast(e.message);
+      }
     } finally {
       btn.textContent = "Dengele";
       btn.disabled = state.selected.size !== 10;
@@ -195,17 +253,26 @@
   // Eski salt-id şekli gelirse (backend güncellenmemişse) rolsüz gösterilir.
   const teamEntry = (e) =>
     (e !== null && typeof e === "object") ? e : { player_id: e, position: null };
-  const teamList = (members, side) =>
+  const teamList = (members, side, nemIds) =>
     `<ul class="team ${side}">` +
     [...members].map(teamEntry)
       .sort((a, b) => roleOrder(a.position) - roleOrder(b.position))
-      .map(m => `<li><span class="pos-tag">${roleLabel(m.position)}</span>` +
+      .map(m => `<li${nemIds && nemIds.has(m.player_id) ? ' class="nem-row"' : ""}>` +
+                `<span class="pos-tag">${roleLabel(m.position)}</span>` +
                 `<span class="p-who">${playerName(m.player_id)}</span></li>`)
       .join("") + "</ul>";
 
-  function renderSuggestions(suggestions) {
+  // nemesis: yalnız POST /balance/nemesis yanıtında gelir ({source, role, player_ids}) —
+  // öneri çizimi aynıdır, çiftin satırları vurgulanır.
+  function renderSuggestions(suggestions, nemesis) {
     const box = $("#suggestions");
-    box.innerHTML = "<h2 class='sug-title'>Öneriler</h2>";
+    const nemIds = nemesis ? new Set(nemesis.player_ids) : null;
+    box.innerHTML = "<h2 class='sug-title'>Öneriler</h2>" +
+      (nemesis && suggestions.length
+        ? `<p class="sug-note">Nemesis maçı: ` +
+          `${esc(nemesis.player_ids.map(playerName).join(" vs "))} — ` +
+          `${roleLabel(nemesis.role)} (${nemesis.source === "weekly" ? "bu haftanın çifti" : "tüm zamanların çifti"})</p>`
+        : "");
     suggestions.forEach((s, i) => {
       const best = i === 0;
       const bluePct = Math.round(s.p_win_team_100 * 100);
@@ -214,12 +281,12 @@
       card.innerHTML =
         (best ? `<div class="best-badge">En dengeli</div>` : "") +
         `<div class="sug-teams">
-           ${teamList(s.team_100, "blue")}
+           ${teamList(s.team_100, "blue", nemIds)}
            <div class="sug-mid">
              <div class="quality">%${(s.quality * 100).toFixed(1)}</div>
              <div class="quality-label">denge</div>
            </div>
-           ${teamList(s.team_200, "red")}
+           ${teamList(s.team_200, "red", nemIds)}
          </div>
          <div class="winbar" role="img" aria-label="Mavi taraf kazanma olasılığı %${bluePct}">
            <div class="winbar-blue" style="width:${bluePct}%"></div>
@@ -400,11 +467,66 @@
       </button>`;
   }
 
+  // ── 2d) Nemesis (GÖREV 3) ─────────────────────────────────────
+  // GET /nemesis: (çift, rol) adaylarından en başa baş geçen rekabet. Ekranda
+  // TÜM ZAMANLARIN çifti büyük gösterilir; weekly farklıysa tek satır not düşülür.
+  // Maç kurma her zaman `active` çiftle olur — hangisi olduğu ekranda işaretlenir.
+  const nemKey = (p) =>
+    p ? p.role + ":" + p.players.map(x => x.player_id).sort((a, b) => a - b).join("-") : "";
+  const nemPct = (c) => "%" + Math.round((c || 0) * 100);
+  const nemLink = (x, cls) =>
+    `<button type="button" class="${cls}" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
+
+  function nemesisCard(pair, isActive) {
+    const [a, b] = pair.players;
+    return `<div class="nem-card">
+        ${nemLink(a, "nem-who")}
+        <div class="nem-mid">
+          <span class="nem-role">${roleLabel(pair.role)}</span>
+          <span class="nem-score">${a.wins}–${b.wins}</span>
+          <span class="nem-sub">${pair.encounters} karşılaşma</span>
+        </div>
+        ${nemLink(b, "nem-who")}
+      </div>
+      <p class="nem-close">${nemPct(pair.closeness)} başa baş${
+        isActive ? `<span class="nem-active">maç bu çiftle kurulur</span>` : ""}</p>`;
+  }
+
+  // n null ise (backend /nemesis bilmiyor / istek düştü) bölüm hiç çizilmez.
+  function nemesisSection(n) {
+    if (!n) return "";
+    const at = n.all_time, wk = n.weekly;
+    let body;
+    if (!at) {
+      body = `<p class="ps-empty">Nemesis için en az 3 koridor karşılaşması gerekiyor.</p>`;
+    } else {
+      body = nemesisCard(at, n.active === "all_time");
+      if (wk && nemKey(wk) !== nemKey(at)) {
+        const [wa, wb] = wk.players;
+        body += `<p class="nem-weekly">Bu haftanın çifti: ${nemLink(wa, "nem-link")} vs ` +
+          `${nemLink(wb, "nem-link")} — ${roleLabel(wk.role)} · ${wk.encounters} karşılaşma · ` +
+          `${nemPct(wk.closeness)} başa baş` +
+          (n.active === "weekly" ? `<span class="nem-active">maç bu çiftle kurulur</span>` : "") + `</p>`;
+      }
+    }
+    const btn = n.active
+      ? `<button type="button" id="btn-nemesis-setup" class="btn-primary btn-nemesis">Nemesis maçı kur</button>`
+      : "";
+    return `<section class="prof-section nem-section">
+        <h3 class="ps-title">Nemesis</h3>${body}${btn}
+      </section>`;
+  }
+
   async function loadHighlights() {
     const box = $("#highlights-body");
     box.innerHTML = "<p class='empty'>Yükleniyor…</p>";
     try {
-      const h = await api("/highlights/weekly");
+      // /nemesis ayrı bir uçtur: düşerse Enler ekranının kalanı çalışmaya devam etsin.
+      const [h, n] = await Promise.all([
+        api("/highlights/weekly"),
+        api("/nemesis").catch(() => null),
+      ]);
+      state.nemesis = n;
       const roles = h.best_by_role || {};
       // Hiç valid maç yoksa contract üç alanı da null döner → tek satır boş durum.
       if (!h.best_player && !h.rising_star && !ROLES.some(r => roles[r])) {
@@ -428,10 +550,14 @@
         `<section class="prof-section">
            <h3 class="ps-title">Rol enleri</h3>
            <div class="hl-roles">${ROLES.map(r => hlRoleCard(r, roles[r])).join("")}</div>
-         </section>`;
+         </section>` +
+        nemesisSection(n);
 
+      // Nemesis bölümündeki isimler de data-player taşır → aynı kayıtla profile gider.
       box.querySelectorAll("button[data-player]").forEach(btn =>
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
+      const setup = box.querySelector("#btn-nemesis-setup");
+      if (setup) setup.addEventListener("click", () => startNemesisMode(state.nemesis));
     } catch (e) {
       box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
       throw e; // toast'ı showView gösterir
