@@ -9,10 +9,12 @@
   const state = {
     apiKey: localStorage.getItem("apiKey") || "",
     roster: [],                 // GET /players sonucu
+    board: [],                  // GET /leaderboard sonucu (harita ekranı, GÖREV 4)
     selected: new Set(),        // dengeleme seçimi (player_id)
     manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
-    profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler)
+    profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita)
+    mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
   };
@@ -123,11 +125,14 @@
   // ── Sekme yönlendirme ─────────────────────────────────────────
   const loaders = {
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
-    matches: loadMatches, manual: loadManual, profile: loadProfile,
+    map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
   };
-  // Sekmesi olmayan "detay" görünümü (GÖREV 1: profil) hangi sekmeyi aktif tutar.
-  // Profil iki yerden açılır (sıralama, enler) → geldiği görünümün sekmesi yanar.
-  const tabOf = (name) => (name === "profile" ? state.profileFrom : name);
+  // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
+  // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
+  // zincir (harita → profil) özyinelemeyle gerçek sekmeye çözülür.
+  const tabOf = (name) =>
+    name === "profile" ? tabOf(state.profileFrom) :
+    name === "map" ? tabOf(state.mapFrom) : name;
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
@@ -319,7 +324,9 @@
 
   // ── 2b) Oyuncu profili (GÖREV 1) ──────────────────────────────
   // Alt sekmelerin dışında bir "detay" görünümü: sıralamadan açılır, geri döner.
-  const BACK_LABEL = { leaderboard: "← Sıralamaya dön", highlights: "← Enlere dön" };
+  const BACK_LABEL = {
+    leaderboard: "← Sıralamaya dön", highlights: "← Enlere dön", map: "← Haritaya dön",
+  };
 
   function openProfile(id) {
     state.profileId = id;
@@ -548,7 +555,10 @@
         hlCard("rising", "Yıldız Rukisi", rs,
           rs ? `<span class="hl-value delta ${up ? "up" : "down"}">${fmtDelta2(rs.delta)}</span>` : "") +
         `<section class="prof-section">
-           <h3 class="ps-title">Rol enleri</h3>
+           <div class="ps-head">
+             <h3 class="ps-title">Rol enleri</h3>
+             <button type="button" id="btn-map-from-hl" class="map-link">Haritada gör →</button>
+           </div>
            <div class="hl-roles">${ROLES.map(r => hlRoleCard(r, roles[r])).join("")}</div>
          </section>` +
         nemesisSection(n);
@@ -558,11 +568,131 @@
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
       const setup = box.querySelector("#btn-nemesis-setup");
       if (setup) setup.addEventListener("click", () => startNemesisMode(state.nemesis));
+      // "Haritada gör →" (GÖREV 4): rol enlerini harita görünümünde açar.
+      box.querySelector("#btn-map-from-hl").addEventListener("click", openMap);
     } catch (e) {
       box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
       throw e; // toast'ı showView gösterir
     }
   }
+
+  // ── 2e) Harita: rol enleri (GÖREV 4) ──────────────────────────
+  // Yeni endpoint yok: veri GET /leaderboard'un role_ratings alanından gelir
+  // (sıralama ekranıyla aynı istek şekli; her görünüşte taze çekilir, diğer
+  // ekranlarla tutarlı — void/ingest sonrası bayat kalmaz).
+  //
+  // Baloncuk konumları: SVG viewBox'ıyla aynı yüzde uzayında [sol %, üst %].
+  // ÜST üst koridorun ortasında, ORMAN üst-sol orman bölgesinde, ORTA harita
+  // merkezinde, ALT alt koridorun ortasında, DESTEK alt koridorun yanında.
+  const RIFT_SPOTS = {
+    TOP: [24, 15], JUNGLE: [22, 42], MIDDLE: [50, 50], BOTTOM: [80, 80], UTILITY: [48, 86],
+  };
+
+  // O rolde ≥1 maçı olanlar; rol score azalan → o roldeki maç azalan → ad alfabetik.
+  // matches === 0 default prior'dır (gerçek veri değil) → sıralamaya girmez.
+  function roleRanking(rows, role) {
+    return rows
+      .map(p => ({ p, r: (p.role_ratings || {})[role] }))
+      .filter(x => x.r && typeof x.r.score === "number" && x.r.matches > 0)
+      .sort((a, b) =>
+        b.r.score - a.r.score ||
+        b.r.matches - a.r.matches ||
+        a.p.display_name.localeCompare(b.p.display_name, "tr"));
+  }
+
+  function riftBubble(role, top) {
+    const [x, y] = RIFT_SPOTS[role];
+    const pos = `left:${x}%;top:${y}%`;
+    if (!top) {
+      // Sınıf adı "rb-none": global ".empty" (ortalı boş-durum paragrafı, padding 40px)
+      // baloncuğun kutusunu bozuyordu — enler ekranındaki ".hl-none" ile aynı desen.
+      return `<button type="button" class="rift-bub rb-none" style="${pos}" data-role="${role}"
+                aria-label="${ROLE_TR[role]}: bu rolde oynayan yok">
+          <span class="rb-role">${ROLE_ABBR[role]}</span>
+          <span class="rb-name">—</span>
+        </button>`;
+    }
+    const score = fmtRating(top.r.score);
+    return `<button type="button" class="rift-bub" style="${pos}" data-role="${role}"
+              aria-label="${ROLE_TR[role]} birincisi ${esc(top.p.display_name)}, ${score} puan">
+        <span class="rb-role">${ROLE_ABBR[role]}</span>
+        <span class="rb-name">${esc(top.p.display_name)}</span>
+        <span class="rb-score">${score}</span>
+      </button>`;
+  }
+
+  // Harita alt çubukta sekme DEĞİLDİR: 320px'de 6. sekme "SIRALAMA" etiketini
+  // kesiyordu (ölçüm README'de), bu yüzden profil gibi "detay" görünümü olarak
+  // Enler ve Sıralama ekranlarından açılır.
+  function openMap() {
+    if (currentView !== "map") {
+      const from = currentView === "profile" ? state.profileFrom : currentView;
+      state.mapFrom = from === "map" ? "highlights" : from; // kendine dönen geri düğmesi olmasın
+    }
+    $("#btn-map-back").textContent = BACK_LABEL[state.mapFrom] || BACK_LABEL.highlights;
+    showView("map");
+  }
+  $("#btn-map-back").addEventListener("click", () => showView(state.mapFrom));
+  $("#btn-map-from-board").addEventListener("click", openMap);
+
+  async function loadMap() {
+    const box = $("#rift-bubbles");
+    try {
+      state.board = await api("/leaderboard");
+    } catch (e) {
+      box.innerHTML = `<p class="rift-err">${esc(e.message)}</p>`;
+      throw e; // toast'ı showView gösterir
+    }
+    box.innerHTML = ROLES.map(r => riftBubble(r, roleRanking(state.board, r)[0])).join("");
+    box.querySelectorAll(".rift-bub").forEach(btn =>
+      btn.addEventListener("click", () => openRoleModal(btn.dataset.role, btn)));
+  }
+
+  // Pop-up: o rolün tam sıralaması. Kapatma: × / dışına tıklama / Esc.
+  let roleModalReturn = null; // pop-up kapanınca odağın döneceği baloncuk
+
+  function roleModalHtml(role) {
+    const list = roleRanking(state.board, role);
+    if (!list.length) return `<p class="ps-empty">Bu koridorda henüz kimse oynamadı.</p>`;
+    return `<ol class="rr-list">` + list.map(({ p, r }, i) =>
+      `<li class="rr-row">
+         <span class="rr-rank">${i + 1}</span>
+         <button type="button" class="rr-name" data-player="${p.id}">${esc(p.display_name)}</button>
+         <span class="rr-score">${fmtRating(r.score)}</span>
+         <span class="rr-matches">${r.matches} maç</span>
+       </li>`).join("") + `</ol>`;
+  }
+
+  function openRoleModal(role, fromBtn) {
+    roleModalReturn = fromBtn || null;
+    $("#role-modal-title").textContent = `${ROLE_TR[role]} sıralaması`;
+    const body = $("#role-modal-body");
+    body.innerHTML = roleModalHtml(role);
+    body.querySelectorAll(".rr-name").forEach(btn =>
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.player);
+        closeRoleModal(false);
+        openProfile(id); // pop-up kapanır, profile gidilir
+      }));
+    $("#role-modal").hidden = false;
+    $("#role-modal-close").focus();
+  }
+
+  function closeRoleModal(restoreFocus = true) {
+    if ($("#role-modal").hidden) return;
+    $("#role-modal").hidden = true;
+    if (restoreFocus && roleModalReturn && document.contains(roleModalReturn)) roleModalReturn.focus();
+    roleModalReturn = null;
+  }
+
+  $("#role-modal-close").addEventListener("click", () => closeRoleModal());
+  // Dışına tıklama: yalnız backdrop'un kendisi (modal içi tıklamalar sayılmaz).
+  $("#role-modal").addEventListener("click", (e) => {
+    if (e.target === $("#role-modal")) closeRoleModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeRoleModal();
+  });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   async function loadMatches() {

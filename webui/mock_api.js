@@ -42,9 +42,16 @@
   const roleScoreOf = (mu, sigma, perf) =>
     +(0.5 * mu + 0.5 * (25 + 20 * (perf - 1)) - 3 * sigma).toFixed(1);
 
+  // SENARYO BAYRAĞI (GÖREV 4): bu rolde HİÇ kimsenin maçı yokmuş gibi davranılır
+  // (5 anahtar yine döner, hepsi default prior). Harita ekranındaki soluk "—"
+  // baloncuğu ve rol sıralaması pop-up'ının boş mesajı bu yolla test edilir.
+  // null yaparsan beş rol de dolu olur.
+  const EMPTY_ROLE = "UTILITY";
+
   players.forEach(p => {
     const rr = {};
     POS.forEach((role, i) => {
+      if (role === EMPTY_ROLE) { rr[role] = defaultRole(); return; }
       const main = i === p.id % 5;
       const second = i === (p.id + 2) % 5;
       const matches = Math.round(p.matches_played * (main ? 0.6 : second ? 0.25 : 0));
@@ -418,7 +425,11 @@
 
     const best_by_role = {};
     for (const role of POS) {
-      const cand = rows.filter(x => x.e.roles.get(role));
+      // Aday = pencerede o rolde oynamış VE rol evreninde o rolde rating'i olan
+      // (contract: role_rating_history). İkinci koşul EMPTY_ROLE bayrağıyla mock'un
+      // kendi içinde tutarlı kalmasını sağlar (rol boşsa Enler kartı da boş çıkar).
+      const cand = rows.filter(x => x.e.roles.get(role) &&
+        (((x.p.role_ratings || {})[role] || {}).matches > 0));
       const roleCount = (x) => x.e.roles.get(role);
       const roleScore = (x) => ((x.p.role_ratings || {})[role] || {}).score || 0;
       const w = cand.length ? best(cand, roleScore, roleCount) : null;
