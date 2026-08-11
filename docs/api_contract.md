@@ -70,6 +70,8 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
   winrate azalan → matches_together azalan → display_name alfabetik; en fazla 3 kayıt
   döner (UI ilkini "en yüksek sinerji" olarak vurgular). Uygun kimse yoksa `[]`.
 - Bilinmeyen oyuncu → `404`.
+- Hassasiyet: tüm oran/ortalama alanları (`*_avg`, `ratio`, `winrate`) 2 ondalığa
+  yuvarlanır; sıralama ve eşitlik kırılımları yuvarlanmamış değerle yapılır.
 
 ## 3. Maçlar
 ```
