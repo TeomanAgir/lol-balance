@@ -419,6 +419,112 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .syn-link { padding: 0; text-align: left; font-weight: 600; transition: color 0.12s; }
 .syn-link:hover { color: var(--brass); }
 
+/* ── Haftanın enleri (GÖREV 2) ── */
+.hl-window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.hl-fb { color: var(--brass-dim); font-size: 13px; }
+
+/* Büyük kartlar: solda etiket/ad/alt bilgi, sağda tek büyük değer. */
+.hl-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.12s;
+}
+button.hl-card:hover { border-color: var(--brass-dim); }
+.hl-card .hl-label { grid-area: 1 / 1; }
+.hl-card .hl-name { grid-area: 2 / 1; }
+.hl-card .hl-sub { grid-area: 3 / 1; }
+.hl-card .hl-value { grid-area: 1 / 2 / 4 / 3; align-self: center; justify-self: end; }
+.hl-label {
+  font-family: var(--display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.hl-card .hl-name {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-sub { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hl-card .hl-value {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hl-unit {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-left: 4px;
+}
+/* Haftanın oyuncusu: ekranın tek vurgulu kartı. */
+.hl-card.hero { background: var(--surface-2); border-color: var(--brass); }
+.hl-card.hero .hl-name { font-size: 28px; color: var(--brass); }
+.hl-card.hero .hl-value { font-size: 32px; color: var(--brass); }
+/* Yıldız rukisi delta'sının rengi .delta.up/.down'dan gelir (yeşil/kırmızı). */
+/* Veri yok işaretçisi ".hl-none"dır; global ".empty" (ortalı boş durum paragrafı)
+   bilinçli olarak kullanılmaz — kart yerleşimini bozuyor. */
+.hl-card.hl-none .hl-name { color: var(--muted); }
+
+/* Dar ekranda 2 sütun, 560px'ten sonra 5 rolün tamamı tek sıra (auto-fit 4+1
+   gibi dengesiz kırılımlar üretiyordu). */
+.hl-roles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@media (min-width: 560px) { .hl-roles { grid-template-columns: repeat(5, 1fr); } }
+.hl-role {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 0.12s;
+}
+button.hl-role:hover { border-color: var(--brass-dim); }
+.hl-role.hl-none { opacity: 0.38; }      /* pencerede o rolde kimse oynamamış */
+.hl-role .hl-label { font-size: 10px; letter-spacing: 0.1em; }
+.hl-role .hl-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-role .hl-value {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+.hl-role .hl-sub { font-size: 12px; }
+
 /* ── Maç geçmişi ── */
 .match-card {
   background: var(--surface);
@@ -580,18 +686,24 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 10;
 }
+/* 5 sekme dar telefonda da tek satırda kalmalı: etiketler kısa tutuldu, ölçek
+   14px yerine 12px'e indirildi, en dar ekranlarda 11px'e düşer. */
 .tab {
   flex: 1;
+  min-width: 0;
   min-height: 56px;
+  padding: 0 2px;
   font-family: var(--display);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   color: var(--muted);
   border-top: 2px solid transparent;
 }
 .tab.active { color: var(--brass); border-top-color: var(--brass); }
+@media (max-width: 400px) { .tab { font-size: 11px; letter-spacing: 0.01em; } }
 
 /* ── Modal ── */
 .modal-backdrop {
