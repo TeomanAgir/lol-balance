@@ -275,6 +275,105 @@
     };
   }
 
+  // ── Haftanın enleri (GÖREV 2) ──
+  // api_contract §2 "Haftanın enleri": pencere = son 7 gün; o pencerede hiç valid maç
+  // yoksa end = en son valid maçın zamanı olur ve fallback: true döner.
+  //
+  // SENARYO BAYRAKLARI (test için elle değiştir):
+  //   HL_FORCE_FALLBACK = true → pencereyi zorla son maç haftasına kaydırır (fallback: true).
+  //     (Mock maçlar 2026-08-02..09 tarihli; bu tarihler 7 günden eskiyince bu yol
+  //      zaten kendiliğinden devreye girer.)
+  //   HL_EMPTY = true → hiç valid maç yokmuş gibi davranır: üç alan da null, UI boş durum.
+  const HL_FORCE_FALLBACK = false;
+  const HL_EMPTY = false;
+
+  const DAY7_MS = 7 * 24 * 60 * 60 * 1000;
+  const playedAt = (m) => Date.parse(m.played_at);
+  const ordinalOf = (mu, sigma) => mu - 3 * sigma;
+  const emptyRoles = () => POS.reduce((o, r) => (o[r] = null, o), {});
+
+  function weeklyHighlights() {
+    const valid = matches.filter(m => m.status === "valid");
+    if (HL_EMPTY || !valid.length) {
+      const end = Date.now();
+      return {
+        window: { start: new Date(end - DAY7_MS).toISOString(), end: new Date(end).toISOString(), fallback: false },
+        best_player: null, rising_star: null, best_by_role: emptyRoles(),
+      };
+    }
+
+    let end = Date.now();
+    let fallback = false;
+    let inWindow = valid.filter(m => playedAt(m) > end - DAY7_MS && playedAt(m) <= end);
+    if (HL_FORCE_FALLBACK || !inWindow.length) {
+      end = Math.max(...valid.map(playedAt));           // en son valid maç
+      inWindow = valid.filter(m => playedAt(m) > end - DAY7_MS && playedAt(m) <= end);
+      fallback = true;
+    }
+    const win = {   // global window'u gölgelememek için "win"
+      start: new Date(end - DAY7_MS).toISOString(),
+      end: new Date(end).toISOString(),
+      fallback,
+    };
+
+    // Oyuncu bazında topla: pencere maç sayısı, rol bazlı maç sayısı ve
+    // ordinal'in pencere içi ilk "önce" / son "sonra" değerleri (rising_star için).
+    const agg = new Map();
+    for (const m of [...inWindow].sort((a, b) => playedAt(a) - playedAt(b))) {
+      for (const part of m.participants) {
+        let e = agg.get(part.player_id);
+        if (!e) { e = { matches: 0, first: null, last: null, roles: new Map() }; agg.set(part.player_id, e); }
+        e.matches++;
+        if (part.position) e.roles.set(part.position, (e.roles.get(part.position) || 0) + 1);
+        const rc = part.rating_change;   // null olabilir → o maç rating'e girmemiş
+        if (rc) {
+          if (e.first === null) e.first = ordinalOf(rc.mu_before, rc.sigma_before);
+          e.last = ordinalOf(rc.mu_after, rc.sigma_after);
+        }
+      }
+    }
+
+    const rows = [...agg.entries()]
+      .map(([id, e]) => ({ id, e, p: players.find(x => x.id === id) }))
+      .filter(x => x.p);
+    if (!rows.length) return { window: win, best_player: null, rising_star: null, best_by_role: emptyRoles() };
+
+    // Eşitlik kırılımı (contract): değer azalan → pencere maç sayısı azalan → ad alfabetik.
+    const best = (list, valueOf, countOf) => [...list].sort((a, b) =>
+      valueOf(b) - valueOf(a) ||
+      countOf(b) - countOf(a) ||
+      a.p.display_name.localeCompare(b.p.display_name, "tr"))[0];
+
+    const winCount = (x) => x.e.matches;
+    const topScore = best(rows, x => x.p.rating.score, winCount);
+    const best_player = {
+      player_id: topScore.id, display_name: topScore.p.display_name,
+      score: topScore.p.rating.score, matches_in_window: topScore.e.matches,
+    };
+
+    const risers = rows.filter(x => x.e.first !== null);
+    const deltaOf = (x) => +(x.e.last - x.e.first).toFixed(2);
+    const topRise = risers.length ? best(risers, deltaOf, winCount) : null;
+    const rising_star = topRise ? {
+      player_id: topRise.id, display_name: topRise.p.display_name,
+      delta: deltaOf(topRise), matches_in_window: topRise.e.matches,
+    } : null;
+
+    const best_by_role = {};
+    for (const role of POS) {
+      const cand = rows.filter(x => x.e.roles.get(role));
+      const roleCount = (x) => x.e.roles.get(role);
+      const roleScore = (x) => ((x.p.role_ratings || {})[role] || {}).score || 0;
+      const w = cand.length ? best(cand, roleScore, roleCount) : null;
+      best_by_role[role] = w ? {
+        player_id: w.id, display_name: w.p.display_name,
+        score: roleScore(w), matches_in_window: roleCount(w),
+      } : null;
+    }
+
+    return { window: win, best_player, rising_star, best_by_role };
+  }
+
   // ── fetch stub ──
   window.mockFetch = async function (url, opts = {}) {
     await delay(250); // ağ hissi
@@ -294,6 +393,8 @@
 
     if (method === "GET" && path === "/leaderboard")
       return json([...players].sort((a, b) => b.rating.score - a.rating.score));
+
+    if (method === "GET" && path === "/highlights/weekly") return json(weeklyHighlights());
 
     if (method === "GET" && path.startsWith("/matches")) return json(matches);
 

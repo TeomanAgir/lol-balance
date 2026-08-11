@@ -60,6 +60,25 @@ def perf_averages(
     }
 
 
+def effective_score(
+    engine: Engine, blend: bool, rating: Rating, p_avg: float | None
+) -> float:
+    """Gösterilecek `score` (api_contract §2) — TEK doğruluk noktası.
+
+    Harman version'da efektif rating (`mu_eff - 3σ`), harman olmayanda
+    `ordinal`. `p_avg` None ise nötr (1.0) sayılır: hiç perf satırı olmayan
+    oyuncu/rol için harman engine 1.0 varsayar.
+
+    players router (ana + rol rating listesi) ve haftanın enleri bu fonksiyonu
+    ortak kullanır; blend dallanması hiçbir çağıranda kopyalanmaz.
+    """
+    if not blend:
+        return rating.ordinal
+    return engine.effective(
+        rating.mu, rating.sigma, 1.0 if p_avg is None else p_avg
+    ).score
+
+
 def is_blend(engine: Engine) -> bool:
     """Engine harman (efektif rating) destekliyor mu?
 

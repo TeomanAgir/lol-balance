@@ -12,6 +12,7 @@
     selected: new Set(),        // dengeleme seçimi (player_id)
     manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
+    profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -59,6 +60,8 @@
       ? ""
       : `W/L ${fmtRating(r.ordinal)} · Perf ${r.perf_avg.toFixed(2)}`;
   const fmtDelta = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(1);
+  // Haftanın enleri delta'sı contract'ta 2 ondalıklı gelir ("+2.31") — o hassasiyet korunur.
+  const fmtDelta2 = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(2);
   const fmtDate = (iso) =>
     new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmtDuration = (s) => (s == null ? "—" : Math.round(s / 60) + " dk");
@@ -113,16 +116,17 @@
 
   // ── Sekme yönlendirme ─────────────────────────────────────────
   const loaders = {
-    balance: loadBalance, leaderboard: loadLeaderboard, matches: loadMatches,
-    manual: loadManual, profile: loadProfile,
+    balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
+    matches: loadMatches, manual: loadManual, profile: loadProfile,
   };
-  // Sekmesi olmayan "detay" görünümleri hangi sekmeyi aktif tutar (GÖREV 1: profil).
-  const TAB_OF = { profile: "leaderboard" };
+  // Sekmesi olmayan "detay" görünümü (GÖREV 1: profil) hangi sekmeyi aktif tutar.
+  // Profil iki yerden açılır (sıralama, enler) → geldiği görünümün sekmesi yanar.
+  const tabOf = (name) => (name === "profile" ? state.profileFrom : name);
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
     currentView = name;
-    const tab = TAB_OF[name] || name;
+    const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === tab));
     window.scrollTo({ top: 0 });
@@ -248,11 +252,16 @@
 
   // ── 2b) Oyuncu profili (GÖREV 1) ──────────────────────────────
   // Alt sekmelerin dışında bir "detay" görünümü: sıralamadan açılır, geri döner.
+  const BACK_LABEL = { leaderboard: "← Sıralamaya dön", highlights: "← Enlere dön" };
+
   function openProfile(id) {
     state.profileId = id;
+    // Profilden profile geçilebilir (sinerji linkleri) — çıkış noktası ilk giriş yeridir.
+    if (currentView !== "profile") state.profileFrom = currentView;
+    $("#btn-profile-back").textContent = BACK_LABEL[state.profileFrom] || BACK_LABEL.leaderboard;
     showView("profile");
   }
-  $("#btn-profile-back").addEventListener("click", () => showView("leaderboard"));
+  $("#btn-profile-back").addEventListener("click", () => showView(state.profileFrom));
 
   const num1 = (x) => (typeof x === "number" ? x.toFixed(1) : "—");
   const num2 = (x) => (typeof x === "number" ? x.toFixed(2) : "—");
@@ -335,6 +344,93 @@
       box.innerHTML = profileHtml(s);
       // Sinerji listesindeki isimler o oyuncunun profiline geçer.
       box.querySelectorAll(".syn-link").forEach(btn =>
+        btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
+    } catch (e) {
+      box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
+      throw e; // toast'ı showView gösterir
+    }
+  }
+
+  // ── 2c) Haftanın enleri (GÖREV 2) ─────────────────────────────
+  // Salt-okur ekran: GET /highlights/weekly. Contract'taki her alan null olabilir;
+  // dolu kartlar tıklanabilir (profile gider), null kartlar soluk "—" olarak kalır.
+
+  // Pencere metni: "5–12 Ağu arası"; ay sınırını aşarsa "29 Tem – 5 Ağu arası".
+  function windowText(w) {
+    const s = new Date(w.start), e = new Date(w.end);
+    if (isNaN(s) || isNaN(e)) return "";
+    const day = (d) => d.toLocaleDateString("tr-TR", { day: "numeric" });
+    const mon = (d) => d.toLocaleDateString("tr-TR", { month: "short" });
+    return s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()
+      ? `${day(s)}–${day(e)} ${mon(e)} arası`
+      : `${day(s)} ${mon(s)} – ${day(e)} ${mon(e)} arası`;
+  }
+
+  // Büyük kartlar (haftanın oyuncusu / yıldız rukisi). d null ise dokunma hedefi
+  // üretilmez: <button> yerine soluk <div> çizilir.
+  function hlCard(cls, label, d, valueHtml) {
+    if (!d) {
+      return `<div class="hl-card ${cls} hl-none">
+          <span class="hl-label">${label}</span>
+          <span class="hl-name">—</span>
+          <span class="hl-sub">Pencerede maç yok</span>
+        </div>`;
+    }
+    return `<button type="button" class="hl-card ${cls}" data-player="${d.player_id}">
+        <span class="hl-label">${label}</span>
+        <span class="hl-name">${esc(d.display_name)}</span>
+        ${valueHtml}
+        <span class="hl-sub">pencerede ${d.matches_in_window} maç</span>
+      </button>`;
+  }
+
+  // Rol kartı: etiket ROLE_TR adıdır; d null ise o rolde pencerede kimse oynamamıştır.
+  function hlRoleCard(role, d) {
+    const label = `<span class="hl-label">${ROLE_TR[role]}</span>`;
+    if (!d) {
+      return `<div class="hl-role hl-none">${label}
+          <span class="hl-name">—</span>
+          <span class="hl-sub">oynanmadı</span>
+        </div>`;
+    }
+    return `<button type="button" class="hl-role" data-player="${d.player_id}">${label}
+        <span class="hl-name">${esc(d.display_name)}</span>
+        <span class="hl-value">${num1(d.score)}</span>
+        <span class="hl-sub">${d.matches_in_window} maç</span>
+      </button>`;
+  }
+
+  async function loadHighlights() {
+    const box = $("#highlights-body");
+    box.innerHTML = "<p class='empty'>Yükleniyor…</p>";
+    try {
+      const h = await api("/highlights/weekly");
+      const roles = h.best_by_role || {};
+      // Hiç valid maç yoksa contract üç alanı da null döner → tek satır boş durum.
+      if (!h.best_player && !h.rising_star && !ROLES.some(r => roles[r])) {
+        box.innerHTML = "<p class='empty'>Değerlendirilecek maç yok.</p>";
+        return;
+      }
+      const w = h.window || {};
+      const head = windowText(w)
+        ? `<div class="hl-window">${windowText(w)}` +
+          (w.fallback ? `<span class="hl-fb">(son maç haftası)</span>` : "") + `</div>`
+        : "";
+      const rs = h.rising_star;
+      const up = rs && rs.delta >= 0;
+      box.innerHTML = head +
+        hlCard("hero", "Haftanın Oyuncusu", h.best_player,
+          h.best_player
+            ? `<span class="hl-value">${num1(h.best_player.score)}<span class="hl-unit">puan</span></span>`
+            : "") +
+        hlCard("rising", "Yıldız Rukisi", rs,
+          rs ? `<span class="hl-value delta ${up ? "up" : "down"}">${fmtDelta2(rs.delta)}</span>` : "") +
+        `<section class="prof-section">
+           <h3 class="ps-title">Rol enleri</h3>
+           <div class="hl-roles">${ROLES.map(r => hlRoleCard(r, roles[r])).join("")}</div>
+         </section>`;
+
+      box.querySelectorAll("button[data-player]").forEach(btn =>
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
     } catch (e) {
       box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
