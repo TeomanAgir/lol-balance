@@ -68,6 +68,17 @@ class RatingOut(BaseModel):
     score: float
 
 
+class RoleRatingOut(BaseModel):
+    # Rol evreni (api_contract §2): 5 rolün her biri HER ZAMAN döner.
+    # Hiç oynanmamış rol: mu=25, sigma=25/3, perf_avg=1.0, score=0.0, matches=0.
+    # Harman olmayan version'da perf_avg=None, score = mu - 3*sigma.
+    mu: float
+    sigma: float
+    perf_avg: Optional[float]
+    score: float
+    matches: int
+
+
 class PlayerOut(BaseModel):
     id: int
     display_name: str
@@ -75,6 +86,19 @@ class PlayerOut(BaseModel):
     puuid: Optional[str]
     matches_played: int
     rating: RatingOut
+    role_ratings: dict[str, RoleRatingOut]
+
+
+class PositionsUpdate(BaseModel):
+    # api_contract §3: anahtarlar bu maçın player_id'leri (JSON nesne anahtarı
+    # olduğu için string), değerler rol adı veya null. Kısmi güncelleme serbest.
+    # Anahtar/rol doğrulaması router'da yapılır (Türkçe detail üretebilmek için).
+    positions: dict[str, Optional[str]]
+
+
+class PositionsUpdateResponse(BaseModel):
+    updated: int
+    role_matches_replayed: int
 
 
 class BalanceRequest(BaseModel):
@@ -82,9 +106,16 @@ class BalanceRequest(BaseModel):
     top_n: int = 3
 
 
+class TeamSlotOut(BaseModel):
+    player_id: int
+    position: Position
+
+
 class BalanceSuggestionOut(BaseModel):
-    team_100: list[int]
-    team_200: list[int]
+    # Dengeleme HER ZAMAN rol bazlıdır (api_contract §4): takımlar oyuncu id'si
+    # değil, (player_id, position) çiftleri döner.
+    team_100: list[TeamSlotOut]
+    team_200: list[TeamSlotOut]
     p_win_team_100: float
     quality: float
 
@@ -96,4 +127,5 @@ class BalanceResponse(BaseModel):
 
 class ReplayResponse(BaseModel):
     matches_replayed: int
+    role_matches_replayed: int
     engine_version: str

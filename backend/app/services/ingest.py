@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from ..schemas import IngestMatch, IngestParticipant
 from . import ratings as rating_service
+from . import role_ratings as role_rating_service
 
 VOID_THRESHOLD_S = 300
 
@@ -159,6 +160,11 @@ def ingest_match(
 
             if not is_void:
                 rating_service.apply_match_incremental(
+                    conn, match_id, body.winner_team, engine_version
+                )
+                # Rol evreni ayrı state uzayıdır; uygunluk kontrolü içeride
+                # yapılır, uygun değilse sessizce atlanır (GÖREV 0).
+                role_rating_service.apply_match_incremental_roles(
                     conn, match_id, body.winner_team, engine_version
                 )
     except sqlite3.IntegrityError as exc:

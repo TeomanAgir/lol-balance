@@ -4,10 +4,13 @@ from __future__ import annotations
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from rating import ROLES
 
 from ..config import Settings, get_settings
 from ..deps import get_db
+from ..schemas import PositionsUpdate, PositionsUpdateResponse
 from ..services.ratings import replay
+from ..services.role_ratings import replay_roles
 
 router = APIRouter()
 
@@ -89,11 +92,84 @@ def void_match(
         conn.execute(
             "UPDATE matches SET status = 'void' WHERE id = ?", (match_id,)
         )
-    # Void, geçmişi değiştirir → otomatik replay (api_contract §5).
+    # Void, geçmişi değiştirir → HER İKİ evrende otomatik replay
+    # (api_contract §5; rol evreni GÖREV 0).
     matches_replayed = replay(conn, settings.engine_version)
+    role_matches_replayed = replay_roles(conn, settings.engine_version)
     return {
         "match_id": match_id,
         "status": "void",
         "matches_replayed": matches_replayed,
+        "role_matches_replayed": role_matches_replayed,
         "engine_version": settings.engine_version,
     }
+
+
+@router.put("/matches/{match_id}/positions")
+def update_positions(
+    match_id: int,
+    body: PositionsUpdate,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> PositionsUpdateResponse:
+    """Katılımcı rollerini günceller (api_contract §3).
+
+    `match_participants.position` küratörlü alandır (db_schema ilke 5): ham
+    `ingest_events` DEĞİŞMEZ. Yalnız rol evreni replay edilir; ana rating
+    bit-bit korunur.
+    """
+    row = conn.execute(
+        "SELECT id FROM matches WHERE id = ?", (match_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+
+    participants = {
+        r["player_id"]
+        for r in conn.execute(
+            "SELECT player_id FROM match_participants WHERE match_id = ?",
+            (match_id,),
+        )
+    }
+
+    # Önce TÜM girdi doğrulanır, sonra yazılır: kısmen uygulanmış güncelleme
+    # olmaz (hata durumunda DB'ye hiç dokunulmaz).
+    updates: list[tuple[int, str | None]] = []
+    for raw_key, value in body.positions.items():
+        try:
+            player_id = int(raw_key)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                422,
+                detail=f"positions anahtarı oyuncu id'si olmalı, geldi: {raw_key!r}.",
+            ) from None
+        if player_id not in participants:
+            raise HTTPException(
+                422,
+                detail=f"Oyuncu {player_id} bu maçta yer almıyor (maç {match_id}).",
+            )
+        if value is not None and value not in ROLES:
+            raise HTTPException(
+                422,
+                detail=(
+                    f"Geçersiz rol: {value!r}. "
+                    f"Geçerli roller: {', '.join(ROLES)} veya null."
+                ),
+            )
+        updates.append((player_id, value))
+
+    updated = 0
+    with conn:
+        for player_id, value in updates:
+            cur = conn.execute(
+                "UPDATE match_participants SET position = ? "
+                "WHERE match_id = ? AND player_id = ?",
+                (value, match_id, player_id),
+            )
+            updated += cur.rowcount
+
+    # Rol düzeltmesi rol evreninde replay tetikler; ana evren ETKİLENMEZ.
+    role_matches_replayed = replay_roles(conn, settings.engine_version)
+    return PositionsUpdateResponse(
+        updated=updated, role_matches_replayed=role_matches_replayed
+    )

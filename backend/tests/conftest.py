@@ -30,6 +30,7 @@ CONTRACT_PARTICIPANT = {
 }
 
 POSITIONS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
+ROLES_SET = set(POSITIONS)
 
 
 def make_payload(
@@ -52,6 +53,60 @@ def make_payload(
                 "stats": dict(CONTRACT_PARTICIPANT["stats"]),
             }
         )
+    return {
+        "source": "lcu_eog",
+        "source_game_id": source_game_id,
+        "played_at": played_at,
+        "duration_s": duration_s,
+        "winner_team": winner_team,
+        "participants": participants,
+    }
+
+
+def make_role_payload(
+    source_game_id: str = "6874231955",
+    played_at: str = "2026-08-11T20:41:03Z",
+    duration_s: int = 1874,
+    winner_team: int = 100,
+):
+    """make_payload'ın rol evrenine UYGUN hâli.
+
+    make_payload'ın rol dağılımı bilinçli olarak bozuktur (team100'de MIDDLE
+    iki kez, TOP hiç); burada her takım 5 farklı rolü tam 1'er kez alır
+    (rating_contract "Rol Rating Evreni" §3).
+    """
+    payload = make_payload(source_game_id, played_at, duration_s, winner_team)
+    for i, p in enumerate(payload["participants"]):
+        p["position"] = POSITIONS[i % 5]
+    return payload
+
+
+def make_roster_payload(
+    source_game_id: str,
+    played_at: str,
+    team100_ids: list[int],
+    team200_ids: list[int],
+    winner_team: int = 100,
+    duration_s: int = 1874,
+):
+    """Var olan oyuncu id'leriyle rol evrenine uygun maç payload'ı.
+
+    ingest_contract participant'ı puuid YERİNE player_id kabul eder; bu, hangi
+    oyuncunun hangi rolde oynadığını testte tam kontrol etmeyi sağlar.
+    Statlar tüm katılımcılarda aynıdır → perf = 1.0 (nötr), sonuç saf W/L.
+    """
+    participants = []
+    for team, ids in ((100, team100_ids), (200, team200_ids)):
+        for i, pid in enumerate(ids):
+            participants.append(
+                {
+                    "player_id": pid,
+                    "team": team,
+                    "position": POSITIONS[i],
+                    "champion": "Ahri",
+                    "stats": dict(CONTRACT_PARTICIPANT["stats"]),
+                }
+            )
     return {
         "source": "lcu_eog",
         "source_game_id": source_game_id,
