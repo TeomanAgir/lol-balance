@@ -69,9 +69,12 @@
   // Deterministik sahte maç geçmişi üret (Date.now/random'a gerek yok).
   let nextMatchId = 100;
   const matches = [];
+  // Maçsız oyuncu (Ece) hiçbir maça girmez: matches_played ile maç geçmişi tutarlı kalsın,
+  // profil ekranında (GÖREV 1) boş/null senaryosu gerçekten boş görünsün.
+  const matchPool = players.filter(p => p.matches_played).map(p => p.id);
   for (let m = 0; m < 8; m++) {
     // Her maçta havuz bir kaydırılır, ilk 10 kişi oynar.
-    const uniq = players.map(p => p.id).map((_, i, all) => all[(i + m) % all.length]).slice(0, 10);
+    const uniq = matchPool.map((_, i, all) => all[(i + m) % all.length]).slice(0, 10);
     const winner = m % 2 === 0 ? 100 : 200;
     matches.push({
       id: nextMatchId++,
@@ -94,7 +97,9 @@
           // m === 1 maçında iki katılımcının rolü boş: UI'ın "—" gösterimi ve rol
           // düzeltme akışı denenebilsin (bu maç rol evrenine girmez).
           position: (m === 1 && (i === 1 || i === 6)) ? null : POS[i % 5],
-          champion: CHAMPS[(pid + m) % CHAMPS.length],
+          // Her oyuncu iki şampiyon arasında gidip gelir → profildeki "favori karakter"
+          // birden çok maça dayanır (tek maçlık beraberlik yerine anlamlı bir favori).
+          champion: CHAMPS[(pid * 3 + (m % 2)) % CHAMPS.length],
           stats: {
             kills: (pid + m) % 12,
             deaths: (pid * 3 + m) % 9,
@@ -169,6 +174,107 @@
       .sort((a, b) => b.quality - a.quality);
   }
 
+  // ── Oyuncu profili (GÖREV 1) ──
+  // api_contract §2 "Oyuncu profili": tüm istatistikler yalnız status='valid' maçlardan.
+  // Mock bunları maç geçmişinden TÜRETİR → void işlemi profili de tutarlı etkiler.
+  const emptyStats = (p) => ({
+    player: { id: p.id, display_name: p.display_name, riot_id: p.riot_id },
+    totals: { matches: 0, wins: 0, losses: 0, winrate: null },
+    kda: null,
+    favorite_champion: null,
+    favorite_role: null,
+    synergy: [],
+  });
+
+  function playerStats(id) {
+    const p = players.find(x => x.id === id);
+    if (!p) return null;
+    // Ece (matches_played: 0) → contract'taki tüm null/boş yolları temsil eden senaryo.
+    if (!p.matches_played) return emptyStats(p);
+
+    const mine = [];
+    for (const m of matches) {
+      if (m.status !== "valid") continue;
+      const part = m.participants.find(x => x.player_id === id);
+      if (part) mine.push({ m, part });
+    }
+    if (!mine.length) return emptyStats(p);
+
+    const wins = mine.filter(({ m, part }) => m.winner_team === part.team).length;
+    const totals = {
+      matches: mine.length, wins, losses: mine.length - wins,
+      winrate: +(wins / mine.length).toFixed(3),
+    };
+
+    // kda: yalnız kills/deaths/assists ÜÇÜ DE dolu maçlar; hiç yoksa null.
+    const statted = mine.filter(({ part }) => part.stats &&
+      part.stats.kills != null && part.stats.deaths != null && part.stats.assists != null);
+    let kda = null;
+    if (statted.length) {
+      const sum = (f) => statted.reduce((a, { part }) => a + part.stats[f], 0);
+      const K = sum("kills"), D = sum("deaths"), A = sum("assists");
+      kda = {
+        kills_avg: +(K / statted.length).toFixed(2),
+        deaths_avg: +(D / statted.length).toFixed(2),
+        assists_avg: +(A / statted.length).toFixed(2),
+        ratio: +((K + A) / Math.max(1, D)).toFixed(2),
+      };
+    }
+
+    // favorite_champion: champion null hariç en çok oynanan; eşitlikte ad alfabetik küçük.
+    const champs = new Map();
+    for (const { m, part } of mine) {
+      if (!part.champion) continue;
+      const c = champs.get(part.champion) || { champion: part.champion, matches: 0, wins: 0 };
+      c.matches++;
+      if (m.winner_team === part.team) c.wins++;
+      champs.set(part.champion, c);
+    }
+    const favC = [...champs.values()]
+      .sort((a, b) => b.matches - a.matches || a.champion.localeCompare(b.champion))[0];
+    const favorite_champion = favC
+      ? { champion: favC.champion, matches: favC.matches, winrate: +(favC.wins / favC.matches).toFixed(3) }
+      : null;
+
+    // favorite_role: position null hariç en çok oynanan; eşitlikte kanonik rol sırası.
+    const roles = new Map();
+    for (const { part } of mine) {
+      if (!part.position) continue;
+      roles.set(part.position, (roles.get(part.position) || 0) + 1);
+    }
+    const favR = [...roles.entries()]
+      .sort((a, b) => b[1] - a[1] || POS.indexOf(a[0]) - POS.indexOf(b[0]))[0];
+    const favorite_role = favR ? { role: favR[0], matches: favR[1] } : null;
+
+    // synergy: AYNI TAKIMDA oynanan valid maçlar, en az 2 ortak maç, en fazla 3 kayıt.
+    const mates = new Map();
+    for (const { m, part } of mine) {
+      const won = m.winner_team === part.team;
+      for (const other of m.participants) {
+        if (other.player_id === id || other.team !== part.team) continue;
+        const e = mates.get(other.player_id) || {
+          player_id: other.player_id, display_name: other.display_name,
+          matches_together: 0, wins_together: 0,
+        };
+        e.matches_together++;
+        if (won) e.wins_together++;
+        mates.set(other.player_id, e);
+      }
+    }
+    const synergy = [...mates.values()]
+      .filter(e => e.matches_together >= 2)
+      .map(e => ({ ...e, winrate: +(e.wins_together / e.matches_together).toFixed(3) }))
+      .sort((a, b) => b.winrate - a.winrate ||
+                      b.matches_together - a.matches_together ||
+                      a.display_name.localeCompare(b.display_name))
+      .slice(0, 3);
+
+    return {
+      player: { id: p.id, display_name: p.display_name, riot_id: p.riot_id },
+      totals, kda, favorite_champion, favorite_role, synergy,
+    };
+  }
+
   // ── fetch stub ──
   window.mockFetch = async function (url, opts = {}) {
     await delay(250); // ağ hissi
@@ -179,6 +285,12 @@
     if (!key) return err(401, "API anahtarı eksik veya hatalı.");
 
     if (method === "GET" && path === "/players") return json(players);
+
+    const statsPath = path.match(/^\/players\/(\d+)\/stats$/);
+    if (method === "GET" && statsPath) {
+      const s = playerStats(Number(statsPath[1]));
+      return s ? json(s) : err(404, "Oyuncu bulunamadı.");
+    }
 
     if (method === "GET" && path === "/leaderboard")
       return json([...players].sort((a, b) => b.rating.score - a.rating.score));

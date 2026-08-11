@@ -11,6 +11,7 @@
     roster: [],                 // GET /players sonucu
     selected: new Set(),        // dengeleme seçimi (player_id)
     manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
+    profileId: null,            // açık olan oyuncu profili (GÖREV 1)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -61,6 +62,9 @@
   const fmtDate = (iso) =>
     new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmtDuration = (s) => (s == null ? "—" : Math.round(s / 60) + " dk");
+  // innerHTML'e giren serbest metin (oyuncu adı, riot_id, şampiyon, hata detayı) için.
+  const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ESC[c]);
   const playerName = (id) => {
     const p = state.roster.find(x => x.id === id);
     return p ? p.display_name : "#" + id;
@@ -108,13 +112,20 @@
   $("#btn-key").addEventListener("click", openKeyModal);
 
   // ── Sekme yönlendirme ─────────────────────────────────────────
-  const loaders = { balance: loadBalance, leaderboard: loadLeaderboard, matches: loadMatches, manual: loadManual };
+  const loaders = {
+    balance: loadBalance, leaderboard: loadLeaderboard, matches: loadMatches,
+    manual: loadManual, profile: loadProfile,
+  };
+  // Sekmesi olmayan "detay" görünümleri hangi sekmeyi aktif tutar (GÖREV 1: profil).
+  const TAB_OF = { profile: "leaderboard" };
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
     currentView = name;
+    const tab = TAB_OF[name] || name;
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === tab));
+    window.scrollTo({ top: 0 });
     loaders[name](forceReload).catch(e => toast(e.message));
   }
   document.querySelectorAll(".tab").forEach(t =>
@@ -216,32 +227,119 @@
   }
 
   // ── 2) Leaderboard ────────────────────────────────────────────
+  // Oyuncu adı artık profili açar (GÖREV 1). Eski satır-içi rol açılırı kaldırıldı:
+  // rol şeridi profilde daha geniş biçimde zaten var, iki ayrı açılır tekrar olurdu.
   async function loadLeaderboard() {
     const rows = await api("/leaderboard"); // backend score'a göre sıralı döner
     const body = $("#board-body");
     body.innerHTML = rows.map((p, i) => {
       const sub = ratingSub(p.rating);
-      const strip = roleCells(p.role_ratings, true);
-      const nameCell = strip
-        ? `<button type="button" class="row-toggle" aria-expanded="false" aria-controls="roles-${p.id}">` +
-          `${p.display_name}<span class="chev" aria-hidden="true">▾</span></button>`
-        : p.display_name;
       return `<tr>
          <td class="rank">${i + 1}</td>
-         <td>${nameCell}</td>
+         <td><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button></td>
          <td class="num strong">${fmtRating(p.rating.score)}${sub ? `<span class="rating-sub">${sub}</span>` : ""}</td>
          <td class="num">${p.matches_played}</td>
-       </tr>` +
-       (strip ? `<tr class="board-roles" id="roles-${p.id}" hidden><td></td><td colspan="3">${strip}</td></tr>` : "");
+       </tr>`;
     }).join("");
 
-    body.querySelectorAll(".row-toggle").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const target = document.getElementById(btn.getAttribute("aria-controls"));
-        target.hidden = !target.hidden;
-        btn.setAttribute("aria-expanded", String(!target.hidden));
-      });
-    });
+    body.querySelectorAll(".name-link").forEach(btn =>
+      btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
+  }
+
+  // ── 2b) Oyuncu profili (GÖREV 1) ──────────────────────────────
+  // Alt sekmelerin dışında bir "detay" görünümü: sıralamadan açılır, geri döner.
+  function openProfile(id) {
+    state.profileId = id;
+    showView("profile");
+  }
+  $("#btn-profile-back").addEventListener("click", () => showView("leaderboard"));
+
+  const num1 = (x) => (typeof x === "number" ? x.toFixed(1) : "—");
+  const num2 = (x) => (typeof x === "number" ? x.toFixed(2) : "—");
+  // winrate contract'ta 0..1 oran ve null olabilir.
+  const pctText = (x) => (typeof x === "number" ? "%" + Math.round(x * 100) : "—");
+
+  const statCard = (title, main, sub) =>
+    `<article class="stat-card">
+       <h3 class="sc-title">${title}</h3>
+       <div class="sc-main">${main}</div>
+       ${sub ? `<div class="sc-sub">${sub}</div>` : ""}
+     </article>`;
+
+  // s = GET /players/{id}/stats yanıtı. kda / favoriler null, synergy boş,
+  // winrate null olabilir — hepsi kısa notla gösterilir.
+  function profileHtml(s) {
+    const p = s.player || {};
+    const rp = state.roster.find(x => x.id === p.id); // rol şeridi + puan roster'dan
+    const t = s.totals || {};
+    const played = t.matches || 0;
+    const k = s.kda, fc = s.favorite_champion, fr = s.favorite_role;
+    const syn = s.synergy || [];
+
+    const head =
+      `<header class="prof-head">
+         <h2 class="prof-name">${esc(p.display_name)}</h2>
+         ${p.riot_id ? `<span class="prof-riot">${esc(p.riot_id)}</span>` : ""}
+         ${rp ? `<div class="prof-score">${fmtRating(rp.rating.score)}<span>puan</span></div>` : ""}
+       </header>`;
+
+    const cards =
+      statCard("Maç & W/L",
+        played ? `${played} maç · ${t.wins}G ${t.losses}M` : "Henüz maç yok",
+        played && t.winrate != null ? `${pctText(t.winrate)} galibiyet` : "") +
+      statCard("Ortalama KDA",
+        k ? `${num1(k.kills_avg)} / ${num1(k.deaths_avg)} / ${num1(k.assists_avg)}` : "—",
+        k ? `${num2(k.ratio)} KDA` : "İstatistikli maç yok") +
+      statCard("Favori karakter",
+        fc ? esc(fc.champion) : "—",
+        fc ? `${fc.matches} maç · ${pctText(fc.winrate)} galibiyet` : "Şampiyon verisi yok") +
+      statCard("Favori koridor",
+        fr ? roleLabel(fr.role) : "—",
+        fr ? `${fr.matches} maç` : "Rol verisi yok");
+
+    const strip = rp ? roleCells(rp.role_ratings, true) : "";
+    const roleSec = strip
+      ? `<section class="prof-section"><h3 class="ps-title">Rol ratingleri</h3>${strip}</section>`
+      : "";
+
+    const synMeta = (x) =>
+      `<span class="syn-meta">${x.matches_together} ortak maç · ${pctText(x.winrate)} galibiyet</span>`;
+    const synLink = (x, cls) =>
+      `<button type="button" class="syn-link${cls ? " " + cls : ""}" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
+    const synSec =
+      `<section class="prof-section">
+         <h3 class="ps-title">En yüksek sinerji</h3>` +
+      (syn.length
+        ? `<div class="syn-top">${synLink(syn[0], "syn-name")}${synMeta(syn[0])}</div>` +
+          (syn.length > 1
+            ? `<ul class="syn-rest">` +
+              syn.slice(1).map(x => `<li>${synLink(x)}${synMeta(x)}</li>`).join("") +
+              `</ul>`
+            : "")
+        : `<p class="ps-empty">En az 2 ortak maç gerekiyor.</p>`) +
+      `</section>`;
+
+    return head + `<div class="stat-grid">${cards}</div>` + roleSec + synSec;
+  }
+
+  async function loadProfile() {
+    const box = $("#profile-body");
+    if (state.profileId == null) {
+      box.innerHTML = "<p class='empty'>Oyuncu seçilmedi.</p>";
+      return;
+    }
+    box.innerHTML = "<p class='empty'>Yükleniyor…</p>";
+    try {
+      await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
+      const s = await api(`/players/${state.profileId}/stats`);
+      box.innerHTML = profileHtml(s);
+      // Sinerji listesindeki isimler o oyuncunun profiline geçer.
+      box.querySelectorAll(".syn-link").forEach(btn =>
+        btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
+    } catch (e) {
+      box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
+      throw e; // toast'ı showView gösterir
+    }
   }
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
