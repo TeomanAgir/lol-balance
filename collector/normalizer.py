@@ -210,11 +210,11 @@ def normalize_eog(
     """
     game_id = raw.get("gameId")
     if not game_id:
-        raise NormalizeError("EOG bloğunda gameId yok")
+        raise NormalizeError("EOG block has no gameId")
 
     duration_raw = raw.get("gameLength", raw.get("gameDuration"))
     if duration_raw is None:
-        raise NormalizeError(f"EOG bloğunda süre alanı yok (gameId={game_id})")
+        raise NormalizeError(f"EOG block has no duration field (gameId={game_id})")
 
     teams = raw.get("teams") or []
     winner_team: Optional[int] = None
@@ -234,8 +234,8 @@ def normalize_eog(
             puuid = player.get("puuid")
             if not puuid:
                 raise NormalizeError(
-                    f"puuid eksik (gameId={game_id}, oyuncu={player.get('summonerName')!r}) — "
-                    f"contract puuid zorunlu tutar, maç gönderilemez"
+                    f"puuid missing (gameId={game_id}, player={player.get('summonerName')!r}) — "
+                    f"the contract requires puuid, match cannot be sent"
                 )
             champion = player.get("championName")
             if not champion and champion_map:
@@ -257,7 +257,7 @@ def normalize_eog(
             )
 
     if winner_team not in (100, 200):
-        raise NormalizeError(f"Kazanan takım belirlenemedi (gameId={game_id})")
+        raise NormalizeError(f"Could not determine the winning team (gameId={game_id})")
 
     return MatchPayload(
         source_game_id=str(game_id),
@@ -318,16 +318,16 @@ def normalize_match_history_game(
     """Match history game → contract. Backfill ve EOG fallback yolu."""
     game_id = raw.get("gameId")
     if not game_id:
-        raise NormalizeError("Match history kaydında gameId yok")
+        raise NormalizeError("Match history record has no gameId")
 
     duration_raw = raw.get("gameDuration")
     if duration_raw is None:
-        raise NormalizeError(f"Match history kaydında gameDuration yok (gameId={game_id})")
+        raise NormalizeError(f"Match history record has no gameDuration (gameId={game_id})")
     duration_s = _duration_seconds(duration_raw)
 
     winner_team = _mh_winner_team(raw)
     if winner_team is None:
-        raise NormalizeError(f"Kazanan takım belirlenemedi (gameId={game_id})")
+        raise NormalizeError(f"Could not determine the winning team (gameId={game_id})")
 
     identities: dict[int, dict[str, Any]] = {}
     for identity in raw.get("participantIdentities") or []:
@@ -343,8 +343,8 @@ def normalize_match_history_game(
         puuid = player.get("puuid") or p.get("puuid")
         if not puuid:
             raise NormalizeError(
-                f"puuid eksik (gameId={game_id}, participantId={p.get('participantId')}) — "
-                f"contract puuid zorunlu tutar, maç gönderilemez"
+                f"puuid missing (gameId={game_id}, participantId={p.get('participantId')}) — "
+                f"the contract requires puuid, match cannot be sent"
             )
         champion = None
         if champion_map:
@@ -367,7 +367,7 @@ def normalize_match_history_game(
 
     created = game_creation_datetime(raw)
     if created is None:
-        raise NormalizeError(f"Maç zamanı belirlenemedi (gameId={game_id})")
+        raise NormalizeError(f"Could not determine match time (gameId={game_id})")
     played_at = to_utc_z(created + timedelta(seconds=duration_s))
 
     return MatchPayload(

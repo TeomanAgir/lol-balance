@@ -48,7 +48,7 @@ class Sender:
         try:
             response = self._client.post(INGEST_PATH, json=payload)
         except httpx.HTTPError as exc:
-            log.warning("Backend erişilemedi (%s): %s", game_id, exc)
+            log.warning("Backend unreachable (%s): %s", game_id, exc)
             return SendOutcome.RETRY
 
         if 200 <= response.status_code < 300:
@@ -57,17 +57,17 @@ class Sender:
                 duplicate = bool(response.json().get("duplicate"))
             except Exception:
                 pass
-            log.info("Gönderildi: %s%s", game_id, " (duplicate)" if duplicate else "")
+            log.info("Sent: %s%s", game_id, " (duplicate)" if duplicate else "")
             return SendOutcome.OK
 
         if 400 <= response.status_code < 500 and response.status_code != 429:
             log.error(
-                "Backend reddetti (%s, HTTP %s): %s",
+                "Backend rejected (%s, HTTP %s): %s",
                 game_id, response.status_code, response.text[:500],
             )
             return SendOutcome.REJECTED
 
-        log.warning("Backend hatası (%s, HTTP %s), outbox'tan denenecek", game_id, response.status_code)
+        log.warning("Backend error (%s, HTTP %s), will retry from outbox", game_id, response.status_code)
         return SendOutcome.RETRY
 
     def send_or_outbox(self, payload: dict[str, Any]) -> SendOutcome:
@@ -88,7 +88,7 @@ class Sender:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
-                log.error("Outbox dosyası okunamadı, atlanıyor: %s (%s)", path.name, exc)
+                log.error("Could not read outbox file, skipping: %s (%s)", path.name, exc)
                 continue
             outcome = self.send(payload)
             if outcome is SendOutcome.OK:
@@ -104,7 +104,7 @@ class Sender:
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / _safe_filename(str(payload.get("source_game_id", "unknown")))
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        log.info("Payload diske yazıldı: %s", path)
+        log.info("Payload written to disk: %s", path)
 
     def close(self) -> None:
         self._client.close()

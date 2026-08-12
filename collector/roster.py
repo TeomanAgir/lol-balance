@@ -51,7 +51,7 @@ def load_seed_roster(path: Path) -> set[str]:
         return set()
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list):
-        raise ValueError(f"{path} bir JSON listesi olmalı (riot_id string'leri)")
+        raise ValueError(f"{path} must be a JSON list (riot_id strings)")
     return {_norm(item) for item in data if isinstance(item, str) and item.strip()}
 
 
@@ -71,7 +71,7 @@ def fetch_backend_roster(
             response.raise_for_status()
             players = response.json()
     except (httpx.HTTPError, ValueError) as exc:
-        log.warning("Backend roster alınamadı, seed_roster ile devam: %s", exc)
+        log.warning("Could not fetch backend roster, continuing with seed_roster: %s", exc)
         return roster
 
     for player in players or []:
@@ -89,7 +89,7 @@ def build_known_roster(
     seed = load_seed_roster(config.seed_roster_path)
     roster.riot_ids |= seed
     log.info(
-        "Bilinen oyuncu kümesi: %d puuid, %d riot_id (seed: %d)",
+        "Known player set: %d puuids, %d riot_ids (seed: %d)",
         len(roster.puuids), len(roster.riot_ids), len(seed),
     )
     return roster

@@ -61,7 +61,7 @@ class LiveRunner:
             try:
                 self._champion_map = champion_map_from_summary(self._lcu.get_champion_summary())
             except Exception as exc:
-                log.warning("Champion listesi alınamadı (champion=null gidebilir): %s", exc)
+                log.warning("Could not fetch champion list (champion may be sent as null): %s", exc)
                 self._champion_map = {}
         return self._champion_map or None
 
@@ -71,7 +71,7 @@ class LiveRunner:
             try:
                 eog = self._lcu.get_eog_stats_block()
             except Exception as exc:
-                log.debug("EOG isteği başarısız (deneme %d): %s", attempt + 1, exc)
+                log.debug("EOG request failed (attempt %d): %s", attempt + 1, exc)
                 eog = {}
             if eog.get("gameId"):
                 return eog
@@ -93,32 +93,32 @@ class LiveRunner:
         if eog.get("gameId"):
             game_id = str(eog["gameId"])
             if self._already_processed(game_id):
-                log.info("Maç zaten işlendi, atlanıyor: %s", game_id)
+                log.info("Match already processed, skipping: %s", game_id)
                 return False
             if not is_custom(eog):
-                log.info("Custom değil, atlanıyor: %s (gameType=%s, queueId=%s)",
+                log.info("Not a custom game, skipping: %s (gameType=%s, queueId=%s)",
                          game_id, eog.get("gameType"), eog.get("queueId"))
                 self._process(game_id, eog, None)
                 return False
             try:
                 payload = normalize_eog(eog, self._now(), self._get_champion_map())
             except NormalizeError as exc:
-                log.error("Normalize edilemedi: %s", exc)
+                log.error("Could not normalize: %s", exc)
                 self._process(game_id, eog, None)
                 return False
             self._process(game_id, eog, payload.model_dump())
             return True
 
         # Fallback: EOG bloğu gelmedi → gameflow session'dan gameId, match history'den detay
-        log.warning("EOG bloğu alınamadı, match history fallback deneniyor")
+        log.warning("Could not fetch EOG block, trying match history fallback")
         try:
             session = self._lcu.get_gameflow_session()
             game_id_raw = (session.get("gameData") or {}).get("gameId")
         except Exception as exc:
-            log.error("Gameflow session alınamadı: %s", exc)
+            log.error("Could not fetch gameflow session: %s", exc)
             return False
         if not game_id_raw:
-            log.error("Fallback için gameId bulunamadı, maç kaçırıldı (backfill ile telafi edilebilir)")
+            log.error("No gameId found for fallback, match missed (can be recovered with backfill)")
             return False
 
         game_id = str(game_id_raw)
@@ -127,16 +127,16 @@ class LiveRunner:
         try:
             game = self._lcu.get_game(game_id_raw)
         except Exception as exc:
-            log.error("Match history detayı alınamadı (%s): %s", game_id, exc)
+            log.error("Could not fetch match history detail (%s): %s", game_id, exc)
             return False
         if not is_custom(game):
-            log.info("Custom değil (fallback), atlanıyor: %s", game_id)
+            log.info("Not a custom game (fallback), skipping: %s", game_id)
             self._process(game_id, game, None)
             return False
         try:
             payload = normalize_match_history_game(game, self._get_champion_map())
         except NormalizeError as exc:
-            log.error("Normalize edilemedi (fallback): %s", exc)
+            log.error("Could not normalize (fallback): %s", exc)
             self._process(game_id, game, None)
             return False
         self._process(game_id, game, payload.model_dump())
@@ -153,7 +153,7 @@ class LiveRunner:
                 failures = 0
             except Exception as exc:
                 failures += 1
-                log.debug("Gameflow phase alınamadı (%d/%d): %s",
+                log.debug("Could not fetch gameflow phase (%d/%d): %s",
                           failures, _MAX_CONSECUTIVE_FAILURES, exc)
                 if failures >= _MAX_CONSECUTIVE_FAILURES:
                     raise LcuConnectionLost() from exc
@@ -164,7 +164,7 @@ class LiveRunner:
                 try:
                     self.on_end_of_game()
                 except Exception:
-                    log.exception("EndOfGame işlenirken beklenmeyen hata")
+                    log.exception("Unexpected error while handling EndOfGame")
             previous_phase = phase
 
             self._sender.flush_outbox()

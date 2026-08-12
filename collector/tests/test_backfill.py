@@ -229,7 +229,7 @@ def test_backfill_no_winner_long_game_is_still_error(
 
     assert stats.skipped_remake == 0
     assert len(stats.errors) == 1
-    assert "Kazanan takım belirlenemedi" in stats.errors[0]
+    assert "Could not determine the winning team" in stats.errors[0]
     assert sent == []
 
 

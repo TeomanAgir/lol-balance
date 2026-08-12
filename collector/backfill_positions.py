@@ -104,7 +104,7 @@ def _load_raw(path: Path) -> Optional[dict[str, Any]]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        log.error("Ham maç dosyası okunamadı, atlanıyor: %s (%s)", path.name, exc)
+        log.error("Could not read raw match file, skipping: %s (%s)", path.name, exc)
         return None
     return data if isinstance(data, dict) else None
 
@@ -121,7 +121,7 @@ def run_position_backfill(
     files = _archive_files(config, archive_dir)
     if not files:
         log.warning(
-            "Ham maç arşivi boş (%s): backfill-positions yapacak iş bulamadı",
+            "Raw match archive is empty (%s): backfill-positions found nothing to do",
             archive_dir or config.raw_archive_dir,
         )
         return stats
@@ -131,12 +131,12 @@ def run_position_backfill(
             matches = fetch_match_index(client, limit=min(limit, MATCH_LIST_LIMIT))
             players = fetch_player_index(client)
         except (httpx.HTTPError, ValueError) as exc:
-            log.error("Backend'den maç/oyuncu listesi alınamadı: %s", exc)
-            stats.errors.append(f"backend listesi: {exc}")
+            log.error("Could not fetch match/player list from the backend: %s", exc)
+            stats.errors.append(f"backend list: {exc}")
             return stats
 
         log.info(
-            "Backend'de %d maç, %d puuid'li oyuncu; %d ham maç dosyası taranacak%s",
+            "Backend has %d matches, %d players with puuid; %d raw match files to scan%s",
             len(matches), len(players), len(files), " (DRY-RUN)" if dry_run else "",
         )
 
@@ -151,8 +151,8 @@ def run_position_backfill(
             if match is None:
                 stats.unmatched_matches.append(source_game_id)
                 log.warning(
-                    "Maç backend'de bulunamadı, atlanıyor: %s "
-                    "(ingest edilmemiş ya da liste limitinin dışında olabilir)",
+                    "Match not found in the backend, skipping: %s "
+                    "(may not be ingested or may be outside the list limit)",
                     source_game_id,
                 )
                 continue
@@ -167,21 +167,21 @@ def run_position_backfill(
                 if player_id is None:
                     stats.unknown_players += 1
                     log.warning(
-                        "Oyuncu eşleşmedi (maç %s): puuid=%s — backend'de puuid'li kaydı yok",
+                        "Player not matched (match %s): puuid=%s — no record with this puuid in the backend",
                         source_game_id, key,
                     )
                     continue
                 if match["player_ids"] and player_id not in match["player_ids"]:
                     stats.unknown_players += 1
                     log.warning(
-                        "Oyuncu %s bu maçın (%s) katılımcısı değil, atlanıyor",
+                        "Player %s is not a participant of this match (%s), skipping",
                         player_id, source_game_id,
                     )
                     continue
                 positions[str(player_id)] = role
 
             if not positions:
-                log.warning("Gönderilecek rol yok: %s", source_game_id)
+                log.warning("No roles to send: %s", source_game_id)
                 continue
 
             if dry_run:
@@ -201,14 +201,14 @@ def run_position_backfill(
                 )
             except httpx.HTTPError as exc:
                 stats.errors.append(f"{source_game_id}: {exc}")
-                log.error("Rol güncellemesi gönderilemedi (%s): %s", source_game_id, exc)
+                log.error("Could not send role update (%s): %s", source_game_id, exc)
                 continue
 
             if 200 <= response.status_code < 300:
                 stats.updated += 1
                 stats.positions_sent += len(positions)
                 log.info(
-                    "Roller güncellendi: maç %s (id=%s), %d rol",
+                    "Roles updated: match %s (id=%s), %d roles",
                     source_game_id, match["id"], len(positions),
                 )
             else:
@@ -216,15 +216,15 @@ def run_position_backfill(
                     f"{source_game_id}: HTTP {response.status_code} {response.text[:300]}"
                 )
                 log.error(
-                    "Backend rol güncellemesini reddetti (%s, HTTP %s): %s",
+                    "Backend rejected the role update (%s, HTTP %s): %s",
                     source_game_id, response.status_code, response.text[:300],
                 )
 
     log.info(
-        "backfill-positions bitti%s: %d ham maç, %d eşleşti, %d maç güncellendi, "
-        "%d rol gönderildi, %d rol çözülemedi, %d maç backend'de yok, "
-        "%d oyuncu eşleşmedi, %d hata",
-        " (DRY-RUN — hiçbir şey gönderilmedi)" if dry_run else "",
+        "backfill-positions finished%s: %d raw matches, %d matched, %d matches updated, "
+        "%d roles sent, %d roles unresolved, %d matches missing in backend, "
+        "%d players unmatched, %d errors",
+        " (DRY-RUN — nothing was sent)" if dry_run else "",
         stats.archives, stats.matched, stats.updated, stats.positions_sent,
         stats.unresolved, len(stats.unmatched_matches), stats.unknown_players,
         len(stats.errors),
