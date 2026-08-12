@@ -4,6 +4,11 @@ LoL client'ın çalıştığı Windows PC'de koşan Python servisi. Biten **cust
 end-of-game verisini LCU API'den çeker, `docs/ingest_contract.md` formatına normalize
 eder ve backend'e POST eder.
 
+> **Arkadaşlara dağıtım (Python gerektirmez):** tek dosyalık
+> `LoLBalanceCollector.exe` — derleme ve kullanım talimatı
+> [`packaging/README.md`](packaging/README.md). Exe ilk açılışta `.env` yoksa
+> sihirbazla sorar ve tüm dosyalarını **exe'nin yanına** yazar.
+
 ## Kurulum
 
 Gereksinim: Windows 10/11, Python 3.11+, LoL client kurulu.
@@ -26,6 +31,21 @@ notepad collector\.env   # LOL_DIR, BACKEND_URL, API_KEY doldurun
 | `POLL_INTERVAL_S` | hayır (2.5) | Gameflow polling aralığı (saniye) |
 
 Ortam değişkenleri `.env` dosyasındaki değerleri ezer.
+
+`.env` arama sırası: **uygulama dizini** → çalışma dizini (`./.env`). Uygulama dizini
+kaynaktan çalışırken `collector/`, paketlenmiş exe'de exe'nin bulunduğu klasördür
+(`config.app_dir()`). `raw_archive/`, `outbox/` ve `seed_roster.json` de aynı köke bağlıdır.
+
+### Kurulum sihirbazı
+
+`.env` hiç yoksa (ve gerekli alanlar ortam değişkenlerinde de yoksa) program ilk
+açılışta interaktif olarak sorar: backend adresi (varsayılan canlı URL), API anahtarı
+(zorunlu) ve LoL klasörü — sonuncusu önce kayıt defteri → Riot metadata → bilinen
+yollar sırasıyla otomatik aranır, bulunursa yalnızca onaylatılır. Sihirbazı sonradan
+tekrar çalıştırmak için `--setup`.
+
+Her başlangıçta backend'e hızlı bir `GET /api/v1/players` doğrulaması atılır; yanlış
+anahtar/adres ilk saniyede Türkçe raporlanır (program bu yüzden durmaz).
 
 ## Çalıştırma
 
