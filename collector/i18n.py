@@ -289,14 +289,17 @@ def persist_language(lang: str, env_path: Path) -> None:
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def prompt_language(input_fn: Callable[[str], str] = input) -> str:
+def prompt_language(input_fn: Optional[Callable[[str], str]] = None) -> str:
     """Contract §1'deki İngilizce soru; tr/en dışındaki her girişte tekrar sorar.
 
     Girdi tükenirse (EOF) sonsuz döngüye girmemek için varsayılan dil döner.
+    `input_fn` verilmezse `input` ÇAĞRI anında çözülür (geç bağlama) — böylece
+    testler `builtins.input`'u monkeypatch'leyebilir, import sırası fark etmez.
     """
+    read = input_fn if input_fn is not None else input
     while True:
         try:
-            answer = input_fn(LANGUAGE_PROMPT)
+            answer = read(LANGUAGE_PROMPT)
         except EOFError:
             return DEFAULT_LANGUAGE
         normalized = (answer or "").strip().lower()
@@ -306,7 +309,7 @@ def prompt_language(input_fn: Callable[[str], str] = input) -> str:
 
 def resolve_language(
     env_path: Optional[Path] = None,
-    input_fn: Callable[[str], str] = input,
+    input_fn: Optional[Callable[[str], str]] = None,
     *,
     allow_prompt: bool = True,
 ) -> str:

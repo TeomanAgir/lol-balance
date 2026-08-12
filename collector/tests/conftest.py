@@ -5,10 +5,29 @@ from pathlib import Path
 
 import pytest
 
+from collector import config as config_module
 from collector import i18n
 from collector.config import Config
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _isolated_app_dir(tmp_path_factory, monkeypatch):
+    """Testler geliştiricinin GERÇEK collector/.env'ini asla okumasın/yazmasın.
+
+    Kaynak modda `app_dir()` paket dizinini (PACKAGE_DIR) döner ve
+    `env_candidates()` buna ek olarak cwd'ye bakar — repo checkout'unda gerçek
+    bir `.env` varsa, `main()`/`load_config()` çağıran her test ona ulaşır
+    (LANGUAGE'sız gerçek .env'de dil çözümü stdin'den soru sormaya kalkar:
+    "reading from stdin while output is captured"). İkisi de teste özel boş
+    bir geçici dizine yönlendirilir; `.env` görmesi gereken testler kendi
+    dosyalarını zaten açıkça yazar (ör. test_packaging'in frozen fixture'ı).
+    """
+    isolated = tmp_path_factory.mktemp("isolated_app_dir")
+    monkeypatch.setattr(config_module, "PACKAGE_DIR", isolated)
+    monkeypatch.chdir(isolated)
+    yield isolated
 
 
 @pytest.fixture(autouse=True)
