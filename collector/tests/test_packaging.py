@@ -253,7 +253,7 @@ def test_wizard_writes_env_next_to_exe_with_detected_lol_dir(frozen: Path, monke
     lol_dir = _make_lol_dir(tmp_path / "Riot Games" / "League of Legends")
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (lol_dir, "kayıt defteri"))
 
-    console = Console(["", "gizli-anahtar", ""])  # Enter=varsayılan URL, anahtar, Enter=onay
+    console = Console(["tr", "", "gizli-anahtar", ""])  # dil, Enter=varsayılan URL, anahtar, Enter=onay
     path = wiz.run_wizard(input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     assert path == frozen / ".env"
@@ -270,7 +270,7 @@ def test_wizard_custom_url_and_manual_lol_dir(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (None, None))
     target = tmp_path / ".env"
 
-    console = Console(["http://127.0.0.1:8000/", "k1", str(lol_dir)])
+    console = Console(["tr", "http://127.0.0.1:8000/", "k1", str(lol_dir)])
     wiz.run_wizard(target, input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     values = _read_env(target)
@@ -285,7 +285,7 @@ def test_wizard_rejects_detected_dir_and_asks(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (detected, "bilinen yollar"))
     target = tmp_path / ".env"
 
-    console = Console(["", "k1", "h", str(real)])
+    console = Console(["tr", "", "k1", "h", str(real)])
     wiz.run_wizard(target, input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     assert _read_env(target)["LOL_DIR"] == str(real)
@@ -296,7 +296,7 @@ def test_wizard_adds_scheme_to_bare_host(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (lol_dir, "x"))
     target = tmp_path / ".env"
 
-    console = Console(["lol.teomanagir.com", "k1", ""])
+    console = Console(["tr", "lol.teomanagir.com", "k1", ""])
     wiz.run_wizard(target, input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     assert _read_env(target)["BACKEND_URL"] == "https://lol.teomanagir.com"
@@ -307,7 +307,7 @@ def test_wizard_api_key_cannot_be_empty(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (lol_dir, "x"))
     target = tmp_path / ".env"
 
-    console = Console(["", "", "  ", "sonunda-girdi", ""])
+    console = Console(["tr", "", "", "  ", "sonunda-girdi", ""])
     wiz.run_wizard(target, input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     assert _read_env(target)["API_KEY"] == "sonunda-girdi"
@@ -316,7 +316,7 @@ def test_wizard_api_key_cannot_be_empty(tmp_path: Path, monkeypatch):
 
 def test_wizard_gives_up_when_api_key_never_entered(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (tmp_path, "x"))
-    console = Console(["", "", "", "", "", ""])
+    console = Console(["tr", "", "", "", "", "", ""])
     with pytest.raises(SystemExit):
         wiz.run_wizard(tmp_path / ".env", input_fn=console.read,
                        print_fn=console.write, check=_ok_check)
@@ -328,7 +328,7 @@ def test_wizard_warns_on_dir_without_marker(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(wiz, "detect_lol_dir", lambda *a, **k: (None, None))
     target = tmp_path / ".env"
 
-    console = Console(["", "k1", str(plain)])
+    console = Console(["tr", "", "k1", str(plain)])
     wiz.run_wizard(target, input_fn=console.read, print_fn=console.write, check=_ok_check)
 
     assert _read_env(target)["LOL_DIR"] == str(plain)
@@ -342,7 +342,7 @@ def test_wizard_reports_backend_failure_immediately(tmp_path: Path, monkeypatch)
     def failing(url: str, key: str) -> wiz.BackendCheck:
         return wiz.BackendCheck(False, "API anahtarı REDDEDİLDİ (HTTP 401).")
 
-    console = Console(["", "yanlis-anahtar", ""])
+    console = Console(["tr", "", "yanlis-anahtar", ""])
     wiz.run_wizard(tmp_path / ".env", input_fn=console.read,
                    print_fn=console.write, check=failing)
 

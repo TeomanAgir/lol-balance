@@ -36,7 +36,7 @@ class Participant(BaseModel):
     @classmethod
     def _position_valid(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v not in VALID_POSITIONS:
-            raise ValueError(f"Geçersiz position: {v!r} (izinli: {sorted(VALID_POSITIONS)} veya null)")
+            raise ValueError(f"Invalid position: {v!r} (allowed: {sorted(VALID_POSITIONS)} or null)")
         return v
 
 
@@ -52,15 +52,15 @@ class MatchPayload(BaseModel):
     @classmethod
     def _played_at_utc_iso(cls, v: str) -> str:
         if not v.endswith("Z"):
-            raise ValueError("played_at UTC ISO8601 olmalı ve 'Z' ile bitmeli")
+            raise ValueError("played_at must be UTC ISO8601 and end with 'Z'")
         datetime.fromisoformat(v.replace("Z", "+00:00"))  # parse edilemiyorsa ValueError
         return v
 
     @model_validator(mode="after")
     def _teams_balanced(self) -> "MatchPayload":
         if len(self.participants) != 10:
-            raise ValueError(f"participants tam 10 eleman olmalı, {len(self.participants)} geldi")
+            raise ValueError(f"participants must have exactly 10 items, got {len(self.participants)}")
         team_100 = sum(1 for p in self.participants if p.team == 100)
         if team_100 != 5:
-            raise ValueError(f"team=100 tam 5 olmalı, {team_100} geldi (team=200: {10 - team_100})")
+            raise ValueError(f"team=100 must be exactly 5, got {team_100} (team=200: {10 - team_100})")
         return self

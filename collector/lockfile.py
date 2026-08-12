@@ -29,7 +29,7 @@ class LockfileInfo:
 def parse_lockfile(text: str) -> LockfileInfo:
     parts = text.strip().split(":")
     if len(parts) < 5:
-        raise ValueError(f"Beklenmeyen lockfile formatı: {text!r}")
+        raise ValueError(f"Unexpected lockfile format: {text!r}")
     # password içinde ':' olabilir; ilk üç ve son alan sabittir
     return LockfileInfo(
         name=parts[0],

@@ -5,9 +5,18 @@ from pathlib import Path
 
 import pytest
 
+from collector import i18n
 from collector.config import Config
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _reset_language():
+    """Dil, süreç-genel durumdur: her test varsayılan (tr) ile başlasın."""
+    i18n.reset_language()
+    yield
+    i18n.reset_language()
 
 
 def load_fixture(name: str):

@@ -259,7 +259,7 @@ class TestMhIsRemake:
         for team in mh_game_custom["teams"]:
             team["win"] = "Fail"  # gameDuration 2011 kalır
         assert mh_is_remake(mh_game_custom) is False
-        with pytest.raises(NormalizeError, match="Kazanan"):
+        with pytest.raises(NormalizeError, match="winning team"):
             normalize_match_history_game(mh_game_custom)
 
     def test_short_game_with_winner_is_not_remake(self, mh_game_custom):

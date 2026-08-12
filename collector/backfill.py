@@ -64,20 +64,20 @@ def run_backfill(
         roster = build_known_roster(config)
     if roster.is_empty():
         log.error(
-            "Bilinen oyuncu kümesi boş: backend'de oyuncu yok ve seed_roster.json boş. "
-            "İlk backfill için collector/seed_roster.json dosyasına riot_id'leri ekleyin."
+            "Known player set is empty: no players in the backend and seed_roster.json is empty. "
+            "For the first backfill, add riot_ids to collector/seed_roster.json."
         )
         return stats
 
     puuid = lcu.get_current_summoner().get("puuid")
     if not puuid:
-        log.error("current-summoner'dan puuid alınamadı")
+        log.error("Could not get puuid from current-summoner")
         return stats
 
     try:
         champion_map = champion_map_from_summary(lcu.get_champion_summary()) or None
     except Exception as exc:
-        log.warning("Champion listesi alınamadı (champion=null gidecek): %s", exc)
+        log.warning("Could not fetch champion list (champion will be sent as null): %s", exc)
         champion_map = None
 
     seen_game_ids: set = set()
@@ -92,7 +92,7 @@ def run_backfill(
         # Gerçek LCU bazı sürümlerde begIndex/endIndex'i yok sayıp hep aynı listeyi
         # döndürür: sayfa hiç yeni gameId içermiyorsa liste ilerlemiyordur.
         if all(g.get("gameId") in seen_game_ids for g in games):
-            log.info("Sayfa %d yeni maç içermiyor: liste ilerlemiyor, tarama bitti", page)
+            log.info("Page %d contains no new matches: the list is not advancing, scan finished", page)
             break
         for game_summary in games:
             game_id = game_summary.get("gameId")
@@ -110,28 +110,28 @@ def run_backfill(
             try:
                 full = lcu.get_game(game_id)
             except Exception as exc:
-                stats.errors.append(f"{game_id}: detay alınamadı ({exc})")
-                log.error("Maç detayı alınamadı (%s): %s", game_id, exc)
+                stats.errors.append(f"{game_id}: could not fetch detail ({exc})")
+                log.error("Could not fetch match detail (%s): %s", game_id, exc)
                 continue
 
             known = roster.count_known(mh_identity_pairs(full))
             if known < config.min_known:
                 stats.skipped_roster += 1
-                log.info("Roster filtresi: %s atlandı (%d/%d bilinen < %d eşik)",
+                log.info("Roster filter: %s skipped (%d/%d known < threshold %d)",
                          game_id, known, len(full.get("participantIdentities") or []),
                          config.min_known)
                 continue
 
             if mh_is_remake(full):
                 stats.skipped_remake += 1
-                log.info("Remake atlandı (%s): kazanan yok ve süre < 300 sn", game_id)
+                log.info("Remake skipped (%s): no winner and duration < 300 s", game_id)
                 continue
 
             try:
                 payload = normalize_match_history_game(full, champion_map)
             except NormalizeError as exc:
                 stats.errors.append(f"{game_id}: {exc}")
-                log.error("Normalize edilemedi (%s): %s", game_id, exc)
+                log.error("Could not normalize (%s): %s", game_id, exc)
                 continue
 
             archive_raw(config, str(game_id), full)
@@ -147,8 +147,8 @@ def run_backfill(
         stats.sent += 1
 
     log.info(
-        "Backfill bitti: %d maç tarandı, %d custom, %d gönderildi, "
-        "%d roster filtresine takıldı, %d remake atlandı, %d hata",
+        "Backfill finished: %d matches scanned, %d custom, %d sent, "
+        "%d blocked by roster filter, %d remakes skipped, %d errors",
         stats.scanned, stats.customs, stats.sent, stats.skipped_roster,
         stats.skipped_remake, len(stats.errors),
     )
