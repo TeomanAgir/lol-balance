@@ -32,6 +32,9 @@ jobs:
         run: pytest tests -q
       - name: Collector testleri
         run: pytest collector -q
+      - name: Webui i18n testleri
+        # Sözlük bütünlüğü + hardcode taraması (docs/i18n_contract.md §5) — Node gerekmez.
+        run: pytest webui/tests -q
 
   image:
     # main'e push'ta, testler geçince GHCR'a image basılır.

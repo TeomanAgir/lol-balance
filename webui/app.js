@@ -1,10 +1,17 @@
 // app.js — api_contract.md'nin ince istemcisi. İş mantığı yok: rating, dengeleme,
 // doğrulama tamamı backend'de; burada yalnızca seçim/gösterim var.
+// Görünen HER metin i18n sözlüğünden gelir (docs/i18n_contract.md, GÖREV 6):
+// statik düğümler index.html'de data-i18n taşır, dinamik metin t() üzerinden kurulur.
+// Backend'in döndürdüğü `detail` metni contract gereği lokalize EDİLMEZ, aynen geçer.
 (function () {
   "use strict";
 
   const CONFIG = window.APP_CONFIG;
   const $ = (sel) => document.querySelector(sel);
+  // Kısayol: sözlük çevirisi. profileHtml içindeki "totals" değişkeni bu yüzden
+  // "tot" adını taşır — t adı görünürde yalnız çeviriye aittir.
+  const t = (key, params) => window.I18n.t(key, params);
+  const uiLocale = () => (window.I18n.getLang() === "tr" ? "tr-TR" : "en-GB");
 
   const state = {
     apiKey: localStorage.getItem("apiKey") || "",
@@ -30,18 +37,18 @@
         method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch {
-      throw new Error("Sunucuya ulaşılamadı. Backend çalışıyor mu?");
+      throw new Error(t("common.err_network"));
     }
     if (res.status === 401) {
       openKeyModal();
-      throw new Error("API anahtarı reddedildi, yeniden gir.");
+      throw new Error(t("common.err_unauthorized"));
     }
     if (!res.ok) {
       let detail = "";
       try { detail = (await res.json()).detail; } catch { /* gövde JSON değil */ }
       // status hata nesnesinde taşınır: çağıran yer duruma göre davranabilsin
       // (ör. nemesis modunda 409 = aktif çift kalmadı → modu kapat).
-      const e = new Error(detail || `Beklenmeyen hata (HTTP ${res.status}).`);
+      const e = new Error(detail || t("common.err_http", { status: res.status }));
       e.status = res.status;
       throw e;
     }
@@ -66,13 +73,13 @@
   const ratingSub = (r) =>
     r.perf_avg == null
       ? ""
-      : `W/L ${fmtRating(r.ordinal)} · Perf ${r.perf_avg.toFixed(2)}`;
+      : t("common.rating_sub", { wl: fmtRating(r.ordinal), perf: r.perf_avg.toFixed(2) });
   const fmtDelta = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(1);
   // Haftanın enleri delta'sı contract'ta 2 ondalıklı gelir ("+2.31") — o hassasiyet korunur.
   const fmtDelta2 = (d) => (d >= 0 ? "+" : "−") + Math.abs(d).toFixed(2);
   const fmtDate = (iso) =>
-    new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const fmtDuration = (s) => (s == null ? "—" : Math.round(s / 60) + " dk");
+    new Date(iso).toLocaleString(uiLocale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const fmtDuration = (s) => (s == null ? "—" : t("common.minutes_short", { n: Math.round(s / 60) }));
   // innerHTML'e giren serbest metin (oyuncu adı, riot_id, şampiyon, hata detayı) için.
   const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ESC[c]);
@@ -83,10 +90,13 @@
 
   // ── Roller (GÖREV 0) ──────────────────────────────────────────
   // Sıra contract'taki kanonik sıradır; gösterim her yerde bu sırayı izler.
+  // Ad ve kısaltmalar sözlükten gelir (common.role_* / common.role_abbr_*).
   const ROLES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
-  const ROLE_TR = { TOP: "Üst", JUNGLE: "Orman", MIDDLE: "Orta", BOTTOM: "Alt", UTILITY: "Destek" };
-  const ROLE_ABBR = { TOP: "ÜST", JUNGLE: "ORM", MIDDLE: "ORT", BOTTOM: "ALT", UTILITY: "DES" };
-  const roleLabel = (pos) => (pos == null ? "—" : ROLE_TR[pos] || pos);
+  const roleName = (r) => t("common.role_" + r.toLowerCase());
+  const roleAbbr = (r) => t("common.role_abbr_" + r.toLowerCase());
+  // Bilinmeyen pozisyon değeri (ileri sürüm backend'i) olduğu gibi gösterilir.
+  const roleLabel = (pos) =>
+    pos == null ? "—" : (ROLES.includes(pos) ? roleName(pos) : pos);
   const roleOrder = (pos) => { const i = ROLES.indexOf(pos); return i === -1 ? ROLES.length : i; };
 
   // role_ratings kompakt şeridi. long=true → geniş yerleşim (sıralama tablosu).
@@ -97,11 +107,12 @@
       const v = rr[r];
       if (!v || typeof v.score !== "number") return "";
       const zero = !v.matches;
-      const title = `${ROLE_TR[r]} · ${fmtRating(v.score)} puan · ${v.matches} maç`;
+      const title = t("common.role_cell_title",
+        { role: roleName(r), score: fmtRating(v.score), matches: v.matches });
       return `<div class="role-cell${zero ? " zero" : ""}" title="${title}">
-          <span class="rc-role">${long ? ROLE_TR[r] : ROLE_ABBR[r]}</span>
+          <span class="rc-role">${long ? roleName(r) : roleAbbr(r)}</span>
           <span class="rc-score">${fmtRating(v.score)}</span>
-          <span class="rc-matches">${v.matches}${long ? " maç" : ""}</span>
+          <span class="rc-matches">${long ? t("common.n_matches", { n: v.matches }) : v.matches}</span>
         </div>`;
     }).join("");
     return cells ? `<div class="role-strip${long ? " long" : ""}">${cells}</div>` : "";
@@ -139,12 +150,12 @@
     currentView = name;
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === tab));
+    document.querySelectorAll(".tab").forEach(tb => tb.classList.toggle("active", tb.dataset.view === tab));
     window.scrollTo({ top: 0 });
     loaders[name](forceReload).catch(e => toast(e.message));
   }
-  document.querySelectorAll(".tab").forEach(t =>
-    t.addEventListener("click", () => showView(t.dataset.view)));
+  document.querySelectorAll(".tab").forEach(tb =>
+    tb.addEventListener("click", () => showView(tb.dataset.view)));
 
   async function fetchRoster(force = false) {
     if (state.roster.length && !force) return state.roster;
@@ -167,12 +178,12 @@
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
         `<span class="p-name">${p.display_name}</span>` +
-        `<span class="p-meta">${fmtRating(p.rating.score)} · ${p.matches_played} maç</span>` +
+        `<span class="p-meta">${fmtRating(p.rating.score)} · ${t("common.n_matches", { n: p.matches_played })}</span>` +
         roleCells(p.role_ratings);
       card.addEventListener("click", () => {
         if (state.selected.has(p.id)) state.selected.delete(p.id);
         else if (state.selected.size < 10) state.selected.add(p.id);
-        else { toast("En fazla 10 oyuncu seçilebilir.", "warn"); return; }
+        else { toast(t("balance.err_max_players"), "warn"); return; }
         card.classList.toggle("selected", state.selected.has(p.id));
         updatePickCounter();
       });
@@ -183,7 +194,7 @@
 
   function updatePickCounter() {
     const n = state.selected.size;
-    $("#pick-counter").innerHTML = `${n}<span>/10 seçildi</span>`;
+    $("#pick-counter").innerHTML = `${n}<span>${t("balance.pick_suffix")}</span>`;
     $("#btn-balance").disabled = n !== 10;
     renderNemesisBadge();
   }
@@ -197,19 +208,19 @@
     if (!nm) { box.hidden = true; return; }
     box.hidden = false;
     const [a, b] = nm.players;
-    $("#nem-mode-pair").textContent =
-      `${a.display_name} vs ${b.display_name} — ${roleLabel(nm.role)}`;
+    $("#nem-mode-pair").textContent = t("balance.nem_pair",
+      { a: a.display_name, b: b.display_name, role: roleLabel(nm.role) });
     const missing = nm.players.filter(x => !state.selected.has(x.player_id));
     const hint = $("#nem-mode-hint");
     hint.textContent = missing.length
-      ? `Çiftin ikisi de seçili olmalı — eksik: ${missing.map(x => x.display_name).join(", ")}`
-      : "Çift karşı takımlara ayrılıp bu koridora sabitlenecek.";
+      ? t("balance.nem_missing", { names: missing.map(x => x.display_name).join(", ") })
+      : t("balance.nem_locked");
     hint.classList.toggle("warn", missing.length > 0);
   }
 
   function startNemesisMode(n) {
     const pair = n && n.active ? n[n.active] : null;
-    if (!pair) { toast("Aktif nemesis çifti yok.", "warn"); return; }
+    if (!pair) { toast(t("balance.err_no_active_pair"), "warn"); return; }
     state.nemesisMode = {
       source: n.active,
       role: pair.role,
@@ -232,7 +243,7 @@
     const btn = $("#btn-balance");
     const nm = state.nemesisMode;
     btn.disabled = true;
-    btn.textContent = "Hesaplanıyor…";
+    btn.textContent = t("balance.calculating");
     try {
       const res = await api(nm ? "/balance/nemesis" : "/balance", {
         method: "POST",
@@ -244,12 +255,12 @@
       // modda kalmanın anlamı kalmaz, kapatıp normal dengelemeye dönülür.
       if (e.status === 409 && state.nemesisMode) {
         exitNemesisMode();
-        toast(e.message + " Nemesis modu kapatıldı.");
+        toast(e.message + " " + t("balance.nem_mode_closed"));
       } else {
         toast(e.message);
       }
     } finally {
-      btn.textContent = "Dengele";
+      btn.textContent = t("balance.balance_btn");
       btn.disabled = state.selected.size !== 10;
     }
   });
@@ -272,11 +283,13 @@
   function renderSuggestions(suggestions, nemesis) {
     const box = $("#suggestions");
     const nemIds = nemesis ? new Set(nemesis.player_ids) : null;
-    box.innerHTML = "<h2 class='sug-title'>Öneriler</h2>" +
+    box.innerHTML = `<h2 class='sug-title'>${t("balance.suggestions_title")}</h2>` +
       (nemesis && suggestions.length
-        ? `<p class="sug-note">Nemesis maçı: ` +
-          `${esc(nemesis.player_ids.map(playerName).join(" vs "))} — ` +
-          `${roleLabel(nemesis.role)} (${nemesis.source === "weekly" ? "bu haftanın çifti" : "tüm zamanların çifti"})</p>`
+        ? `<p class="sug-note">` + t("balance.nem_match_note", {
+            pair: esc(nemesis.player_ids.map(playerName).join(" vs ")),
+            role: roleLabel(nemesis.role),
+            source: t(nemesis.source === "weekly" ? "balance.pair_weekly" : "balance.pair_alltime"),
+          }) + `</p>`
         : "");
     suggestions.forEach((s, i) => {
       const best = i === 0;
@@ -284,19 +297,19 @@
       const card = document.createElement("article");
       card.className = "sug-card" + (best ? " best" : "");
       card.innerHTML =
-        (best ? `<div class="best-badge">En dengeli</div>` : "") +
+        (best ? `<div class="best-badge">${t("balance.best_badge")}</div>` : "") +
         `<div class="sug-teams">
            ${teamList(s.team_100, "blue", nemIds)}
            <div class="sug-mid">
-             <div class="quality">%${(s.quality * 100).toFixed(1)}</div>
-             <div class="quality-label">denge</div>
+             <div class="quality">${t("common.percent", { n: (s.quality * 100).toFixed(1) })}</div>
+             <div class="quality-label">${t("balance.quality_label")}</div>
            </div>
            ${teamList(s.team_200, "red", nemIds)}
          </div>
-         <div class="winbar" role="img" aria-label="Mavi taraf kazanma olasılığı %${bluePct}">
+         <div class="winbar" role="img" aria-label="${t("balance.winbar_aria", { pct: bluePct })}">
            <div class="winbar-blue" style="width:${bluePct}%"></div>
          </div>
-         <div class="winbar-caption"><span>Mavi %${bluePct}</span><span>Kırmızı %${100 - bluePct}</span></div>`;
+         <div class="winbar-caption"><span>${t("balance.win_blue", { pct: bluePct })}</span><span>${t("balance.win_red", { pct: 100 - bluePct })}</span></div>`;
       box.appendChild(card);
     });
     box.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -310,10 +323,11 @@
     const body = $("#board-body");
     body.innerHTML = rows.map((p, i) => {
       const sub = ratingSub(p.rating);
+      const subHtml = sub ? `<span class="rating-sub">` + sub + `</span>` : "";
       return `<tr>
          <td class="rank">${i + 1}</td>
          <td><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button></td>
-         <td class="num strong">${fmtRating(p.rating.score)}${sub ? `<span class="rating-sub">${sub}</span>` : ""}</td>
+         <td class="num strong">${fmtRating(p.rating.score)}${subHtml}</td>
          <td class="num">${p.matches_played}</td>
        </tr>`;
     }).join("");
@@ -324,23 +338,25 @@
 
   // ── 2b) Oyuncu profili (GÖREV 1) ──────────────────────────────
   // Alt sekmelerin dışında bir "detay" görünümü: sıralamadan açılır, geri döner.
-  const BACK_LABEL = {
-    leaderboard: "← Sıralamaya dön", highlights: "← Enlere dön", map: "← Haritaya dön",
-  };
+  // Geri düğmesi metinleri sözlükten gelir; dil değişince abone yeniden yazar.
+  const BACK_VIEWS = ["leaderboard", "highlights", "map"];
+  const backLabel = (from) =>
+    t("common.back_" + (BACK_VIEWS.includes(from) ? from : "leaderboard"));
 
   function openProfile(id) {
     state.profileId = id;
     // Profilden profile geçilebilir (sinerji linkleri) — çıkış noktası ilk giriş yeridir.
     if (currentView !== "profile") state.profileFrom = currentView;
-    $("#btn-profile-back").textContent = BACK_LABEL[state.profileFrom] || BACK_LABEL.leaderboard;
+    $("#btn-profile-back").textContent = backLabel(state.profileFrom);
     showView("profile");
   }
   $("#btn-profile-back").addEventListener("click", () => showView(state.profileFrom));
 
   const num1 = (x) => (typeof x === "number" ? x.toFixed(1) : "—");
   const num2 = (x) => (typeof x === "number" ? x.toFixed(2) : "—");
-  // winrate contract'ta 0..1 oran ve null olabilir.
-  const pctText = (x) => (typeof x === "number" ? "%" + Math.round(x * 100) : "—");
+  // winrate contract'ta 0..1 oran ve null olabilir. Yüzde biçimi dile göre değişir
+  // (tr "%50", en "50%") — common.percent anahtarı taşır.
+  const pctText = (x) => (typeof x === "number" ? t("common.percent", { n: Math.round(x * 100) }) : "—");
 
   const statCard = (title, main, sub) =>
     `<article class="stat-card">
@@ -354,44 +370,47 @@
   function profileHtml(s) {
     const p = s.player || {};
     const rp = state.roster.find(x => x.id === p.id); // rol şeridi + puan roster'dan
-    const t = s.totals || {};
-    const played = t.matches || 0;
+    const tot = s.totals || {};
+    const played = tot.matches || 0;
     const k = s.kda, fc = s.favorite_champion, fr = s.favorite_role;
     const syn = s.synergy || [];
 
+    const scoreHtml = rp
+      ? `<div class="prof-score">${fmtRating(rp.rating.score)}<span>${t("common.points_word")}</span></div>`
+      : "";
     const head =
       `<header class="prof-head">
          <h2 class="prof-name">${esc(p.display_name)}</h2>
          ${p.riot_id ? `<span class="prof-riot">${esc(p.riot_id)}</span>` : ""}
-         ${rp ? `<div class="prof-score">${fmtRating(rp.rating.score)}<span>puan</span></div>` : ""}
+         ${scoreHtml}
        </header>`;
 
     const cards =
-      statCard("Maç & W/L",
-        played ? `${played} maç · ${t.wins}G ${t.losses}M` : "Henüz maç yok",
-        played && t.winrate != null ? `${pctText(t.winrate)} galibiyet` : "") +
-      statCard("Ortalama KDA",
+      statCard(t("profile.card_matches"),
+        played ? t("profile.matches_line", { n: played, w: tot.wins, l: tot.losses }) : t("profile.no_matches"),
+        played && tot.winrate != null ? t("profile.win_pct", { pct: pctText(tot.winrate) }) : "") +
+      statCard(t("profile.card_kda"),
         k ? `${num1(k.kills_avg)} / ${num1(k.deaths_avg)} / ${num1(k.assists_avg)}` : "—",
-        k ? `${num2(k.ratio)} KDA` : "İstatistikli maç yok") +
-      statCard("Favori karakter",
+        k ? t("profile.kda_ratio", { ratio: num2(k.ratio) }) : t("profile.no_stat_matches")) +
+      statCard(t("profile.card_champion"),
         fc ? esc(fc.champion) : "—",
-        fc ? `${fc.matches} maç · ${pctText(fc.winrate)} galibiyet` : "Şampiyon verisi yok") +
-      statCard("Favori koridor",
+        fc ? t("profile.champ_line", { n: fc.matches, pct: pctText(fc.winrate) }) : t("profile.no_champion_data")) +
+      statCard(t("profile.card_role"),
         fr ? roleLabel(fr.role) : "—",
-        fr ? `${fr.matches} maç` : "Rol verisi yok");
+        fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data"));
 
     const strip = rp ? roleCells(rp.role_ratings, true) : "";
     const roleSec = strip
-      ? `<section class="prof-section"><h3 class="ps-title">Rol ratingleri</h3>${strip}</section>`
+      ? `<section class="prof-section"><h3 class="ps-title">${t("profile.role_ratings_title")}</h3>${strip}</section>`
       : "";
 
     const synMeta = (x) =>
-      `<span class="syn-meta">${x.matches_together} ortak maç · ${pctText(x.winrate)} galibiyet</span>`;
+      `<span class="syn-meta">${t("profile.syn_meta", { n: x.matches_together, pct: pctText(x.winrate) })}</span>`;
     const synLink = (x, cls) =>
       `<button type="button" class="syn-link${cls ? " " + cls : ""}" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
     const synSec =
       `<section class="prof-section">
-         <h3 class="ps-title">En yüksek sinerji</h3>` +
+         <h3 class="ps-title">${t("profile.synergy_title")}</h3>` +
       (syn.length
         ? `<div class="syn-top">${synLink(syn[0], "syn-name")}${synMeta(syn[0])}</div>` +
           (syn.length > 1
@@ -399,7 +418,7 @@
               syn.slice(1).map(x => `<li>${synLink(x)}${synMeta(x)}</li>`).join("") +
               `</ul>`
             : "")
-        : `<p class="ps-empty">En az 2 ortak maç gerekiyor.</p>`) +
+        : `<p class="ps-empty">${t("profile.synergy_empty")}</p>`) +
       `</section>`;
 
     return head + `<div class="stat-grid">${cards}</div>` + roleSec + synSec;
@@ -408,10 +427,10 @@
   async function loadProfile() {
     const box = $("#profile-body");
     if (state.profileId == null) {
-      box.innerHTML = "<p class='empty'>Oyuncu seçilmedi.</p>";
+      box.innerHTML = `<p class='empty'>${t("profile.no_player")}</p>`;
       return;
     }
-    box.innerHTML = "<p class='empty'>Yükleniyor…</p>";
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     try {
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
       const s = await api(`/players/${state.profileId}/stats`);
@@ -429,15 +448,16 @@
   // Salt-okur ekran: GET /highlights/weekly. Contract'taki her alan null olabilir;
   // dolu kartlar tıklanabilir (profile gider), null kartlar soluk "—" olarak kalır.
 
-  // Pencere metni: "5–12 Ağu arası"; ay sınırını aşarsa "29 Tem – 5 Ağu arası".
+  // Pencere metni: tr "5–12 Ağu arası" / en "Aug 5–12"; ay sınırını aşarsa
+  // tr "29 Tem – 5 Ağu arası" / en "Jul 29 – Aug 5". Biçim sözlük anahtarındadır.
   function windowText(w) {
     const s = new Date(w.start), e = new Date(w.end);
     if (isNaN(s) || isNaN(e)) return "";
-    const day = (d) => d.toLocaleDateString("tr-TR", { day: "numeric" });
-    const mon = (d) => d.toLocaleDateString("tr-TR", { month: "short" });
+    const day = (d) => d.toLocaleDateString(uiLocale(), { day: "numeric" });
+    const mon = (d) => d.toLocaleDateString(uiLocale(), { month: "short" });
     return s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()
-      ? `${day(s)}–${day(e)} ${mon(e)} arası`
-      : `${day(s)} ${mon(s)} – ${day(e)} ${mon(e)} arası`;
+      ? t("highlights.window_same", { d1: day(s), d2: day(e), m: mon(e) })
+      : t("highlights.window_cross", { d1: day(s), m1: mon(s), d2: day(e), m2: mon(e) });
   }
 
   // Büyük kartlar (haftanın oyuncusu / yıldız rukisi). d null ise dokunma hedefi
@@ -447,30 +467,30 @@
       return `<div class="hl-card ${cls} hl-none">
           <span class="hl-label">${label}</span>
           <span class="hl-name">—</span>
-          <span class="hl-sub">Pencerede maç yok</span>
+          <span class="hl-sub">${t("highlights.no_window_matches")}</span>
         </div>`;
     }
     return `<button type="button" class="hl-card ${cls}" data-player="${d.player_id}">
         <span class="hl-label">${label}</span>
         <span class="hl-name">${esc(d.display_name)}</span>
         ${valueHtml}
-        <span class="hl-sub">pencerede ${d.matches_in_window} maç</span>
+        <span class="hl-sub">${t("highlights.in_window", { n: d.matches_in_window })}</span>
       </button>`;
   }
 
-  // Rol kartı: etiket ROLE_TR adıdır; d null ise o rolde pencerede kimse oynamamıştır.
+  // Rol kartı: etiket sözlükteki rol adıdır; d null ise o rolde pencerede kimse oynamamıştır.
   function hlRoleCard(role, d) {
-    const label = `<span class="hl-label">${ROLE_TR[role]}</span>`;
+    const label = `<span class="hl-label">${roleName(role)}</span>`;
     if (!d) {
       return `<div class="hl-role hl-none">${label}
           <span class="hl-name">—</span>
-          <span class="hl-sub">oynanmadı</span>
+          <span class="hl-sub">${t("highlights.role_not_played")}</span>
         </div>`;
     }
     return `<button type="button" class="hl-role" data-player="${d.player_id}">${label}
         <span class="hl-name">${esc(d.display_name)}</span>
         <span class="hl-value">${num1(d.score)}</span>
-        <span class="hl-sub">${d.matches_in_window} maç</span>
+        <span class="hl-sub">${t("common.n_matches", { n: d.matches_in_window })}</span>
       </button>`;
   }
 
@@ -480,9 +500,10 @@
   // Maç kurma her zaman `active` çiftle olur — hangisi olduğu ekranda işaretlenir.
   const nemKey = (p) =>
     p ? p.role + ":" + p.players.map(x => x.player_id).sort((a, b) => a - b).join("-") : "";
-  const nemPct = (c) => "%" + Math.round((c || 0) * 100);
+  const nemPct = (c) => t("common.percent", { n: Math.round((c || 0) * 100) });
   const nemLink = (x, cls) =>
     `<button type="button" class="${cls}" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
+  const nemActiveBadge = () => `<span class="nem-active">${t("highlights.active_badge")}</span>`;
 
   function nemesisCard(pair, isActive) {
     const [a, b] = pair.players;
@@ -491,12 +512,12 @@
         <div class="nem-mid">
           <span class="nem-role">${roleLabel(pair.role)}</span>
           <span class="nem-score">${a.wins}–${b.wins}</span>
-          <span class="nem-sub">${pair.encounters} karşılaşma</span>
+          <span class="nem-sub">${t("highlights.encounters", { n: pair.encounters })}</span>
         </div>
         ${nemLink(b, "nem-who")}
       </div>
-      <p class="nem-close">${nemPct(pair.closeness)} başa baş${
-        isActive ? `<span class="nem-active">maç bu çiftle kurulur</span>` : ""}</p>`;
+      <p class="nem-close">${t("highlights.close", { pct: nemPct(pair.closeness) })}${
+        isActive ? nemActiveBadge() : ""}</p>`;
   }
 
   // n null ise (backend /nemesis bilmiyor / istek düştü) bölüm hiç çizilmez.
@@ -505,28 +526,32 @@
     const at = n.all_time, wk = n.weekly;
     let body;
     if (!at) {
-      body = `<p class="ps-empty">Nemesis için en az 3 koridor karşılaşması gerekiyor.</p>`;
+      body = `<p class="ps-empty">${t("highlights.nemesis_empty")}</p>`;
     } else {
       body = nemesisCard(at, n.active === "all_time");
       if (wk && nemKey(wk) !== nemKey(at)) {
         const [wa, wb] = wk.players;
-        body += `<p class="nem-weekly">Bu haftanın çifti: ${nemLink(wa, "nem-link")} vs ` +
-          `${nemLink(wb, "nem-link")} — ${roleLabel(wk.role)} · ${wk.encounters} karşılaşma · ` +
-          `${nemPct(wk.closeness)} başa baş` +
-          (n.active === "weekly" ? `<span class="nem-active">maç bu çiftle kurulur</span>` : "") + `</p>`;
+        body += `<p class="nem-weekly">` + t("highlights.weekly_pair", {
+            a: nemLink(wa, "nem-link"),
+            b: nemLink(wb, "nem-link"),
+            role: roleLabel(wk.role),
+            enc: t("highlights.encounters", { n: wk.encounters }),
+            close: t("highlights.close", { pct: nemPct(wk.closeness) }),
+          }) +
+          (n.active === "weekly" ? nemActiveBadge() : "") + `</p>`;
       }
     }
     const btn = n.active
-      ? `<button type="button" id="btn-nemesis-setup" class="btn-primary btn-nemesis">Nemesis maçı kur</button>`
+      ? `<button type="button" id="btn-nemesis-setup" class="btn-primary btn-nemesis">${t("highlights.nemesis_setup_btn")}</button>`
       : "";
     return `<section class="prof-section nem-section">
-        <h3 class="ps-title">Nemesis</h3>${body}${btn}
+        <h3 class="ps-title">${t("highlights.nemesis_title")}</h3>${body}${btn}
       </section>`;
   }
 
   async function loadHighlights() {
     const box = $("#highlights-body");
-    box.innerHTML = "<p class='empty'>Yükleniyor…</p>";
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     try {
       // /nemesis ayrı bir uçtur: düşerse Enler ekranının kalanı çalışmaya devam etsin.
       const [h, n] = await Promise.all([
@@ -537,27 +562,27 @@
       const roles = h.best_by_role || {};
       // Hiç valid maç yoksa contract üç alanı da null döner → tek satır boş durum.
       if (!h.best_player && !h.rising_star && !ROLES.some(r => roles[r])) {
-        box.innerHTML = "<p class='empty'>Değerlendirilecek maç yok.</p>";
+        box.innerHTML = `<p class='empty'>${t("highlights.empty")}</p>`;
         return;
       }
       const w = h.window || {};
       const head = windowText(w)
-        ? `<div class="hl-window">${windowText(w)}` +
-          (w.fallback ? `<span class="hl-fb">(son maç haftası)</span>` : "") + `</div>`
+        ? `<div class="hl-window">` + windowText(w) +
+          (w.fallback ? `<span class="hl-fb">${t("highlights.fallback_note")}</span>` : "") + `</div>`
         : "";
       const rs = h.rising_star;
       const up = rs && rs.delta >= 0;
+      const bestValue = h.best_player
+        ? `<span class="hl-value">${num1(h.best_player.score)}<span class="hl-unit">${t("common.points_word")}</span></span>`
+        : "";
       box.innerHTML = head +
-        hlCard("hero", "Haftanın Oyuncusu", h.best_player,
-          h.best_player
-            ? `<span class="hl-value">${num1(h.best_player.score)}<span class="hl-unit">puan</span></span>`
-            : "") +
-        hlCard("rising", "Yıldız Rukisi", rs,
+        hlCard("hero", t("highlights.best_player"), h.best_player, bestValue) +
+        hlCard("rising", t("highlights.rising_star"), rs,
           rs ? `<span class="hl-value delta ${up ? "up" : "down"}">${fmtDelta2(rs.delta)}</span>` : "") +
         `<section class="prof-section">
            <div class="ps-head">
-             <h3 class="ps-title">Rol enleri</h3>
-             <button type="button" id="btn-map-from-hl" class="map-link">Haritada gör →</button>
+             <h3 class="ps-title">${t("highlights.role_bests")}</h3>
+             <button type="button" id="btn-map-from-hl" class="map-link">${t("highlights.map_link")}</button>
            </div>
            <div class="hl-roles">${ROLES.map(r => hlRoleCard(r, roles[r])).join("")}</div>
          </section>` +
@@ -597,7 +622,7 @@
       .sort((a, b) =>
         b.r.score - a.r.score ||
         b.r.matches - a.r.matches ||
-        a.p.display_name.localeCompare(b.p.display_name, "tr"));
+        a.p.display_name.localeCompare(b.p.display_name, window.I18n.getLang()));
   }
 
   function riftBubble(role, top) {
@@ -607,15 +632,15 @@
       // Sınıf adı "rb-none": global ".empty" (ortalı boş-durum paragrafı, padding 40px)
       // baloncuğun kutusunu bozuyordu — enler ekranındaki ".hl-none" ile aynı desen.
       return `<button type="button" class="rift-bub rb-none" style="${pos}" data-role="${role}"
-                aria-label="${ROLE_TR[role]}: bu rolde oynayan yok">
-          <span class="rb-role">${ROLE_ABBR[role]}</span>
+                aria-label="${t("map.bubble_none_aria", { role: roleName(role) })}">
+          <span class="rb-role">${roleAbbr(role)}</span>
           <span class="rb-name">—</span>
         </button>`;
     }
     const score = fmtRating(top.r.score);
     return `<button type="button" class="rift-bub" style="${pos}" data-role="${role}"
-              aria-label="${ROLE_TR[role]} birincisi ${esc(top.p.display_name)}, ${score} puan">
-        <span class="rb-role">${ROLE_ABBR[role]}</span>
+              aria-label="${t("map.bubble_aria", { role: roleName(role), name: esc(top.p.display_name), score })}">
+        <span class="rb-role">${roleAbbr(role)}</span>
         <span class="rb-name">${esc(top.p.display_name)}</span>
         <span class="rb-score">${score}</span>
       </button>`;
@@ -629,7 +654,7 @@
       const from = currentView === "profile" ? state.profileFrom : currentView;
       state.mapFrom = from === "map" ? "highlights" : from; // kendine dönen geri düğmesi olmasın
     }
-    $("#btn-map-back").textContent = BACK_LABEL[state.mapFrom] || BACK_LABEL.highlights;
+    $("#btn-map-back").textContent = backLabel(state.mapFrom);
     showView("map");
   }
   $("#btn-map-back").addEventListener("click", () => showView(state.mapFrom));
@@ -653,19 +678,19 @@
 
   function roleModalHtml(role) {
     const list = roleRanking(state.board, role);
-    if (!list.length) return `<p class="ps-empty">Bu koridorda henüz kimse oynamadı.</p>`;
+    if (!list.length) return `<p class="ps-empty">${t("map.role_empty")}</p>`;
     return `<ol class="rr-list">` + list.map(({ p, r }, i) =>
       `<li class="rr-row">
          <span class="rr-rank">${i + 1}</span>
          <button type="button" class="rr-name" data-player="${p.id}">${esc(p.display_name)}</button>
          <span class="rr-score">${fmtRating(r.score)}</span>
-         <span class="rr-matches">${r.matches} maç</span>
+         <span class="rr-matches">${t("common.n_matches", { n: r.matches })}</span>
        </li>`).join("") + `</ol>`;
   }
 
   function openRoleModal(role, fromBtn) {
     roleModalReturn = fromBtn || null;
-    $("#role-modal-title").textContent = `${ROLE_TR[role]} sıralaması`;
+    $("#role-modal-title").textContent = t("map.role_ranking_title", { role: roleName(role) });
     const body = $("#role-modal-body");
     body.innerHTML = roleModalHtml(role);
     body.querySelectorAll(".rr-name").forEach(btn =>
@@ -699,7 +724,7 @@
     await fetchRoster();
     const list = await api("/matches?limit=20");
     const box = $("#match-list");
-    box.innerHTML = list.length ? "" : "<p class='empty'>Henüz kayıtlı maç yok.</p>";
+    box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
 
     for (const m of list) {
       const voided = m.status === "void";
@@ -724,31 +749,35 @@
           .map(p => {
             const cur = p.position == null ? "" : p.position;
             const opts = `<option value=""${cur === "" ? " selected" : ""}>—</option>` +
-              ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${ROLE_TR[r]}</option>`).join("");
+              ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${roleName(r)}</option>`).join("");
             return `<li class="re-row ${p.team === 100 ? "blue" : "red"}">
                 <span class="p-who">${p.display_name}</span>
                 <select data-player="${p.player_id}" data-original="${cur}"
-                        aria-label="${p.display_name} rolü">${opts}</select>
+                        aria-label="${t("matches.role_select_aria", { name: p.display_name })}">${opts}</select>
               </li>`;
           }).join("");
         return `<div class="role-editor" hidden>
             <ul class="re-list">${rows}</ul>
-            <button class="btn-primary btn-save-roles" type="button">Rolleri Kaydet</button>
+            <button class="btn-primary btn-save-roles" type="button">${t("matches.save_roles")}</button>
           </div>`;
       };
+      const headBadge = voided
+        ? `<span class="void-badge">${t("matches.void_badge")}</span>`
+        : `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
+      const voidBtn = voided
+        ? ""
+        : `<button class="btn-void" type="button">${t("matches.void_btn")}</button>`;
       const card = document.createElement("article");
       card.className = "match-card" + (voided ? " voided" : "");
       card.innerHTML =
         `<header class="match-head">
            <span>${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</span>
-           ${voided
-             ? `<span class="void-badge">void</span>`
-             : `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? "Mavi" : "Kırmızı"} kazandı</span>`}
+           ${headBadge}
          </header>
          <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>
          <div class="match-actions">
-           <button class="btn-roles" type="button" aria-expanded="false">Rolleri düzenle</button>
-           ${voided ? "" : `<button class="btn-void" type="button">Maçı void yap</button>`}
+           <button class="btn-roles" type="button" aria-expanded="false">${t("matches.edit_roles")}</button>
+           ${voidBtn}
          </div>` +
         roleEditor();
 
@@ -757,7 +786,7 @@
       btnRoles.addEventListener("click", () => {
         editor.hidden = !editor.hidden;
         btnRoles.setAttribute("aria-expanded", String(!editor.hidden));
-        btnRoles.textContent = editor.hidden ? "Rolleri düzenle" : "Düzenlemeyi kapat";
+        btnRoles.textContent = editor.hidden ? t("matches.edit_roles") : t("matches.close_editor");
       });
 
       card.querySelector(".btn-save-roles").addEventListener("click", async (e) => {
@@ -766,30 +795,30 @@
           if (sel.value !== sel.dataset.original)
             positions[sel.dataset.player] = sel.value === "" ? null : sel.value;
         });
-        if (!Object.keys(positions).length) { toast("Değişen rol yok.", "warn"); return; }
+        if (!Object.keys(positions).length) { toast(t("matches.no_changes"), "warn"); return; }
         const btn = e.target;
         btn.disabled = true;
-        btn.textContent = "Kaydediliyor…";
+        btn.textContent = t("common.saving");
         try {
           const res = await api(`/matches/${m.id}/positions`, { method: "PUT", body: { positions } });
-          toast(`${res.updated} rol güncellendi · rol evreninde ${res.role_matches_replayed} maç yeniden işlendi.`, "ok");
+          toast(t("matches.roles_saved", { updated: res.updated, replayed: res.role_matches_replayed }), "ok");
           state.roster = []; // rol ratingleri değişti → roster önbelleği geçersiz
           loadMatches().catch(err => toast(err.message));
         } catch (err) {
           btn.disabled = false;
-          btn.textContent = "Rolleri Kaydet";
+          btn.textContent = t("matches.save_roles");
           toast(err.message);
         }
       });
 
       if (!voided) {
         card.querySelector(".btn-void").addEventListener("click", async (e) => {
-          const ok = confirm("Bu maç void işaretlenecek ve tüm rating'ler yeniden hesaplanacak. Bu işlem geri alınamaz. Emin misin?");
+          const ok = confirm(t("matches.void_confirm"));
           if (!ok) return;
           e.target.disabled = true;
           try {
             await api(`/matches/${m.id}/void`, { method: "POST" });
-            toast("Maç void işaretlendi, rating'ler yeniden hesaplanıyor.", "ok");
+            toast(t("matches.void_done"), "ok");
             loadMatches().catch(err => toast(err.message));
           } catch (err) {
             e.target.disabled = false;
@@ -812,8 +841,8 @@
       row.innerHTML =
         `<span class="p-name">${p.display_name}</span>
          <div class="team-toggle">
-           <button type="button" class="tt-blue" aria-pressed="false">Mavi</button>
-           <button type="button" class="tt-red" aria-pressed="false">Kırmızı</button>
+           <button type="button" class="tt-blue" aria-pressed="false">${t("common.blue")}</button>
+           <button type="button" class="tt-red" aria-pressed="false">${t("common.red")}</button>
          </div>`;
       const btnB = row.querySelector(".tt-blue");
       const btnR = row.querySelector(".tt-red");
@@ -837,13 +866,13 @@
 
   function manualCounts() {
     let blue = 0, red = 0;
-    for (const t of state.manualTeams.values()) t === 100 ? blue++ : red++;
+    for (const tm of state.manualTeams.values()) tm === 100 ? blue++ : red++;
     return { blue, red };
   }
 
   function updateManualCounter() {
     const { blue, red } = manualCounts();
-    $("#manual-counter").textContent = `Mavi ${blue}/5 · Kırmızı ${red}/5`;
+    $("#manual-counter").textContent = t("manual.counter", { blue, red });
     const winner = document.querySelector("input[name=winner]:checked");
     $("#btn-manual-submit").disabled = !(blue === 5 && red === 5 && winner);
   }
@@ -854,7 +883,7 @@
     const btn = $("#btn-manual-submit");
     const winner = Number(document.querySelector("input[name=winner]:checked").value);
     btn.disabled = true;
-    btn.textContent = "Kaydediliyor…";
+    btn.textContent = t("common.saving");
     try {
       const res = await api("/ingest/match", {
         method: "POST",
@@ -868,16 +897,30 @@
             ({ player_id, team, position: null })),
         },
       });
-      toast(res.duplicate ? "Bu maç zaten kayıtlıydı." : "Maç kaydedildi.", "ok");
+      toast(res.duplicate ? t("manual.duplicate") : t("manual.saved"), "ok");
       state.manualTeams.clear();
       document.querySelectorAll("input[name=winner]").forEach(r => { r.checked = false; });
       loadManual(true).catch(e => toast(e.message));
     } catch (e) {
       toast(e.message);
     } finally {
-      btn.textContent = "Maçı kaydet";
+      btn.textContent = t("manual.submit_btn");
       updateManualCounter();
     }
+  });
+
+  // ── Dil (GÖREV 6) ─────────────────────────────────────────────
+  // Sağ üstteki düğme hedef dili gösterir (sözlük değeri: tr'de "EN", en'de "TR");
+  // apply() data-i18n taşıdığı için metni de kendiliğinden günceller.
+  $("#btn-lang").addEventListener("click", () =>
+    window.I18n.setLang(window.I18n.getLang() === "tr" ? "en" : "tr"));
+  // Dil değişince: statik data-i18n düğümlerini core.js apply() zaten çevirdi;
+  // JS'in kurduğu içerik aktif görünüm yeniden çizilerek tazelenir, sekmesiz
+  // görünümlerin geri düğmeleri state'ten yeniden yazılır.
+  window.I18n.subscribe(() => {
+    $("#btn-profile-back").textContent = backLabel(state.profileFrom);
+    $("#btn-map-back").textContent = backLabel(state.mapFrom);
+    showView(currentView);
   });
 
   // ── Başlangıç ─────────────────────────────────────────────────
