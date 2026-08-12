@@ -4,33 +4,45 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a1018">
-<title>LoL Balance</title>
+<!-- Görünen tüm metin i18n sözlüklerinden gelir (docs/i18n_contract.md, GÖREV 6):
+     statik düğümler data-i18n / data-i18n-placeholder / data-i18n-title /
+     data-i18n-aria-label taşır ve i18n/core.js apply() ile doldurur; bu yüzden
+     çoğu düğüm burada boştur. Marka adı "LoL Balance" çevrilmez ama <title>
+     yine sözlükten geçer. -->
+<title data-i18n="common.app_title">LoL Balance</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="topbar">
   <h1 class="brand">LoL <span>Balance</span></h1>
-  <button id="btn-key" class="key-btn" type="button" title="API anahtarını değiştir">Anahtar</button>
+  <div class="topbar-actions">
+    <!-- Dil düğmesi hedef dili gösterir: tr sözlüğünde "EN", en sözlüğünde "TR" —
+         böylece apply() düğmeyi de kendiliğinden günceller. -->
+    <button id="btn-lang" class="key-btn lang-btn" type="button"
+            data-i18n="common.lang_btn" data-i18n-title="common.lang_btn_title"></button>
+    <button id="btn-key" class="key-btn" type="button"
+            data-i18n="common.key_btn" data-i18n-title="common.key_btn_title"></button>
+  </div>
 </header>
 
 <main id="main">
 
   <!-- ═══ Dengeleme ═══ -->
   <section id="view-balance" class="view">
-    <p class="view-hint">Bu gece oynayacak 10 kişiyi seç. Kartın altındaki kutular rol ratingleridir:
-      rol · puan · o roldeki maç sayısı; hiç oynanmamış rol soluk görünür.</p>
+    <p class="view-hint" data-i18n="balance.hint"></p>
 
     <!-- Nemesis modu rozeti (GÖREV 3) — Enler ekranındaki "Nemesis maçı kur" açar,
          sağdaki × kapatır. Açıkken "Dengele" POST /balance/nemesis'e gider. -->
     <div id="nemesis-mode" class="nem-mode" hidden>
       <div class="nem-mode-body">
-        <span class="nem-mode-title">Nemesis modu</span>
+        <span class="nem-mode-title" data-i18n="balance.nem_mode_title"></span>
         <span id="nem-mode-pair" class="nem-mode-pair"></span>
         <span id="nem-mode-hint" class="nem-mode-hint"></span>
       </div>
       <button id="btn-nemesis-off" class="nem-mode-off" type="button"
-              title="Nemesis modunu kapat" aria-label="Nemesis modunu kapat">×</button>
+              data-i18n-title="balance.nem_mode_off_title"
+              data-i18n-aria-label="balance.nem_mode_off_title">×</button>
     </div>
 
     <div id="roster" class="roster-grid" aria-live="polite"></div>
@@ -38,27 +50,33 @@
     <div id="suggestions" class="suggestions"></div>
 
     <div class="action-bar">
-      <div id="pick-counter" class="pick-counter">0<span>/10 seçildi</span></div>
-      <button id="btn-balance" class="btn-primary" type="button" disabled>Dengele</button>
+      <!-- İçerik JS'te kurulur: updatePickCounter() → "{n}/10 seçildi" -->
+      <div id="pick-counter" class="pick-counter"></div>
+      <button id="btn-balance" class="btn-primary" type="button"
+              data-i18n="balance.balance_btn" disabled></button>
     </div>
   </section>
 
   <!-- ═══ Leaderboard ═══ -->
   <section id="view-leaderboard" class="view" hidden>
-    <p class="view-hint">Oyuncu adına dokununca istatistik sayfası açılır: maç dökümü, KDA,
-      favori karakter/koridor, rol ratingleri ve en iyi anlaştığı takım arkadaşları.</p>
+    <p class="view-hint" data-i18n="leaderboard.hint"></p>
     <!-- Harita (GÖREV 4) girişi: alt çubuk 320px'de 6. sekmeyi kaldırmıyor -->
-    <div class="map-entry"><button id="btn-map-from-board" class="map-link" type="button">Rol enleri haritası →</button></div>
+    <div class="map-entry"><button id="btn-map-from-board" class="map-link" type="button"
+        data-i18n="leaderboard.map_link"></button></div>
     <table class="board">
-      <thead><tr><th class="rank">#</th><th>Oyuncu</th><th class="num">Puan</th><th class="num">Maç</th></tr></thead>
+      <thead><tr>
+        <th class="rank" data-i18n="leaderboard.th_rank"></th>
+        <th data-i18n="leaderboard.th_player"></th>
+        <th class="num" data-i18n="leaderboard.th_score"></th>
+        <th class="num" data-i18n="leaderboard.th_matches"></th>
+      </tr></thead>
       <tbody id="board-body"></tbody>
     </table>
   </section>
 
   <!-- ═══ Haftanın enleri (GÖREV 2) ═══ -->
   <section id="view-highlights" class="view" hidden>
-    <p class="view-hint">Son 7 günün öne çıkanları. Karta dokununca o oyuncunun istatistik sayfası açılır.
-      En altta, en çok başa baş geçen koridor rekabeti (nemesis) ve o çiftle maç kurma düğmesi var.</p>
+    <p class="view-hint" data-i18n="highlights.hint"></p>
     <div id="highlights-body" aria-live="polite"></div>
   </section>
 
@@ -66,13 +84,13 @@
   <!-- Harita ÖZGÜN, stilize bir illüstrasyondur: Riot varlığı/kopyası değildir,
        dış görsel dosyası yoktur (satır içi SVG). Baloncuklar JS ile yerleştirilir. -->
   <section id="view-map" class="view" hidden>
-    <button id="btn-map-back" class="back-btn" type="button">← Enlere dön</button>
-    <p class="view-hint">Her koridorda o rolün en iyisi. Baloncuğa dokununca o rolün tam
-      sıralaması açılır; sıralamadaki isim oyuncunun istatistik sayfasına gider.</p>
+    <!-- Geri düğmesi metnini openMap() geldiği görünüme göre yazar -->
+    <button id="btn-map-back" class="back-btn" type="button"></button>
+    <p class="view-hint" data-i18n="map.hint"></p>
 
     <div class="rift">
       <svg class="rift-svg" viewBox="0 0 100 100" role="img"
-           aria-label="Stilize koridor haritası: iki üs, üç koridor, köşegen nehir ve orman bölgeleri"
+           data-i18n-aria-label="map.svg_aria"
            focusable="false">
         <defs>
           <linearGradient id="rf-ground" x1="0" y1="1" x2="1" y2="0">
@@ -153,64 +171,70 @@
       <div id="rift-bubbles" class="rift-bubbles" aria-live="polite"></div>
     </div>
 
-    <p class="rift-note">Baloncuktaki puan o rolün ratingidir (ana puandan ayrı hesaplanır).
-      Hiç oynanmamış rol soluk "—" görünür.</p>
+    <p class="rift-note" data-i18n="map.note"></p>
   </section>
 
   <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralama/enler'den açılan detay görünümü ═══ -->
   <section id="view-profile" class="view" hidden>
-    <button id="btn-profile-back" class="back-btn" type="button">← Sıralamaya dön</button>
+    <!-- Geri düğmesi metnini openProfile() geldiği görünüme göre yazar -->
+    <button id="btn-profile-back" class="back-btn" type="button"></button>
     <div id="profile-body" aria-live="polite"></div>
   </section>
 
   <!-- ═══ Maç geçmişi ═══ -->
   <section id="view-matches" class="view" hidden>
-    <p class="view-hint">Rol yanlış tahmin edildiyse maç kartındaki "Rolleri düzenle" ile düzelt;
-      yalnız rol evreni yeniden hesaplanır, ana rating değişmez.</p>
+    <p class="view-hint" data-i18n="matches.hint"></p>
     <div id="match-list" class="match-list"></div>
   </section>
 
   <!-- ═══ Manuel giriş ═══ -->
   <section id="view-manual" class="view" hidden>
-    <p class="view-hint">Collector çalışmadıysa maçı buradan gir. Her oyuncuya takım ata: 5 mavi, 5 kırmızı.</p>
+    <p class="view-hint" data-i18n="manual.hint"></p>
     <div id="manual-roster" class="manual-list"></div>
 
     <fieldset class="winner-pick">
-      <legend>Kazanan taraf</legend>
-      <label class="winner-opt blue"><input type="radio" name="winner" value="100">Mavi taraf</label>
-      <label class="winner-opt red"><input type="radio" name="winner" value="200">Kırmızı taraf</label>
+      <legend data-i18n="manual.winner_legend"></legend>
+      <!-- Metin ayrı span'dedir: data-i18n textContent yazar, radyo input'u korunur -->
+      <label class="winner-opt blue"><input type="radio" name="winner" value="100"><span data-i18n="manual.winner_blue"></span></label>
+      <label class="winner-opt red"><input type="radio" name="winner" value="200"><span data-i18n="manual.winner_red"></span></label>
     </fieldset>
 
     <div class="action-bar">
-      <div id="manual-counter" class="pick-counter small">Mavi 0/5 · Kırmızı 0/5</div>
-      <button id="btn-manual-submit" class="btn-primary" type="button" disabled>Maçı kaydet</button>
+      <!-- İçerik JS'te kurulur: updateManualCounter() → "Mavi {b}/5 · Kırmızı {r}/5" -->
+      <div id="manual-counter" class="pick-counter small"></div>
+      <button id="btn-manual-submit" class="btn-primary" type="button"
+              data-i18n="manual.submit_btn" disabled></button>
     </div>
   </section>
 
 </main>
 
 <nav class="tabbar">
-  <button class="tab active" data-view="balance"     type="button">Dengele</button>
-  <button class="tab"        data-view="leaderboard" type="button">Sıralama</button>
-  <button class="tab"        data-view="highlights"  type="button">Enler</button>
-  <button class="tab"        data-view="matches"     type="button">Geçmiş</button>
-  <button class="tab"        data-view="manual"      type="button">Manuel</button>
+  <button class="tab active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
+  <button class="tab"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
+  <button class="tab"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
+  <button class="tab"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
+  <button class="tab"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
 </nav>
 
 <!-- API key modal -->
 <div id="key-modal" class="modal-backdrop" hidden>
   <form id="key-form" class="modal">
-    <h2>API anahtarı</h2>
-    <p>İsteklerin doğrulanması için anahtar gerekiyor. Backend'in <code>.env</code> dosyasındaki değeri gir.</p>
-    <input id="key-input" type="password" autocomplete="off" placeholder="API anahtarı" required>
-    <button class="btn-primary" type="submit">Kaydet</button>
+    <h2 data-i18n="keymodal.title"></h2>
+    <!-- Cümle <code>.env</code> etrafında iki span'e bölündü: data-i18n textContent
+         yazdığı için işaretlemeyi içeremez; iki dilde de bu bölünme dilbilgisel çalışır. -->
+    <p><span data-i18n="keymodal.desc1"></span> <code>.env</code> <span data-i18n="keymodal.desc2"></span></p>
+    <input id="key-input" type="password" autocomplete="off"
+           data-i18n-placeholder="keymodal.placeholder" required>
+    <button class="btn-primary" type="submit" data-i18n="keymodal.save_btn"></button>
   </form>
 </div>
 
 <!-- Rol sıralaması pop-up'ı (GÖREV 4) — API anahtarı modalıyla aynı backdrop deseni -->
 <div id="role-modal" class="modal-backdrop" hidden>
   <div class="modal modal-list" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
-    <button id="role-modal-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+    <button id="role-modal-close" class="modal-x" type="button"
+            data-i18n-aria-label="common.close">×</button>
     <h2 id="role-modal-title"></h2>
     <div id="role-modal-body"></div>
   </div>
@@ -218,8 +242,12 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" }; // USE_MOCK: true → mock_api.js (lokal geliştirme)</script>
+<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" }; // USE_MOCK: true -> mock_api.js (lokal gelistirme)</script>
 <script src="mock_api.js"></script>
+<!-- i18n yükleme sırası contract geregi: tr.js, en.js, core.js, sonra app.js -->
+<script src="i18n/tr.js"></script>
+<script src="i18n/en.js"></script>
+<script src="i18n/core.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -64,6 +64,17 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   min-height: 40px;
 }
 .key-btn:hover { color: var(--brass); border-color: var(--brass-dim); }
+/* Sağ üst düğme grubu: dil + anahtar (GÖREV 6) */
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+/* Dil düğmesi anahtar düğmesiyle aynı kabuğu paylaşır; kısa TR/EN monogramı
+   marka yazısıyla aynı display fontunu taşır. */
+.lang-btn {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  min-width: 48px;
+  text-transform: uppercase;
+}
 
 /* ── Ana yerleşim ── */
 main { max-width: 720px; margin: 0 auto; padding: 16px; }
