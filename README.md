@@ -1,73 +1,76 @@
 # lol-balance
 
-Arkadaş grubunun League of Legends 5v5 custom maçları için: LCU'dan otomatik veri
-toplama → rating (OpenSkill tabanlı harman modeli) → takım dengeleme → web UI.
+🇹🇷 Türkçe: [README.tr.md](README.tr.md)
 
-## Bileşenler
+For a friend group's League of Legends 5v5 custom matches: automatic data
+collection from the LCU → rating (OpenSkill-based blend model) → team balancing → web UI.
 
-| Dizin | Ne | Teknoloji |
+## Components
+
+| Directory | What | Technology |
 |---|---|---|
-| `collector/` | LoL client'ın (LCU) yerel API'sinden biten custom maçları yakalar, normalize eder, backend'e gönderir | Python, httpx |
-| `backend/` | REST API + statik web UI servis + SQLite | FastAPI |
-| `backend/rating/` | Saf rating kütüphanesi (I/O yok): OpenSkill PlackettLuce + performans harmanı + takım dengeleme | Python, openskill |
-| `webui/` | Framework'süz tek sayfa: roster, dengeleme, maç geçmişi, leaderboard | Vanilla HTML/JS |
-| `docs/` | **CONTRACT'lar — tek doğruluk kaynağı** (API, ingest, DB şeması, rating modeli) | — |
+| `collector/` | Captures finished custom matches from the LoL client's (LCU) local API, normalizes them, sends them to the backend | Python, httpx |
+| `backend/` | REST API + static web UI serving + SQLite | FastAPI |
+| `backend/rating/` | Pure rating library (no I/O): OpenSkill PlackettLuce + performance blend + team balancing | Python, openskill |
+| `webui/` | Framework-free single page: roster, balancing, match history, leaderboard | Vanilla HTML/JS |
+| `docs/` | **CONTRACTS — the single source of truth** (API, ingest, DB schema, rating model) | — |
 
-## Geliştirici rehberi (önce bunu oku)
+## Developer guide (read this first)
 
-1. **Contract'lar donmuştur.** `docs/` altındaki dosyalar tek taraflı değiştirilmez;
-   sorun bulursan `docs/CHANGE_REQUESTS.md`'ye yaz, karar orkestrasyon sürecinden çıkar
-   (bkz. `CLAUDE.md` ve `ORCHESTRATION.md`).
-2. **Dizin sınırı:** her bileşen yalnızca kendi dizininde değişir; bileşenler birbirini
-   contract'taki örnek payload'larla mock'lar.
-3. **Test zorunlu.** Üç paket de pytest kullanır; CI her push/PR'da üçünü koşar.
+1. **Contracts are frozen.** Files under `docs/` are never changed unilaterally;
+   if you find a problem, write it up in `docs/CHANGE_REQUESTS.md` — the decision
+   comes out of the orchestration process (see `CLAUDE.md` and `ORCHESTRATION.md`).
+2. **Directory boundary:** each component changes only within its own directory;
+   components mock each other using the example payloads in the contracts.
+3. **Tests are mandatory.** All three packages use pytest; CI runs all three on every push/PR.
 
-## Lokal kurulum
+## Local setup
 
 ```powershell
-# Backend + collector bağımlılıkları (tek venv yeterli)
+# Backend + collector dependencies (a single venv is enough)
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt -r requirements-dev.txt
 .\.venv\Scripts\python -m pip install -r ..\collector\requirements.txt
-copy .env.example .env   # API_KEY doldur
+copy .env.example .env   # fill in API_KEY
 
-# Rating paketinin kendi test venv'i (hypothesis dahil)
+# The rating package's own test venv (includes hypothesis)
 cd rating
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -e .[dev]
 ```
 
-Not: rating paketi backend venv'ine **kopya** kurulur (`pip install ./rating`);
-`backend/rating/` altında değişiklik yaptıysan backend venv'inde yeniden kur
-(editable kurulum, backend/ çalışma dizinindeki `rating/` klasör gölgelemesiyle
-çakıştığı için bilinçli olarak kullanılmıyor).
+Note: the rating package is installed into the backend venv as a **copy**
+(`pip install ./rating`); if you changed anything under `backend/rating/`,
+reinstall it in the backend venv (an editable install is deliberately not used
+because it conflicts with the `rating/` folder shadowing in the backend/
+working directory).
 
-## Çalıştırma
+## Running
 
 ```powershell
 cd backend
 .\.venv\Scripts\python -m uvicorn app.main:app --reload   # http://127.0.0.1:8000
 ```
-Web UI kökten servis edilir; API `/api/v1` altındadır ve `X-API-Key` ister.
-Collector için `collector/README.md`'ye bak (canlı mod + backfill + Task Scheduler).
+The web UI is served from the root; the API lives under `/api/v1` and requires `X-API-Key`.
+For the collector, see `collector/README.md` (live mode + backfill + Task Scheduler).
 
-## Testler
+## Tests
 
 ```powershell
 cd backend\rating && .\.venv\Scripts\python -m pytest -q          # rating
 cd backend && .\.venv\Scripts\python -m pytest tests -q            # backend
-cd <repo kökü> && backend\.venv\Scripts\python -m pytest collector -q  # collector
+cd <repo root> && backend\.venv\Scripts\python -m pytest collector -q  # collector
 ```
 
 ## Deploy
 
-- CI (`.github/workflows/ci.yml`): her push/PR'da üç test paketi; `main`'e push'ta
-  GHCR'a Docker image (`backend/Dockerfile`, backend+webui tek container).
+- CI (`.github/workflows/ci.yml`): all three test suites on every push/PR; on push
+  to `main`, a Docker image to GHCR (`backend/Dockerfile`, backend+webui in a single container).
 - Kubernetes (VPS): `deploy/VPS_AGENT_BRIEF.md`.
 
-## Gizlilik notu
+## Privacy note
 
-`collector/fixtures/` altındaki gerçek LCU kayıtları oyuncuların puuid ve Riot
-ID'lerini içerir. **Repo private kalmalıdır**; public yapılacaksa fixture'lar
-önce anonimleştirilmelidir.
+The real LCU captures under `collector/fixtures/` contain players' puuids and
+Riot IDs. **The repository must remain private**; if it is ever to be made
+public, the fixtures must be anonymized first.
