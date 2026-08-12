@@ -19,10 +19,11 @@ import time
 import traceback
 from datetime import date
 
-from . import __version__
+from . import __version__, i18n
 from .backfill import run_backfill
 from .backfill_positions import run_position_backfill
 from .config import app_dir, find_env_file, is_frozen, load_config
+from .i18n import msg
 from .lcu import HttpLcuClient
 from .live import LcuConnectionLost, LiveRunner
 from .lockfile import LockfileNotFound, read_lockfile
@@ -41,22 +42,24 @@ def _parse_since(value: str) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"--since YYYY-MM-DD formatında olmalı: {value!r}")
+        raise argparse.ArgumentTypeError(msg("cli.since_format", value=repr(value)))
 
 
 def _mode_label(args: argparse.Namespace) -> str:
     if args.setup:
-        return "kurulum sihirbazı"
+        return msg("cli.mode.setup")
     if args.command == "backfill-positions":
-        return "rol backfill" + (" (dry-run)" if args.dry_run else "")
+        return msg("cli.mode.backfill_positions") + (
+            msg("cli.mode.dry_run_suffix") if args.dry_run else ""
+        )
     if args.backfill:
-        return "geçmiş maç backfill"
-    return "canlı mod"
+        return msg("cli.mode.backfill")
+    return msg("cli.mode.live")
 
 
 def _print_banner(args: argparse.Namespace) -> None:
-    print(f"LoL Balance Collector v{__version__} — {_mode_label(args)}")
-    print(f"Çalışma klasörü: {app_dir()}")
+    print(msg("cli.banner", version=__version__, mode=_mode_label(args)))
+    print(msg("cli.workdir", path=app_dir()))
 
 
 def _ensure_env(force_setup: bool = False) -> None:
@@ -69,34 +72,38 @@ def _ensure_env(force_setup: bool = False) -> None:
     if all(os.environ.get(key) for key in REQUIRED_ENV_KEYS):
         return  # ortam değişkenleriyle yapılandırılmış (CI / geliştirici kurulumu)
     if not stdin_is_interactive():
-        raise SystemExit(
-            f"Ayar dosyası yok ({app_dir() / '.env'}) ve kurulum sihirbazı çalıştırılamıyor "
-            "(stdin kapalı). .env.example'ı kopyalayıp doldurun."
-        )
+        raise SystemExit(msg("cli.no_env_no_tty", path=app_dir() / ".env"))
     run_wizard()
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="collector", description="LoL custom maç toplayıcı")
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="collector", description=msg("cli.description"))
     parser.add_argument("command", nargs="?", choices=["backfill-positions"], default=None,
-                        help="backfill-positions: raw_archive'daki maçların rollerini "
-                             "tahmin edip backend'e yazar")
-    parser.add_argument("--backfill", action="store_true",
-                        help="Match history'yi geriye tara (roster filtresiyle)")
+                        help=msg("cli.help.command"))
+    parser.add_argument("--backfill", action="store_true", help=msg("cli.help.backfill"))
     parser.add_argument("--since", type=_parse_since, default=None, metavar="YYYY-MM-DD",
-                        help="Backfill'de bu tarihten eski maçlara bakma")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="backfill-positions: ne gönderileceğini yazdır, gönderme")
-    parser.add_argument("--setup", action="store_true",
-                        help="Kurulum sihirbazını yeniden çalıştır (.env'i yeniden yazar)")
+                        help=msg("cli.help.since"))
+    parser.add_argument("--dry-run", action="store_true", help=msg("cli.help.dry_run"))
+    parser.add_argument("--setup", action="store_true", help=msg("cli.help.setup"))
     parser.add_argument("--version", action="version", version=f"collector {__version__}")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Dil, config'de varsa daha --help/banner basılmadan sessizce yüklenir.
+    i18n.resolve_language(allow_prompt=False)
+    args = _build_parser().parse_args(argv)
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # Config var ama dil alanı yoksa (i18n öncesi kurulum): ilk soru dil seçimi.
+    # --setup'ta sihirbaz kendi sorar; .env hiç yoksa da ilk soruyu sihirbaz sorar.
+    if not args.setup and stdin_is_interactive():
+        i18n.resolve_language()
 
     _print_banner(args)
     _ensure_env(force_setup=args.setup)
@@ -109,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         report_backend_check(config.backend_url, config.api_key)
 
     if args.setup:
-        print("Kurulum bitti. Toplamayı başlatmak için programı normal (argümansız) çalıştır.")
+        print(msg("cli.setup_done"))
         return 0
 
     if args.command == "backfill-positions":
@@ -123,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             info = read_lockfile(config.lol_dir)
         except LockfileNotFound as exc:
-            log.error("Lockfile bulunamadı: %s — LoL client açık mı, LOL_DIR doğru mu?", exc)
+            log.error("Lockfile not found: %s — is the LoL client running, is LOL_DIR correct?", exc)
             return 1
         lcu = HttpLcuClient(info)
         try:
@@ -135,9 +142,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if not stats.errors else 1
 
     # Canlı mod: client kapalıysa bekle, bağlantı koparsa yeniden bağlan
-    log.info("Canlı mod başladı (poll aralığı %.1fs)", config.poll_interval_s)
-    print("LoL client'ini aç ve custom maç oyna — maç biter bitmez otomatik gönderilir.")
-    print("Durdurmak için: Ctrl+C (ya da pencereyi kapat).")
+    log.info("Live mode started (poll interval %.1fs)", config.poll_interval_s)
+    print(msg("cli.live_hint"))
+    print(msg("cli.live_stop_hint"))
     lockfile_warned = False
     try:
         while True:
@@ -145,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                 info = read_lockfile(config.lol_dir)
             except LockfileNotFound:
                 if not lockfile_warned:
-                    log.info("LoL client kapalı görünüyor (lockfile yok), bekleniyor...")
+                    log.info("LoL client appears closed (no lockfile), waiting...")
                     lockfile_warned = True
                 time.sleep(_LOCKFILE_WAIT_S)
                 continue
@@ -156,12 +163,12 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 runner.poll_forever()
             except LcuConnectionLost:
-                log.info("LCU bağlantısı koptu, yeniden bağlanılacak...")
+                log.info("LCU connection lost, will reconnect...")
                 time.sleep(_RECONNECT_WAIT_S)
             finally:
                 lcu.close()
     except KeyboardInterrupt:
-        log.info("Durduruldu.")
+        log.info("Stopped.")
         return 0
     finally:
         sender.close()
@@ -172,7 +179,7 @@ def _pause_if_frozen() -> None:
     if not is_frozen():
         return
     try:
-        input("\nKapatmak için Enter'a bas...")
+        input(msg("cli.press_enter"))
     except (EOFError, KeyboardInterrupt, OSError):
         pass
 
@@ -210,7 +217,7 @@ def run(argv: list[str] | None = None) -> int:
         else:
             code = exc.code or 0
     except KeyboardInterrupt:
-        print("Durduruldu.")
+        print(msg("cli.stopped"))
         code = 0
     except Exception:  # noqa: BLE001 — pencere kapanmadan yığın izi görünsün
         traceback.print_exc()

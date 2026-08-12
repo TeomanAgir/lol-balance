@@ -1,6 +1,8 @@
 """İlk açılış sihirbazı (GÖREV 5) + backend erişim doğrulaması.
 
-`.env` yoksa (frozen'da exe'nin yanında) kullanıcıya üç şey sorulur:
+`.env` yoksa (frozen'da exe'nin yanında) kullanıcıya önce dil (GÖREV 6,
+contract §1: sihirbazın İLK sorusu İngilizce dil seçimidir; config'de
+`LANGUAGE` varsa sorulmaz), sonra üç şey sorulur:
 
 1. BACKEND_URL — varsayılan canlı adres, Enter = kabul.
 2. API_KEY — zorunlu, boş geçilemez.
@@ -8,7 +10,7 @@
    bulunursa onaylatılır (Enter = evet), bulunamazsa sorulur.
 
 Sonuç `.env`'e yazılır ve backend'e hızlı bir doğrulama isteği atılır; anahtar/adres
-hatası ilk dakikada Türkçe olarak raporlanır.
+hatası ilk dakikada seçilen dilde raporlanır.
 
 Tüm G/Ç enjekte edilebilir (`input_fn`, `print_fn`, `check`), böylece sihirbaz
 mock'lanmış girdilerle test edilebilir.
@@ -25,6 +27,14 @@ from typing import Callable, Iterable, Optional
 import httpx
 
 from .config import app_dir
+from .i18n import (
+    LANGUAGE_KEY,
+    get_language,
+    language_from_env_file,
+    msg,
+    prompt_language,
+    set_language,
+)
 
 DEFAULT_BACKEND_URL = "https://lol.teomanagir.com"
 
@@ -173,6 +183,18 @@ LOL_DIR_SOURCES: tuple[tuple[str, Callable[[], Optional[Path]]], ...] = (
     ("bilinen yollar", find_lol_dir_from_known_paths),
 )
 
+#: Kaynak kimliği → sözlük anahtarı (gösterim dili için; kimlikler sabit kalır).
+_SOURCE_LABEL_KEYS = {
+    "kayıt defteri": "wizard.source.registry",
+    "Riot metadata": "wizard.source.riot_metadata",
+    "bilinen yollar": "wizard.source.known_paths",
+}
+
+
+def _source_label(name: str) -> str:
+    key = _SOURCE_LABEL_KEYS.get(name)
+    return msg(key) if key else name
+
 
 def detect_lol_dir(
     sources: Iterable[tuple[str, Callable[[], Optional[Path]]]] | None = None,
@@ -205,7 +227,7 @@ def check_backend(
     transport: httpx.BaseTransport | None = None,
     timeout: float = 10.0,
 ) -> BackendCheck:
-    """`GET /api/v1/players` ile adres+anahtarı doğrular. Türkçe, eyleme dönük mesaj döner."""
+    """`GET /api/v1/players` ile adres+anahtarı doğrular. Seçili dilde, eyleme dönük mesaj döner."""
     url = backend_url.rstrip("/")
     try:
         with httpx.Client(
@@ -217,41 +239,21 @@ def check_backend(
         ) as client:
             response = client.get(PLAYERS_PATH)
     except httpx.HTTPError as exc:
-        return BackendCheck(
-            False,
-            f"Backend'e ULAŞILAMADI ({url}): {exc}\n"
-            "  → BACKEND_URL doğru mu, internet bağlantın var mı? "
-            "Adresi tarayıcıda açıp kontrol edebilirsin.",
-        )
+        return BackendCheck(False, msg("check.unreachable", url=url, error=exc))
 
     status = response.status_code
     if 200 <= status < 300:
         try:
             count = len(response.json() or [])
         except ValueError:
-            return BackendCheck(
-                False,
-                f"Backend yanıt verdi ama JSON değil (HTTP {status}) — "
-                f"BACKEND_URL bu sisteme ait olmayabilir: {url}",
-            )
-        return BackendCheck(True, f"Backend doğrulandı ({url}): {count} kayıtlı oyuncu.")
+            return BackendCheck(False, msg("check.not_json", status=status, url=url))
+        return BackendCheck(True, msg("check.ok", url=url, count=count))
 
     if status in (401, 403):
-        return BackendCheck(
-            False,
-            f"API anahtarı REDDEDİLDİ (HTTP {status}). "
-            "→ .env içindeki API_KEY yanlış; Teoman'dan doğru anahtarı iste.",
-        )
+        return BackendCheck(False, msg("check.key_rejected", status=status))
     if status == 404:
-        return BackendCheck(
-            False,
-            f"Adres bulunamadı (HTTP 404): {url}{PLAYERS_PATH}\n"
-            "  → BACKEND_URL yanlış olabilir (sonunda /api/v1 OLMAMALI).",
-        )
-    return BackendCheck(
-        False,
-        f"Backend beklenmedik yanıt verdi (HTTP {status}): {response.text[:200]}",
-    )
+        return BackendCheck(False, msg("check.not_found", url=url, path=PLAYERS_PATH))
+    return BackendCheck(False, msg("check.unexpected", status=status, body=response.text[:200]))
 
 
 # --------------------------------------------------------------------------- #
@@ -270,71 +272,72 @@ def _ask(prompt: str, input_fn: Reader) -> str:
 
 
 def _ask_backend_url(input_fn: Reader, print_fn: Printer) -> str:
-    answer = _ask(f"Backend adresi [{DEFAULT_BACKEND_URL}]: ", input_fn)
+    answer = _ask(msg("wizard.ask_backend_url", default=DEFAULT_BACKEND_URL), input_fn)
     url = (answer or DEFAULT_BACKEND_URL).strip().rstrip("/")
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
-        print_fn(f"  (şema eksikti, https:// eklendi → {url})")
+        print_fn(msg("wizard.scheme_added", url=url))
     return url
 
 
 def _ask_api_key(input_fn: Reader, print_fn: Printer, max_tries: int = 5) -> str:
     for _ in range(max_tries):
-        key = _ask("API anahtarı (Teoman'dan al): ", input_fn)
+        key = _ask(msg("wizard.ask_api_key"), input_fn)
         if key:
             return key
-        print_fn("  API anahtarı boş olamaz, tekrar dene.")
-    raise SystemExit("API anahtarı girilmedi, kurulum iptal edildi.")
+        print_fn(msg("wizard.api_key_empty"))
+    raise SystemExit(msg("wizard.api_key_aborted"))
 
 
 def _ask_lol_dir(input_fn: Reader, print_fn: Printer, max_tries: int = 5) -> str:
     detected, source = detect_lol_dir()
     if detected is not None:
-        print_fn(f"LoL klasörü bulundu ({source}): {detected}")
-        answer = _ask("  Doğru mu? [E/h]: ", input_fn).lower()
+        print_fn(msg("wizard.lol_dir_found", source=_source_label(source), path=detected))
+        answer = _ask(msg("wizard.lol_dir_confirm"), input_fn).lower()
         if answer in ("", "e", "evet", "y", "yes"):
             return str(detected)
         if answer not in ("h", "hayir", "hayır", "n", "no"):
             # Anlaşılmayan cevap: güvenli taraf = bulunanı kullan
-            print_fn("  (cevap anlaşılmadı, bulunan klasör kullanılıyor)")
+            print_fn(msg("wizard.lol_dir_unclear"))
             return str(detected)
-        print_fn("  Tamam, klasörü elle gir.")
+        print_fn(msg("wizard.lol_dir_manual"))
     else:
-        print_fn("LoL klasörü otomatik bulunamadı.")
+        print_fn(msg("wizard.lol_dir_not_found"))
 
     for _ in range(max_tries):
-        raw = _ask(r"LoL klasörü (ör. C:\Riot Games\League of Legends): ", input_fn)
+        raw = _ask(msg("wizard.ask_lol_dir"), input_fn)
         if not raw:
-            print_fn("  Boş olamaz, tekrar dene.")
+            print_fn(msg("wizard.lol_dir_empty"))
             continue
         candidate = Path(raw.strip().strip('"'))
         if looks_like_lol_dir(candidate):
             return str(candidate)
         if candidate.is_dir():
-            print_fn(
-                "  UYARI: klasör var ama içinde LeagueClient.exe / lockfile gibi bir "
-                "işaret yok. Yine de kaydediliyor — yanlışsa .env'i düzelt."
-            )
+            print_fn(msg("wizard.lol_dir_no_marker"))
             return str(candidate)
-        print_fn(f"  Böyle bir klasör yok: {candidate}")
-    raise SystemExit("Geçerli bir LoL klasörü girilmedi, kurulum iptal edildi.")
+        print_fn(msg("wizard.lol_dir_missing", path=candidate))
+    raise SystemExit(msg("wizard.lol_dir_aborted"))
 
 
 def render_env(values: dict[str, str]) -> str:
-    return (
-        "# LoL Balance Collector — ilk açılış sihirbazı tarafından oluşturuldu\n"
-        "\n"
-        "# LoL kurulum dizini (içinde client açıkken 'lockfile' oluşur)\n"
-        f"LOL_DIR={values['LOL_DIR']}\n"
-        "\n"
-        "# Backend adresi (sondaki / olmadan) ve paylaşılan API anahtarı\n"
-        f"BACKEND_URL={values['BACKEND_URL']}\n"
-        f"API_KEY={values['API_KEY']}\n"
-        "\n"
-        "# Opsiyonel:\n"
-        "#MIN_KNOWN=6\n"
-        "#POLL_INTERVAL_S=2.5\n"
-    )
+    """`.env` içeriği. `LANGUAGE` yalnızca values'ta varsa yazılır — böylece
+    dil alanı mevcut alanların YANINA eklenir, dosya yapısı değişmez."""
+    lines = [msg("env.header"), ""]
+    if LANGUAGE_KEY in values:
+        lines += [msg("env.comment_language"), f"{LANGUAGE_KEY}={values[LANGUAGE_KEY]}", ""]
+    lines += [
+        msg("env.comment_lol_dir"),
+        f"LOL_DIR={values['LOL_DIR']}",
+        "",
+        msg("env.comment_backend"),
+        f"BACKEND_URL={values['BACKEND_URL']}",
+        f"API_KEY={values['API_KEY']}",
+        "",
+        msg("env.comment_optional"),
+        "#MIN_KNOWN=6",
+        "#POLL_INTERVAL_S=2.5",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def write_env(path: Path, values: dict[str, str]) -> Path:
@@ -352,37 +355,48 @@ def run_wizard(
     """İnteraktif kurulum; `.env`'i yazar ve yolunu döner."""
     target = env_path or (app_dir() / ".env")
 
+    # Contract §1: sihirbazın İLK sorusu İngilizce dil seçimidir; hedef config'de
+    # LANGUAGE zaten varsa sessizce kullanılır ve soru tekrar sorulmaz.
+    existing_lang = language_from_env_file(target) if target.is_file() else None
+    if existing_lang:
+        set_language(existing_lang)
+    else:
+        set_language(prompt_language(input_fn))
+
     print_fn("")
     print_fn("=" * 62)
-    print_fn(" LoL Balance Collector — ilk kurulum")
+    print_fn(msg("wizard.title"))
     print_fn("=" * 62)
-    print_fn(f"Ayarlar buraya yazılacak: {target}")
-    print_fn("(Köşeli parantezdeki varsayılanı kabul etmek için Enter'a bas.)")
+    print_fn(msg("wizard.target", path=target))
+    print_fn(msg("wizard.enter_hint"))
     print_fn("")
 
     backend_url = _ask_backend_url(input_fn, print_fn)
     api_key = _ask_api_key(input_fn, print_fn)
     lol_dir = _ask_lol_dir(input_fn, print_fn)
 
-    values = {"BACKEND_URL": backend_url, "API_KEY": api_key, "LOL_DIR": lol_dir}
+    values = {
+        "BACKEND_URL": backend_url,
+        "API_KEY": api_key,
+        "LOL_DIR": lol_dir,
+        LANGUAGE_KEY: get_language(),
+    }
     write_env(target, values)
 
     masked = api_key[:3] + "*" * max(0, len(api_key) - 3)
     print_fn("")
-    print_fn("Kaydedildi:")
-    print_fn(f"  dosya       : {target}")
-    print_fn(f"  BACKEND_URL : {backend_url}")
-    print_fn(f"  API_KEY     : {masked}")
-    print_fn(f"  LOL_DIR     : {lol_dir}")
+    print_fn(msg("wizard.saved"))
+    print_fn(msg("wizard.saved_file", path=target))
+    print_fn(msg("wizard.saved_language", lang=get_language()))
+    print_fn(msg("wizard.saved_backend", url=backend_url))
+    print_fn(msg("wizard.saved_api_key", masked=masked))
+    print_fn(msg("wizard.saved_lol_dir", path=lol_dir))
     print_fn("")
 
     result = check(backend_url, api_key)
-    print_fn(("OK  " if result.ok else "HATA  ") + result.message)
+    print_fn((msg("check.ok_prefix") if result.ok else msg("check.fail_prefix")) + result.message)
     if not result.ok:
-        print_fn(
-            "Ayarları düzeltmek için .env dosyasını elle düzenleyebilir "
-            "ya da programı `--setup` ile yeniden çalıştırabilirsin."
-        )
+        print_fn(msg("wizard.fix_hint"))
     print_fn("")
     return target
 
@@ -395,7 +409,7 @@ def report_backend_check(
 ) -> BackendCheck:
     """Normal başlangıçtaki hızlı doğrulama — bloklamaz, yalnız raporlar."""
     result = check(backend_url, api_key)
-    print_fn(("OK  " if result.ok else "HATA  ") + result.message)
+    print_fn((msg("check.ok_prefix") if result.ok else msg("check.fail_prefix")) + result.message)
     return result
 
 

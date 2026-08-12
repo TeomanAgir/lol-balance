@@ -85,10 +85,11 @@ def load_config(env_file: Path | None = None) -> Config:
 
     missing = [k for k in ("LOL_DIR", "BACKEND_URL", "API_KEY") if not merged.get(k)]
     if missing:
-        location = app_dir() / ".env"
+        # Geç import: i18n bu modülden find_env_file/_load_env_file alır (döngü kırılır).
+        from .i18n import msg
+
         raise SystemExit(
-            f"Eksik config: {', '.join(missing)}. "
-            f"{location} dosyasını doldurun (bkz. collector/.env.example)."
+            msg("config.missing", keys=", ".join(missing), path=app_dir() / ".env")
         )
 
     return Config(
