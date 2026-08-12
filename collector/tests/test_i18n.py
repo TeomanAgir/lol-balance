@@ -195,6 +195,41 @@ def test_wizard_asks_language_first_and_persists_it(tmp_path: Path, monkeypatch)
     assert "Saved:" in console.text
 
 
+def test_cli_prompts_language_once_for_pre_i18n_env_and_persists(
+    _isolated_app_dir: Path, monkeypatch, capsys
+):
+    """Regresyon: i18n öncesi kurulum (.env var, LANGUAGE yok) + CLI çağrısı.
+
+    Dil sorusu bir kez sorulur, yanıt AYNI .env'e yazılır ve akış devam eder.
+    İzole app_dir sayesinde geliştiricinin gerçek .env'ine asla dokunulmaz —
+    izolasyon olmadan bu senaryo pytest'te 'reading from stdin' OSError'ıydı.
+    """
+    from collector import __main__ as cli
+
+    for key in ("LOL_DIR", "BACKEND_URL", "API_KEY", "COLLECTOR_NO_WIZARD"):
+        monkeypatch.delenv(key, raising=False)
+    env = _write_env(_isolated_app_dir / ".env")  # LANGUAGE satırı yok
+
+    prompts: list[str] = []
+
+    def fake_input(prompt: str = "") -> str:
+        prompts.append(prompt)
+        return "en"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr(cli, "report_backend_check", lambda url, key: None)
+    monkeypatch.setattr(
+        cli,
+        "run_position_backfill",
+        lambda cfg, *, dry_run: type("S", (), {"errors": []})(),
+    )
+
+    assert cli.main(["backfill-positions", "--dry-run"]) == 0
+    assert prompts == [LANGUAGE_PROMPT]  # tek soru, tekrar yok
+    assert language_from_env_file(env) == "en"  # aynı config'e persist edildi
+    assert "role backfill (dry-run)" in capsys.readouterr().out  # devamı seçilen dilde
+
+
 def test_wizard_skips_language_question_when_config_has_it(tmp_path: Path, monkeypatch):
     from collector import wizard as wiz
 
