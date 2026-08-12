@@ -37,7 +37,8 @@ API (`window.I18n`):
 - `subscribe(cb)` — dil değişiminde çağrılır; app.js aktif görünümü yeniden çizmek için abone olur.
 
 Statik metin (index.html): `data-i18n="anahtar"` (textContent),
-`data-i18n-placeholder` / `data-i18n-title` (öznitelikler).
+`data-i18n-placeholder` / `data-i18n-title` / `data-i18n-aria-label` (öznitelikler —
+aria-label, yalnızca erişilebilirlik metni taşıyan öğeler [SVG harita, × kapat] için).
 Dinamik metin (app.js): İSTİSNASIZ `I18n.t(...)` üzerinden.
 
 Anahtar adlandırma: düz (nested değil), nokta ile ad alanı: `<görünüm>.<ad>`
