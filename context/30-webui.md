@@ -5,7 +5,9 @@ Yazma izni: yalnız `webui/`. React/bundler/build zinciri ÖNERME (CLAUDE.md kar
 ## Dosyalar
 - `index.html` — tüm görünümlerin iskeleti (tek sayfa, sekmeler).
 - `app.js` — tüm mantık. Görünümler: Sıralama (leaderboard; ada tık → profil),
-  Maçlar (kartlar; "Rolleri düzenle" → PUT /positions), Dengele (normal + nemesis modu),
+  Maçlar (kartlar; "Rolleri düzenle" → PUT /positions; karta tık → maç detayı:
+  rol-eşleşmeli karşılıklı stat barları, `MD_STATS`/`openMatchDetail`, GÖREV 8),
+  Dengele (normal + nemesis modu),
   Enler (haftalık kartlar + Nemesis bölümü; `TAB_OF`/`BACK_LABEL` detay-görünüm mekanizması),
   Harita (satır içi ~3KB özgün SVG, viewBox 0 0 100 100; HTML katmanında yüzde-konumlu
   baloncuk butonlar; `roleRanking`/`openRoleModal`). Profil: `openProfile` (+`esc()` XSS yardımcıcı).
