@@ -14,3 +14,6 @@ collector/.env
 
 # Kok dizindeki ham EOG teshis dosyalari (gercek PII/JWT icerir, asla commit'lenmez)
 /1734940206.json
+
+# Gorev listesi yalniz yerelde tutulur (public'e girmez)
+/new_modules.md
