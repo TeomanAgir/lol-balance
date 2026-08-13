@@ -108,7 +108,8 @@ py -m collector backfill-positions             # backend'e yaz
 backend'e yazar (LCU client'a ihtiyaç duymaz). Arşivde iki format bulunur ve ikisi de
 desteklenir: backfill'den gelen match-history kaydında açık position alanı yoktur
 (tahmin zinciri koşar), canlı EOG bloğunda vardır (`selectedPosition` doğrudan okunur,
-10/10 rol). Akış: her ham maç için rol çözümü →
+10/10 rol; bazı patch'lerde boş string gelir — o zaman `detectedTeamPosition` devralır,
+bkz. "Rol tahmini"). Akış: her ham maç için rol çözümü →
 `GET /matches` ile `source_game_id → match.id` → `GET /players` ile `puuid → player_id`
 → `PUT /matches/{id}/positions`. Sadece çözülebilen roller gönderilir (kısmi güncelleme),
 `null` kalanlar gönderilmez; böylece web UI'dan elle düzeltilmiş bir rol ezilmez.
@@ -139,9 +140,15 @@ Her adım **tam bir aday** bulursa atar; 0 veya 2+ aday varsa o rol `null` kalı
 adaylar havuzda kalır — **tahmin zorlanmaz**. Kısmi sonuç geçerlidir; eksik kalan
 roller web UI'daki maç detayından düzeltilir (`PUT /matches/{id}/positions`).
 
-- Ham veride **açık** bir position alanı (`selectedPosition`/`position`) varsa o kazanır.
-  Bu öncelik kuralı tek yerde, `normalizer.positions_from_raw()` içinde durur; hem
-  normalize yolu hem `backfill-positions` onu kullanır.
+- **Rol önceliği üç katmandır** (ingest_contract "Rol önceliği", 2026-08-13 revizyonu):
+  (a) ham veride **açık** bir position alanı (`selectedPosition`/`position`, boş olmayan)
+  varsa o kazanır; (b) açık alan boşsa Riot'un kendi tespiti **`detectedTeamPosition`**
+  kullanılır — bazı patch'lerde custom draft EOG'unda `selectedPosition` 10/10 boş string
+  gelirken bu alan 10/10 dolu gelir (kanıt: gameId 1734940206, anonimleştirilmiş fixture
+  `eog_custom_detected.json`); yalnızca kanonik rol adları kabul edilir, tanınmayan değer
+  zincire düşer; (c) ikisi de yoksa kısıt zinciri. Boş string hiçbir katmanda değer
+  değildir. Bu öncelik kuralı tek yerde, `normalizer.positions_from_raw()` içinde durur;
+  hem normalize yolu hem `backfill-positions` onu kullanır.
 - 10 gerçek maçta ölçüm: 20 takımın **19'u** 5/5 çözüldü (**98/100 pozisyon**), 20/20
   Smite taşıyıcısı doğru JUNGLE. Tek istisna 1734450310 / takım 200: kalan iki oyuncunun
   ikisi de `TOP/DUO` etiketli, ayırt edilemez → MIDDLE ve TOP null (bkz.
@@ -212,11 +219,17 @@ Fixture'lar iki sınıftır:
 |---|---|
 | `eog_custom.json`, `mh_game_custom.json`, ... | **sentetik** — yapıyı ve uç durumları (eksik stat, ms süre, dengesiz takım) belgeler |
 | `eog_custom_real.json` (gameId 1734664864) | **gerçek** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu |
+| `eog_custom_detected.json` (gameId 1734940206) | **gerçek şema, anonimleştirilmiş** EOG bloğu (yeni patch şekli): `selectedPosition` 10/10 BOŞ string, `detectedTeamPosition` 10/10 dolu — tespit katmanının kanıt maçı |
 | `mh_game_custom_real.json` (gameId 1734450310) | **gerçek** match-history kaydı: camelCase statlar, açık position yok |
 | `mh_list_page_real.json`, `champion_summary_real.json` | **gerçek** liste sayfası / champion özeti |
 
 `*_real.json` dosyaları gerçek puuid ve riot_id içerir; repo private olduğu için
 olduğu gibi tutulur (anonimleştirme, gerçek şemayı belgeleme amacını bozardı).
+GÖREV 7 sonrası kural: **yeni** fixture'lara gerçek PII girmez —
+`eog_custom_detected.json` bu yüzden deterministik anonimleştirilmiştir (puuid
+`00000000-0000-4000-8000-{N:012d}`, riot_id `PlayerNN#FAKE`, summonerId `1000+N`;
+şema, boş `selectedPosition` stringleri, `detectedTeamPosition`, spell/stat/zaman
+değerleri olduğu gibi korunur).
 Sentetik fixture'lar mevcut davranışı sabitler — gerçek şemayla farkları bilinçlidir,
 gerçek doğrulama `tests/test_real_fixtures.py` üzerinden yapılır.
 

@@ -248,6 +248,81 @@ class TestPositionInferenceIntegration:
         assert all(p.position != "JUNGLE" for p in payload.participants)
 
 
+class TestDetectedTeamPositionTier:
+    """Rol önceliğinin orta katmanı (2026-08-13, gameId 1734940206 vakası):
+    açık seçim (boş olmayan) > `detectedTeamPosition` (boş olmayan) > zincir.
+    Boş string hiçbir katmanda değer değildir."""
+
+    ROLES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
+
+    def test_eog_detected_wins_when_selected_is_empty_string(self, eog_custom):
+        """Olayın birebir şekli: selectedPosition="" + detected dolu → tespit
+        kazanır, 10/10 rol dolar."""
+        for team in eog_custom["teams"]:
+            for role, player in zip(self.ROLES, team["players"]):
+                player["selectedPosition"] = ""
+                player["detectedTeamPosition"] = role
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert [p.position for p in payload.participants] == self.ROLES * 2
+
+    def test_eog_explicit_beats_conflicting_detected(self, eog_custom):
+        """1. katman > 2. katman: dolu selectedPosition, çelişen tespiti ezer."""
+        for team in eog_custom["teams"]:
+            for player in team["players"]:
+                player["selectedPosition"] = "TOP"
+                player["detectedTeamPosition"] = "MIDDLE"
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert all(p.position == "TOP" for p in payload.participants)
+
+    def test_eog_both_empty_falls_through_to_chain(self, eog_custom):
+        """2. katman da boşsa 3. katman (zincir) aynen çalışır: EOG'de
+        lane/role yok → yalnız Smite taşıyanlar JUNGLE olur."""
+        for team in eog_custom["teams"]:
+            for index, player in enumerate(team["players"]):
+                player["selectedPosition"] = ""
+                player["detectedTeamPosition"] = ""
+                player["spell1Id"] = 11 if index == 1 else 4
+                player["spell2Id"] = 14
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert sum(1 for p in payload.participants if p.position == "JUNGLE") == 2
+        assert sum(1 for p in payload.participants if p.position is None) == 8
+
+    @pytest.mark.parametrize("garbage", ["NONE", "", "MID", "FILL", 5])
+    def test_eog_garbage_detected_falls_through_to_chain(self, eog_custom, garbage):
+        """Tanınmayan tespit değeri olduğu gibi YAYILMAZ (alias çözümü de
+        yapılmaz — "MID" bile geçersizdir): zincire düşülür."""
+        for team in eog_custom["teams"]:
+            for index, player in enumerate(team["players"]):
+                player["selectedPosition"] = ""
+                player["detectedTeamPosition"] = garbage
+                player["spell1Id"] = 11 if index == 1 else 4
+                player["spell2Id"] = 14
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert sum(1 for p in payload.participants if p.position == "JUNGLE") == 2
+        assert sum(1 for p in payload.participants if p.position is None) == 8
+
+    def test_eog_missing_detected_field_behaves_like_before(self, eog_custom):
+        """Alanın hiç olmaması (eski patch şekli) boş olmasıyla aynıdır: sentetik
+        fixture'da açık alan NONE ve tespit alanı yok → tüm roller null kalır."""
+        assert all(
+            "detectedTeamPosition" not in p
+            for t in eog_custom["teams"] for p in t["players"]
+        )
+        payload = normalize_eog(eog_custom, CAPTURED_AT)
+        assert all(p.position is None for p in payload.participants)
+
+    def test_mh_detected_wins_when_no_explicit_field(self, mh_game_custom):
+        """Orta katman match-history formatında da geçerlidir (alan bir gün
+        orada da görünürse aynı öncelik uygulanır)."""
+        for p in mh_game_custom["participants"]:
+            index = (int(p["participantId"]) - 1) % 5
+            p["detectedTeamPosition"] = self.ROLES[index]
+        payload = normalize_match_history_game(mh_game_custom)
+        for team in (100, 200):
+            roles = sorted(p.position for p in payload.participants if p.team == team)
+            assert roles == sorted(self.ROLES)
+
+
 class TestMhIsRemake:
     def test_no_winner_short_game_is_remake(self, mh_game_custom):
         mh_game_custom["gameDuration"] = 185
