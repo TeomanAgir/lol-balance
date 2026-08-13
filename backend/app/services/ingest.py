@@ -1,6 +1,7 @@
 """Ingest iş kuralları (docs/ingest_contract.md + db_schema.md kenar durumları)."""
 from __future__ import annotations
 
+import logging
 import sqlite3
 
 from fastapi import HTTPException
@@ -10,6 +11,8 @@ from . import ratings as rating_service
 from . import role_ratings as role_rating_service
 
 VOID_THRESHOLD_S = 300
+
+logger = logging.getLogger(__name__)
 
 
 def validate_rules(body: IngestMatch) -> None:
@@ -159,14 +162,34 @@ def ingest_match(
                 )
 
             if not is_void:
-                rating_service.apply_match_incremental(
-                    conn, match_id, body.winner_team, engine_version
-                )
-                # Rol evreni ayrı state uzayıdır; uygunluk kontrolü içeride
-                # yapılır, uygun değilse sessizce atlanır (GÖREV 0).
-                role_rating_service.apply_match_incremental_roles(
-                    conn, match_id, body.winner_team, engine_version
-                )
+                # Sıra-dışı geliş (api_contract §5): maç, replay sırasında sona
+                # düşmüyorsa incremental "son maçı üste uygula" varsayımı çöker.
+                # O durumda tek maç yerine HER İKİ evren baştan kurulur; replay
+                # servisleri aynen kullanılır (mantık kopyalanmaz).
+                if rating_service.is_out_of_order(conn, match_id, body.played_at):
+                    logger.info(
+                        "Sıra-dışı ingest: match_id=%s source_game_id=%s "
+                        "played_at=%s mevcut valid maçların sonunda değil; "
+                        "incremental yerine her iki evren replay ediliyor.",
+                        match_id,
+                        body.source_game_id,
+                        body.played_at,
+                    )
+                    # Not: replay/replay_roles kendi `with conn:` bloklarını
+                    # açar; iç içe sqlite3 context manager'ı dıştaki açık
+                    # transaction'ı commit eder — yani maç + replay birlikte
+                    # kalıcı olur, replay patlarsa maç da geri alınır.
+                    rating_service.replay(conn, engine_version)
+                    role_rating_service.replay_roles(conn, engine_version)
+                else:
+                    rating_service.apply_match_incremental(
+                        conn, match_id, body.winner_team, engine_version
+                    )
+                    # Rol evreni ayrı state uzayıdır; uygunluk kontrolü içeride
+                    # yapılır, uygun değilse sessizce atlanır (GÖREV 0).
+                    role_rating_service.apply_match_incremental_roles(
+                        conn, match_id, body.winner_team, engine_version
+                    )
     except sqlite3.IntegrityError as exc:
         # Eşzamanlı çift gönderim: UNIQUE(source_game_id) yarışı kaybedildi.
         if "source_game_id" in str(exc):

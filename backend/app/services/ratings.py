@@ -196,6 +196,38 @@ def apply_match_incremental(
     _apply_and_record(conn, engine, match_id, winner_team, ratings)
 
 
+def is_out_of_order(
+    conn: sqlite3.Connection, match_id: int, played_at: str
+) -> bool:
+    """Yeni kaydedilmiş valid maç, replay sırasında SONA düşmüyor mu?
+
+    Sıra-dışı ingest auto-replay'in tetik koşulu (api_contract §5). Değişmez:
+    "incremental sonuç == tam replay sonucu". Bu ancak yeni maç, replay'in
+    işleyeceği sıranın EN SONUNDA yer alıyorsa geçerlidir — çünkü incremental
+    onu mevcut rating'lerin üstüne son maç olarak uygular.
+
+    Koşul bu yüzden replay'in sıralama anahtarıyla (`ORDER BY played_at, id`,
+    aşağıda ve `role_ratings.replay_roles`'da aynısı) BİREBİR hizalıdır:
+    yeni maçtan SONRA sıralanan başka bir valid maç varsa replay gerekir.
+    Karşılaştırma SQL'de yapılır; böylece `played_at` (TEXT) üzerinde replay'in
+    ORDER BY'ı ile aynı sıralama semantiği kullanılır, Python tarafında farklı
+    bir tarih ayrıştırması devreye girmez.
+
+    Pratikte yeni maç en büyük id'ye sahiptir; o durumda ifade "mevcut valid
+    maçların played_at maksimumu, yeninin played_at'inden KESİN büyük mü"ye
+    indirgenir — yani EŞİT played_at incremental kalır, yalnız kesin eski
+    gelen maç replay tetikler. id şartı, sıralamanın ikinci anahtarını da
+    kapsayarak koşulu bu varsayımdan bağımsız kılar.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM matches "
+        "WHERE status = 'valid' AND id <> ? "
+        "AND (played_at > ? OR (played_at = ? AND id > ?)) LIMIT 1",
+        (match_id, played_at, played_at, match_id),
+    ).fetchone()
+    return row is not None
+
+
 def replay(conn: sqlite3.Connection, engine_version: str) -> int:
     """Aktif engine_version'ın rating_history'sini siler ve valid maçları
     played_at sırasıyla yeniden işler. İşlenen maç sayısını döner.
