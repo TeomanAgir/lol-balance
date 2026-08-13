@@ -187,6 +187,15 @@
     <div id="match-list" class="match-list"></div>
   </section>
 
+  <!-- ═══ Maç detayı (GÖREV 8) — sekme değil, Geçmiş'teki maç kartından açılan detay görünümü ═══ -->
+  <!-- Veri yeni bir uçtan değil, GET /matches yanıtındaki participants.stats'tan gelir;
+       görünüm tamamen app.js'te kurulur (matchDetailHtml). -->
+  <section id="view-matchdetail" class="view" hidden>
+    <!-- Geri düğmesi metnini loadMatchDetail() yazar (her zaman "Geçmiş"e döner) -->
+    <button id="btn-matchdetail-back" class="back-btn" type="button"></button>
+    <div id="matchdetail-body" aria-live="polite"></div>
+  </section>
+
   <!-- ═══ Manuel giriş ═══ -->
   <section id="view-manual" class="view" hidden>
     <p class="view-hint" data-i18n="manual.hint"></p>

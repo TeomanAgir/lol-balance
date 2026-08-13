@@ -130,6 +130,13 @@
         if (m === 1 && (i === 1 || i === 6)) part.position = null;
         // m === 0 maçında iki katılımcıda rating_change null: UI'ın "—" yolu test edilebilsin.
         if (m === 0 && (i === 2 || i === 7)) part.rating_change = null;
+        // m === 2 maçında bazı stat alanları null (contract: stats alanları nullable) —
+        // maç detayındaki (GÖREV 8) "—" + 0 genişlikte bar yolu denenebilsin.
+        if (m === 2 && i === 4) part.stats.vision_score = null;
+        if (m === 2 && i === 9) { part.stats.gold = null; part.stats.damage_to_champs = null; }
+        // m === 3 maçında mavi takımda MÜKERRER rol (iki ORMAN, TOP yok) — maç
+        // detayının rol eşleştirmesi artakalanları "?" satırına düşürmeli.
+        if (m === 3 && i === 0) part.position = "JUNGLE";
         return part;
       }),
     });

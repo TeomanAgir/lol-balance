@@ -908,6 +908,130 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .btn-save-roles { margin-top: 12px; font-size: 14px; padding: 10px 20px; min-height: 44px; }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
 
+/* ── Maç detayı (GÖREV 8) — "md-" öneki bu görünüme aittir ──
+   Kart tıklanabilir; klavye girişi başlıktaki .md-open düğmesidir. */
+.match-card { cursor: pointer; }
+.match-card .role-editor,
+.match-card .match-actions { cursor: default; }
+.md-open {
+  font: inherit;
+  color: var(--muted);
+  text-align: left;
+  padding: 0;
+}
+.md-open:hover { color: var(--brass); }
+
+.md-head {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.md-title {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.md-title .win-blue { color: var(--blue); }
+.md-title .win-red { color: var(--red); }
+.md-title .md-void { color: var(--muted); }
+.md-meta { font-size: 13px; color: var(--muted); }
+
+/* Stat seçimi: graph'ın hemen üstünde, dokunma hedefi 40px */
+.md-statbar { display: flex; gap: 8px; margin-bottom: 10px; }
+.md-statbtn {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  padding: 8px 4px;
+  min-height: 40px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  transition: color 0.15s, border-color 0.15s;
+}
+.md-statbtn:hover { color: var(--brass); border-color: var(--brass-dim); }
+.md-statbtn.active {
+  color: var(--brass);
+  border-color: var(--brass);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* Karşılıklı bar graph: sol mavi (team 100), sağ kırmızı (team 200) */
+.md-graph {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 12px 10px;
+}
+.md-row { margin-bottom: 12px; }
+.md-row:last-child { margin-bottom: 0; }
+.md-row-names {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  margin-bottom: 3px;
+  gap: 8px;
+}
+.md-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 38%;
+}
+.md-name.red { text-align: right; }
+.md-champ { color: var(--muted); font-size: 11px; }
+.md-role {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--brass-dim);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.md-bars { display: flex; align-items: center; gap: 6px; }
+.md-val {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 52px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.md-val.left { text-align: right; }
+.md-val.right { text-align: left; }
+.md-val.lead { color: var(--text); font-weight: 600; }
+.md-track { flex: 1; display: flex; height: 18px; }
+.md-half { flex: 1; position: relative; overflow: hidden; }
+.md-half.left { border-radius: 4px 0 0 4px; background: color-mix(in srgb, var(--blue) 10%, transparent); }
+.md-half.right { border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--red) 10%, transparent); }
+.md-fill { position: absolute; top: 0; bottom: 0; transition: width 0.35s ease; }
+.md-half.left .md-fill { right: 0; background: var(--blue); border-radius: 4px 0 0 4px; }
+.md-half.right .md-fill { left: 0; background: var(--red); border-radius: 0 4px 4px 0; }
+.md-center-line { width: 2px; background: var(--line); flex-shrink: 0; }
+
+/* Takım toplamı: pirinç vurgulu, ayrı çizgiyle */
+.md-total { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+.md-total .md-role { color: var(--brass); }
+
+.md-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+@media (max-width: 480px) {
+  .md-val { min-width: 42px; font-size: 11px; }
+  .md-name { max-width: 34%; font-size: 12px; }
+}
+
 /* ── Manuel giriş ── */
 .manual-list { display: flex; flex-direction: column; gap: 8px; }
 .manual-row {
