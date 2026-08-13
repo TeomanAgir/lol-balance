@@ -138,12 +138,68 @@ def test_eog_archive_uses_explicit_selected_position(config):
         assert sorted(sent_roles) == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
 
 
+def test_eog_archive_uses_detected_position_when_selected_is_empty(config):
+    """2026-08-13 vakası (gameId 1734940206) backfill yolunda: arşivlenmiş EOG'de
+    `selectedPosition` 10/10 boş string ama `detectedTeamPosition` 10/10 dolu →
+    aynı öncelik burada da geçerli, tespit edilen 10 rol gönderilir (zincir tek
+    başına yalnız 2 JUNGLE çözebilirdi)."""
+    raw = load_fixture("eog_custom_detected.json")
+    assert all(p["selectedPosition"] == "" for p in eog_players(raw))
+    write_archive(config, raw)
+    players = {p["puuid"]: pid for pid, p in enumerate(eog_players(raw), start=1)}
+    matches = [{
+        "id": 77, "source_game_id": "1734940206", "status": "valid",
+        "participants": [{"player_id": pid} for pid in players.values()],
+    }]
+    transport, calls = backend(matches, players)
+
+    stats = run_position_backfill(config, transport=transport)
+
+    body = json.loads(put_requests(calls)[0].content)
+    assert body["positions"] == {
+        str(players[p["puuid"]]): p["detectedTeamPosition"] for p in eog_players(raw)
+    }
+    assert len(body["positions"]) == 10
+    assert stats.matched == 1 and stats.updated == 1 and stats.positions_sent == 10
+    assert stats.unresolved == 0 and stats.unknown_players == 0 and stats.errors == []
+    for team_slice in (slice(0, 5), slice(5, 10)):
+        sent_roles = [body["positions"][str(players[p["puuid"]])]
+                      for p in eog_players(raw)[team_slice]]
+        assert sorted(sent_roles) == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+
+def test_eog_archive_explicit_position_still_beats_detected(config):
+    """Regresyon: dolu `selectedPosition` taşıyan eski arşiv EOG'unda (gameId
+    1734664864) davranış DEĞİŞMEDİ — çelişen bir tespit değeri eklense bile
+    gönderilen roller açık alandan gelir (1. katman > 2. katman)."""
+    raw = load_fixture("eog_custom_real.json")
+    for p in eog_players(raw):
+        p["detectedTeamPosition"] = "TOP" if p["selectedPosition"] != "TOP" else "MIDDLE"
+    write_archive(config, raw)
+    players = {p["puuid"]: pid for pid, p in enumerate(eog_players(raw), start=1)}
+    matches = [{
+        "id": 42, "source_game_id": "1734664864", "status": "valid",
+        "participants": [{"player_id": pid} for pid in players.values()],
+    }]
+    transport, calls = backend(matches, players)
+
+    run_position_backfill(config, transport=transport)
+
+    body = json.loads(put_requests(calls)[0].content)
+    assert body["positions"] == {
+        str(players[p["puuid"]]): p["selectedPosition"] for p in eog_players(raw)
+    }
+
+
 def test_eog_archive_without_explicit_position_falls_back_to_inference(config):
-    """Açık alan boş/geçersizse (eski LCU sürümü) zincir devreye girer: EOG'de
-    lane/role olmadığından yalnızca Smite taşıyanlar JUNGLE olarak gider."""
+    """Açık alan VE Riot tespiti boş/geçersizse (eski LCU sürümü) zincir devreye
+    girer: EOG'de lane/role olmadığından yalnızca Smite taşıyanlar JUNGLE olarak
+    gider. (2026-08-13'ten beri tespit alanı 2. katmandır; zincirin koşması için
+    onun da boşaltılması gerekir — gerçek fixture'da ikisi de dolu.)"""
     raw = load_fixture("eog_custom_real.json")
     for p in eog_players(raw):
         p["selectedPosition"] = "NONE"
+        p["detectedTeamPosition"] = "NONE"
     write_archive(config, raw)
     players = {p["puuid"]: pid for pid, p in enumerate(eog_players(raw), start=1)}
     matches = [{

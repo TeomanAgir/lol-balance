@@ -4,10 +4,12 @@
 
 Akış:
 1. `raw_archive/*.json` içindeki her ham maç için roller çözülür
-   (`normalizer.positions_from_raw`: açık `selectedPosition` alanı kazanır, yoksa
-   `role_infer` kısıt zinciri). Arşivde iki format bulunur — backfill'den gelen
-   match-history kaydında açık alan yoktur (zincir koşar), canlı EOG bloğunda
-   vardır (10/10 rol doğrudan okunur).
+   (`normalizer.positions_from_raw`: açık `selectedPosition` alanı kazanır,
+   boşsa Riot tespiti `detectedTeamPosition`, o da yoksa `role_infer` kısıt
+   zinciri — ingest_contract "Rol önceliği", 2026-08-13 revizyonu). Arşivde iki
+   format bulunur — backfill'den gelen match-history kaydında açık alan yoktur
+   (zincir koşar), canlı EOG bloğunda vardır (10/10 rol doğrudan okunur; bazı
+   patch'lerde `selectedPosition` boş gelir ve tespit katmanı devralır).
 2. `GET /api/v1/matches` ile `source_game_id → match.id` eşlenir.
 3. `GET /api/v1/players` ile `puuid → player_id` eşlenir (api_contract §2).
 4. `PUT /api/v1/matches/{id}/positions` ile `{"positions": {"<player_id>": "ROL"}}`

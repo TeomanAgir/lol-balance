@@ -70,17 +70,45 @@ def normalize_position(value: Any) -> Optional[str]:
 
 
 def _explicit_position(raw_player: dict[str, Any]) -> Optional[str]:
-    """Bir katılımcının AÇIK position alanı (tahmin yok)."""
+    """Bir katılımcının AÇIK position alanı (tahmin yok) — 1. katman."""
     return normalize_position(raw_player.get("selectedPosition") or raw_player.get("position"))
 
 
-def _explicit_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
-    """Ham maçtaki açık position alanları → `{key: rol}`.
+def _detected_position(raw_player: dict[str, Any]) -> Optional[str]:
+    """Riot'un kendi tespiti `detectedTeamPosition` — 2. katman (2026-08-13).
+
+    Makine alanıdır: yalnızca kanonik rol adları (VALID_POSITIONS) kabul edilir,
+    alias çözümü YAPILMAZ ("MID" gibi tanınmayan bir değer olduğu gibi
+    yayılamaz). Boş/NONE/tanınmayan her şey None döner → zincire düşülür.
+    """
+    value = raw_player.get("detectedTeamPosition")
+    if not value or not isinstance(value, str):
+        return None
+    upper = value.strip().upper()
+    return upper if upper in VALID_POSITIONS else None
+
+
+def _declared_position(raw_player: dict[str, Any]) -> Optional[str]:
+    """Ham katılımcı kaydında BEYAN edilen rol: açık seçim > Riot tespiti.
+
+    Rol önceliğinin ilk iki katmanı (ingest_contract "Rol önceliği",
+    2026-08-13 revizyonu): (a) `selectedPosition`/`position` boş değilse o
+    kazanır; (b) boşsa `detectedTeamPosition` kullanılır — bazı patch'lerde
+    custom draft EOG'unda `selectedPosition` 10/10 boş string gelirken
+    `detectedTeamPosition` 10/10 dolu gelir (kanıt: gameId 1734940206).
+    Boş string hiçbir katmanda değer DEĞİLDİR. İkisi de yoksa None → 3. katman
+    (kısıt zinciri) `positions_from_raw`'da devrededir.
+    """
+    return _explicit_position(raw_player) or _detected_position(raw_player)
+
+
+def _declared_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
+    """Ham maçtaki beyan edilen position alanları (açık > tespit) → `{key: rol}`.
 
     Anahtarlama `role_infer.infer_positions` ile BİREBİR aynıdır (puuid varsa
     puuid, yoksa participantId/index) — iki sözlük bu sayede birleştirilebilir.
     """
-    explicit: dict[Any, Optional[str]] = {}
+    declared: dict[Any, Optional[str]] = {}
 
     if raw.get("participants"):  # match-history formatı
         identities: dict[int, dict[str, Any]] = {}
@@ -96,27 +124,29 @@ def _explicit_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
                 participant_id = index
             player = identities.get(participant_id, {})
             key = player.get("puuid") or p.get("puuid") or participant_id
-            explicit[key] = _explicit_position(p)
-        return explicit
+            declared[key] = _declared_position(p)
+        return declared
 
     index = 0  # EOG formatı
     for team in raw.get("teams") or []:
         for player in team.get("players") or []:
-            explicit[player.get("puuid") or index] = _explicit_position(player)
+            declared[player.get("puuid") or index] = _declared_position(player)
             index += 1
-    return explicit
+    return declared
 
 
 def positions_from_raw(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
     """Ham maç (EOG veya match-history) → `{key: rol veya None}`.
 
-    Öncelik kuralı TEK YERDE burada durur: **açık position alanı kazanır**, yoksa
-    `role_infer` kısıt zincirinin sonucu kullanılır, o da çözemezse None kalır
-    (tahmin ZORLANMAZ — GÖREV 0). `normalize_eog`, `normalize_match_history_game`
-    ve `backfill_positions` aynı sonucu almak için bu fonksiyonu kullanır.
+    Öncelik kuralı TEK YERDE burada durur (üç katman, 2026-08-13 revizyonu):
+    **açık position alanı kazanır**, boşsa **Riot tespiti `detectedTeamPosition`**
+    kullanılır, o da yoksa `role_infer` kısıt zincirinin sonucu kullanılır,
+    zincir de çözemezse None kalır (tahmin ZORLANMAZ — GÖREV 0). `normalize_eog`,
+    `normalize_match_history_game` ve `backfill_positions` aynı sonucu almak
+    için bu fonksiyonu kullanır.
     """
     resolved = dict(infer_positions(raw))
-    for key, position in _explicit_positions(raw).items():
+    for key, position in _declared_positions(raw).items():
         if position:
             resolved[key] = position
     return resolved
@@ -219,7 +249,8 @@ def normalize_eog(
     teams = raw.get("teams") or []
     winner_team: Optional[int] = None
     participants: list[Participant] = []
-    # Açık position kazanır, yoksa kısıt-çözümlü rol tahmini (GÖREV 0).
+    # Açık position kazanır, boşsa Riot tespiti (detectedTeamPosition), yoksa
+    # kısıt-çözümlü rol tahmini (GÖREV 0 + 2026-08-13 revizyonu).
     # `views_from_eog` ile aynı sırada gezildiğimiz için index anahtarı tutar.
     resolved_positions = positions_from_raw(raw)
     player_index = 0
@@ -249,7 +280,7 @@ def normalize_eog(
                         player.get("summonerName"),
                     ),
                     team=int(player.get("teamId") or team_id),
-                    # Açık position varsa o kazanır; yoksa kısıt-çözümlü tahmin
+                    # Açık position > Riot tespiti > kısıt-çözümlü tahmin
                     position=position_for(resolved_positions, puuid, index_key),
                     champion=champion or None,
                     stats=_extract_stats(player.get("stats") or {}),
@@ -333,7 +364,7 @@ def normalize_match_history_game(
     for identity in raw.get("participantIdentities") or []:
         identities[int(identity.get("participantId", -1))] = identity.get("player") or {}
 
-    # açık position kazanır, yoksa kısıt-çözümlü rol tahmini (GÖREV 0)
+    # açık position > Riot tespiti > kısıt-çözümlü rol tahmini (GÖREV 0 + 2026-08-13)
     resolved_positions = positions_from_raw(raw)
 
     participants: list[Participant] = []

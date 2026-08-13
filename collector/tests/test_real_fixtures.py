@@ -9,6 +9,13 @@ Sentetik fixture'lar (`mh_game_custom.json` vb.) yapıyı belgeler; buradaki
   İKİSİ DE dolu ve tutarlı, `championName` payload'ın içinde (champion_map
   gerekmez), `queueId` alanı HİÇ YOK ve `queueType` "NORMAL" — custom tespiti
   yalnızca `gameType == "CUSTOM_GAME"` ile mümkün.
+- `eog_custom_detected.json`: harici kullanıcının client'ından yakalanmış gerçek
+  EOG bloğunun ANONİMLEŞTİRİLMİŞ kopyası (gameId 1734940206, 2026-08-13 ACİL
+  vakası — yeni patch şekli). `selectedPosition` 10/10 BOŞ string,
+  `detectedTeamPosition` 10/10 dolu ve takım başına tam rol seti; Smite
+  taşıyıcıları tespit edilen iki JUNGLE. GÖREV 7 sonrası kural gereği kimlikler
+  deterministik sahtedir: puuid `00000000-0000-4000-8000-{N:012d}`, riot_id
+  `PlayerNN#FAKE`, summonerId `1000+N` (şema/gameId/spell/stat/zaman korunur).
 - `mh_game_custom_real.json`: 10 kişilik gerçek custom maç (gameId 1734450310).
   Statlar camelCase, açık position alanı yok, puuid'ler participantIdentities'te.
 - `mh_list_page_real.json`: gerçek match-history liste sayfası (21 maç).
@@ -49,6 +56,11 @@ REAL_EOG_CAPTURED_AT = datetime(2026, 8, 12, 9, 0, 0, tzinfo=timezone.utc)
 @pytest.fixture
 def eog_custom_real():
     return load_fixture("eog_custom_real.json")
+
+
+@pytest.fixture
+def eog_custom_detected():
+    return load_fixture("eog_custom_detected.json")
 
 
 @pytest.fixture
@@ -219,6 +231,121 @@ class TestNormalizeRealEog:
         actual = {p.riot_id: p.team for p in payload.participants}
         expected = {rid: team for rid, (team, _, _) in REAL_EOG_ROSTER.items()}
         assert actual == expected
+
+    def test_selected_position_still_wins_over_conflicting_detected(self, eog_custom_real):
+        """Regresyon (2026-08-13 tespit katmanı): dolu `selectedPosition` her
+        şeyi kazanmaya devam eder — çelişen bir `detectedTeamPosition` bile onu
+        EZEMEZ (1. katman > 2. katman)."""
+        conflict = {"TOP": "MIDDLE", "JUNGLE": "TOP", "MIDDLE": "JUNGLE",
+                    "BOTTOM": "UTILITY", "UTILITY": "BOTTOM"}
+        for team in eog_custom_real["teams"]:
+            for player in team["players"]:
+                player["detectedTeamPosition"] = conflict[player["selectedPosition"]]
+        payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
+        actual = {p.riot_id: p.position for p in payload.participants}
+        expected = {rid: pos for rid, (_, pos, _) in REAL_EOG_ROSTER.items()}
+        assert actual == expected
+
+
+#: gameId 1734940206'nın anonimleştirilmiş kadrosu (takım gezinme sırasında):
+#: riot_id → (team, detectedTeamPosition, championName). Smite: Player02, Player07.
+DETECTED_EOG_ROSTER = {
+    "Player01#FAKE": (200, "TOP", "Tahm Kench"),
+    "Player02#FAKE": (200, "JUNGLE", "Skarner"),
+    "Player03#FAKE": (200, "MIDDLE", "Yone"),
+    "Player04#FAKE": (200, "BOTTOM", "Yasuo"),
+    "Player05#FAKE": (200, "UTILITY", "Malphite"),
+    "Player06#FAKE": (100, "TOP", "Volibear"),
+    "Player07#FAKE": (100, "JUNGLE", "Rek'Sai"),
+    "Player08#FAKE": (100, "MIDDLE", "LeBlanc"),
+    "Player09#FAKE": (100, "BOTTOM", "Yunara"),
+    "Player10#FAKE": (100, "UTILITY", "Blitzcrank"),
+}
+
+
+class TestNormalizeDetectedEog:
+    """2026-08-13 ACİL vakasının repro'su (gameId 1734940206, anonim fixture).
+
+    Olay: harici client'ın EOG'unda `selectedPosition` 10/10 boş string geldi;
+    eski davranışta yalnız Smite taşıyanlar JUNGLE alıyor, 8 rol null kalıyordu.
+    Yeni orta katman (`detectedTeamPosition`) ile 10/10 rol dolmalıdır.
+    """
+
+    def test_incident_shape_is_preserved_in_fixture(self, eog_custom_detected):
+        """Fixture olayın şeklini birebir belgeler: açık alan 10/10 boş string
+        (yok değil, BOŞ), Riot tespiti 10/10 dolu ve takım başına tam rol seti."""
+        players = [p for t in eog_custom_detected["teams"] for p in t["players"]]
+        assert len(players) == 10
+        assert all(p["selectedPosition"] == "" for p in players)
+        assert all(p["detectedTeamPosition"] for p in players)
+        for team in eog_custom_detected["teams"]:
+            detected = sorted(p["detectedTeamPosition"] for p in team["players"])
+            assert detected == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+    def test_contract_shape(self, eog_custom_detected):
+        payload = normalize_eog(eog_custom_detected, REAL_EOG_CAPTURED_AT)
+        assert payload.source == "lcu_eog"
+        assert payload.source_game_id == "1734940206"
+        assert payload.duration_s == 1567
+        assert payload.winner_team == 100
+        assert len(payload.participants) == 10
+        assert sum(1 for p in payload.participants if p.team == 100) == 5
+        assert sum(1 for p in payload.participants if p.team == 200) == 5
+        assert is_custom(eog_custom_detected) is True
+
+    def test_all_positions_come_from_detected_team_position(self, eog_custom_detected):
+        """Olayın yeşile dönmesi: 10/10 pozisyon dolu ve ham
+        `detectedTeamPosition` değerleriyle BİREBİR aynı."""
+        payload = normalize_eog(eog_custom_detected, REAL_EOG_CAPTURED_AT)
+        actual = {p.riot_id: p.position for p in payload.participants}
+        expected = {rid: pos for rid, (_, pos, _) in DETECTED_EOG_ROSTER.items()}
+        assert actual == expected
+        assert all(p.position is not None for p in payload.participants)
+        for team in (100, 200):
+            roles = sorted(p.position for p in payload.participants if p.team == team)
+            assert roles == ["BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"]
+
+    def test_smite_carriers_are_the_detected_jungles(self, eog_custom_detected):
+        """Tespit alanının iç tutarlılığı: Smite taşıyan tam 2 kişi var ve
+        ikisi de detectedTeamPosition=JUNGLE — katman zincirle çelişmiyor."""
+        carriers = [
+            p for team in eog_custom_detected["teams"] for p in team["players"]
+            if SMITE_SPELL_ID in (p["spell1Id"], p["spell2Id"])
+        ]
+        assert len(carriers) == 2
+        assert all(p["detectedTeamPosition"] == "JUNGLE" for p in carriers)
+        payload = normalize_eog(eog_custom_detected, REAL_EOG_CAPTURED_AT)
+        jungles = {p.riot_id for p in payload.participants if p.position == "JUNGLE"}
+        assert jungles == {"Player02#FAKE", "Player07#FAKE"}
+
+    def test_fixture_is_anonymized(self, eog_custom_detected):
+        """GÖREV 7 sonrası kural: repoya gerçek PII girmez. Kimlikler
+        deterministik sahte kalıptadır; localPlayer ve chat alanları dahil."""
+        players = [p for t in eog_custom_detected["teams"] for p in t["players"]]
+        for n, p in enumerate(players, start=1):
+            assert p["puuid"] == f"00000000-0000-4000-8000-{n:012d}"
+            assert p["riotIdGameName"] == f"Player{n:02d}"
+            assert p["riotIdTagLine"] == "FAKE"
+            assert p["summonerId"] == 1000 + n
+        local = eog_custom_detected["localPlayer"]
+        assert local["puuid"].startswith("00000000-0000-4000-8000-")
+        assert local["riotIdTagLine"] == "FAKE"
+        # chat kimlik bilgileri (JWT, gerçek puuid gömer) da sahte olmalı
+        assert eog_custom_detected["mucJwtDto"]["jwt"] == "FAKE.FAKE.FAKE"
+        assert eog_custom_detected["multiUserChatPassword"] == "FAKE.FAKE.FAKE"
+
+    def test_played_at_from_end_of_game_timestamp(self, eog_custom_detected):
+        assert eog_custom_detected["endOfGameTimestamp"] == 1786575136925
+        payload = normalize_eog(eog_custom_detected, REAL_EOG_CAPTURED_AT)
+        assert payload.played_at == "2026-08-12T22:52:16Z"
+
+    def test_all_stats_populated_from_upper_snake_keys(self, eog_custom_detected):
+        payload = normalize_eog(eog_custom_detected, REAL_EOG_CAPTURED_AT)
+        for p in payload.participants:
+            for field in STAT_FIELDS:
+                assert getattr(p.stats, field) is not None, (
+                    f"{field} None kaldı ({p.riot_id!r})"
+                )
 
 
 class TestNormalizeRealMatchHistoryGame:
