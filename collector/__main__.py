@@ -2,8 +2,13 @@
 
 Canlı mod:    python -m collector            (exe: çift tıklama)
 Backfill:     python -m collector --backfill [--since YYYY-MM-DD]
+              python -m collector backfill  [--since YYYY-MM-DD]   (aynısı)
 Rol backfill: python -m collector backfill-positions [--dry-run]
 Kurulum:      python -m collector --setup    (.env'i yeniden oluşturur)
+
+Canlı mod, LCU'ya her bağlandığında canlı döngüden ÖNCE sınırlı bir "oto-yetişme"
+backfill'i koşar (son `CATCHUP_DAYS` gün, varsayılan 14, `0` = kapalı) — böylece
+collector kapalıyken oynanan custom'lar da toplanır (bkz. catchup.py).
 
 Paketlenmiş exe'de (`sys.frozen`) tüm kalıcı dosyalar exe'nin yanındadır ve
 `.env` yoksa ilk açılış sihirbazı çalışır (bkz. wizard.py).
@@ -22,6 +27,7 @@ from datetime import date
 from . import __version__, i18n
 from .backfill import run_backfill
 from .backfill_positions import run_position_backfill
+from .catchup import run_catchup
 from .config import app_dir, find_env_file, is_frozen, load_config
 from .i18n import msg
 from .lcu import HttpLcuClient
@@ -45,6 +51,11 @@ def _parse_since(value: str) -> date:
         raise argparse.ArgumentTypeError(msg("cli.since_format", value=repr(value)))
 
 
+def _wants_backfill(args: argparse.Namespace) -> bool:
+    """`--backfill` bayrağı ve pozisyonel `backfill` komutu aynı moddur (alias)."""
+    return bool(args.backfill) or args.command == "backfill"
+
+
 def _mode_label(args: argparse.Namespace) -> str:
     if args.setup:
         return msg("cli.mode.setup")
@@ -52,7 +63,7 @@ def _mode_label(args: argparse.Namespace) -> str:
         return msg("cli.mode.backfill_positions") + (
             msg("cli.mode.dry_run_suffix") if args.dry_run else ""
         )
-    if args.backfill:
+    if _wants_backfill(args):
         return msg("cli.mode.backfill")
     return msg("cli.mode.live")
 
@@ -78,8 +89,8 @@ def _ensure_env(force_setup: bool = False) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="collector", description=msg("cli.description"))
-    parser.add_argument("command", nargs="?", choices=["backfill-positions"], default=None,
-                        help=msg("cli.help.command"))
+    parser.add_argument("command", nargs="?", choices=["backfill", "backfill-positions"],
+                        default=None, help=msg("cli.help.command"))
     parser.add_argument("--backfill", action="store_true", help=msg("cli.help.backfill"))
     parser.add_argument("--since", type=_parse_since, default=None, metavar="YYYY-MM-DD",
                         help=msg("cli.help.since"))
@@ -126,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sender = Sender(config)
 
-    if args.backfill:
+    if _wants_backfill(args):
         try:
             info = read_lockfile(config.lol_dir)
         except LockfileNotFound as exc:
@@ -161,6 +172,9 @@ def main(argv: list[str] | None = None) -> int:
             lcu = HttpLcuClient(info)
             runner = LiveRunner(config, lcu, sender)
             try:
+                # Her bağlantıda (ilk + yeniden) canlı döngüden ÖNCE sınırlı
+                # yetişme; hata yutulur, canlı mod engellenmez (catchup.py).
+                run_catchup(config, lcu, sender)
                 runner.poll_forever()
             except LcuConnectionLost:
                 log.info("LCU connection lost, will reconnect...")

@@ -50,3 +50,7 @@ class FakeLcu:
 
     def get_champion_summary(self) -> list[dict[str, Any]]:
         return self._champions
+
+    def close(self) -> None:
+        """HttpLcuClient.close() karşılığı — CLI'ın finally blokları bunu çağırır."""
+        self.closed = True
