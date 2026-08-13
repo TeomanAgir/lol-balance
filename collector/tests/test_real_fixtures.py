@@ -9,6 +9,16 @@ Sentetik fixture'lar (`mh_game_custom.json` vb.) yapıyı belgeler; buradaki
   İKİSİ DE dolu ve tutarlı, `championName` payload'ın içinde (champion_map
   gerekmez), `queueId` alanı HİÇ YOK ve `queueType` "NORMAL" — custom tespiti
   yalnızca `gameType == "CUSTOM_GAME"` ile mümkün.
+
+Kimlik anonimliği (GÖREV 7, repo public): `*_real.json` fixture'larının ŞEMASI ve
+verisi gerçektir, yalnız KİMLİKLERİ deterministik olarak sahtelenmiştir —
+puuid `00000000-0000-4000-8000-{N:012d}`, riot_id `PlayerNN#FAKE`, summonerId
+`1000+N`, accountId `2000+N`. Aynı gerçek kişi üç dosyada da AYNI N'yi alır
+(ör. `Player11` hem `eog_custom_real` hem `mh_list_page_real` içinde aynı kişi).
+Numaralandırma 11'den başlar: 01-10 `eog_custom_detected.json`'daki BAŞKA maçın
+oyuncularına ayrılmıştır, çakışma yanlış "aynı kişi" izlenimi verirdi.
+gameId'ler, zaman damgaları, statlar, şampiyon/spell/position alanları ve şema
+sırası hiç değişmedi.
 - `eog_custom_detected.json`: harici kullanıcının client'ından yakalanmış gerçek
   EOG bloğunun ANONİMLEŞTİRİLMİŞ kopyası (gameId 1734940206, 2026-08-13 ACİL
   vakası — yeni patch şekli). `selectedPosition` 10/10 BOŞ string,
@@ -83,18 +93,19 @@ def real_champion_map(champion_summary_real):
     return champion_map_from_summary(champion_summary_real)
 
 
-#: gameId 1734664864'ün gerçek kadrosu: riot_id → (team, selectedPosition, championName)
+#: gameId 1734664864'ün kadrosu (kimlikler anonim, takım gezinme sırasında):
+#: riot_id → (team, selectedPosition, championName). Smite: Player13, Player17.
 REAL_EOG_ROSTER = {
-    "YANSIMA#TR1": (100, "TOP", "Riven"),
-    "II RYUKEN II#PNTHR": (100, "JUNGLE", "Quinn"),
-    "SauronunAgzi#3791": (100, "MIDDLE", "Hwei"),
-    "Śhade#TR1": (100, "BOTTOM", "Jhin"),
-    "Kati#TR22": (100, "UTILITY", "Vex"),
-    "DEPRESSED THUGG#1616": (200, "TOP", "Renekton"),
-    "kimsesiz34#7823": (200, "JUNGLE", "Viego"),
-    "Konna Netlaka#1703": (200, "MIDDLE", "Aurelion Sol"),
-    "Çizgi Hükümdarı#PNTHR": (200, "BOTTOM", "Caitlyn"),
-    "YETİ VE PİÇİ#TR1": (200, "UTILITY", "Seraphine"),
+    "Player12#FAKE": (100, "TOP", "Riven"),
+    "Player13#FAKE": (100, "JUNGLE", "Quinn"),
+    "Player14#FAKE": (100, "MIDDLE", "Hwei"),
+    "Player11#FAKE": (100, "BOTTOM", "Jhin"),
+    "Player15#FAKE": (100, "UTILITY", "Vex"),
+    "Player16#FAKE": (200, "TOP", "Renekton"),
+    "Player17#FAKE": (200, "JUNGLE", "Viego"),
+    "Player18#FAKE": (200, "MIDDLE", "Aurelion Sol"),
+    "Player19#FAKE": (200, "BOTTOM", "Caitlyn"),
+    "Player20#FAKE": (200, "UTILITY", "Seraphine"),
 }
 
 
@@ -160,7 +171,7 @@ class TestNormalizeRealEog:
             for p in team["players"]
             if SMITE_SPELL_ID in (p["spell1Id"], p["spell2Id"])
         }
-        assert carriers == {"II RYUKEN II#PNTHR", "kimsesiz34#7823"}
+        assert carriers == {"Player13#FAKE", "Player17#FAKE"}
         payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
         for p in payload.participants:
             if p.riot_id in carriers:
@@ -175,10 +186,10 @@ class TestNormalizeRealEog:
                     f"{field} None kaldı ({p.riot_id!r}) — UPPER_SNAKE stat eşlemesi kırılmış"
                 )
 
-    def test_exact_stats_for_yansima(self, eog_custom_real):
+    def test_exact_stats_for_top_laner(self, eog_custom_real):
         """Fixture'dan okunan gerçek değerler (kaymayı yakalamak için elle sabit)."""
         payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
-        p = next(p for p in payload.participants if p.riot_id == "YANSIMA#TR1")
+        p = next(p for p in payload.participants if p.riot_id == "Player12#FAKE")
         assert p.team == 100
         assert p.champion == "Riven"
         assert p.position == "TOP"
@@ -193,7 +204,7 @@ class TestNormalizeRealEog:
     def test_exact_stats_for_zero_kill_support(self, eog_custom_real):
         """0 değeri None'a düşmemeli (falsy tuzağı) — bu maçta destek 0/9/17."""
         payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
-        p = next(p for p in payload.participants if p.riot_id == "YETİ VE PİÇİ#TR1")
+        p = next(p for p in payload.participants if p.riot_id == "Player20#FAKE")
         assert p.stats.kills == 0
         assert p.stats.deaths == 9
         assert p.stats.assists == 17
@@ -225,6 +236,22 @@ class TestNormalizeRealEog:
             assert name and tag
         assert {p.riot_id for p in payload.participants} == set(REAL_EOG_ROSTER)
         assert len({p.puuid for p in payload.participants}) == 10
+
+    def test_fixture_is_anonymized(self, eog_custom_real):
+        """GÖREV 7 kuralı: repoya gerçek PII girmez. Kimlikler deterministik
+        sahte kalıptadır (localPlayer ve chat alanları dahil); şema/stat/zaman
+        alanları gerçek kalır."""
+        players = [p for t in eog_custom_real["teams"] for p in t["players"]]
+        players.append(eog_custom_real["localPlayer"])
+        for p in players:
+            n = int(p["riotIdGameName"].removeprefix("Player"))
+            assert p["riotIdGameName"] == f"Player{n:02d}"
+            assert p["riotIdTagLine"] == "FAKE"
+            assert p["puuid"] == f"00000000-0000-4000-8000-{n:012d}"
+            assert p["summonerId"] == 1000 + n
+        # chat kimlik bilgileri (JWT gerçek puuid gömer) de sahte olmalı
+        assert eog_custom_real["mucJwtDto"]["jwt"] == "FAKE.FAKE.FAKE"
+        assert eog_custom_real["multiUserChatPassword"] == "FAKE.FAKE.FAKE"
 
     def test_teams_assigned_from_player_team_id(self, eog_custom_real):
         payload = normalize_eog(eog_custom_real, REAL_EOG_CAPTURED_AT)
@@ -403,15 +430,15 @@ class TestNormalizeRealMatchHistoryGame:
         assert sorted(v for v in team_100.values() if v) == [
             "BOTTOM", "JUNGLE", "MIDDLE", "TOP", "UTILITY"
         ]
-        assert team_100["SoSiSwithSaLaM#TR1"] == "JUNGLE"  # Smite taşıyan
+        assert team_100["Player21#FAKE"] == "JUNGLE"  # Smite taşıyan
 
         team_200 = {p.riot_id: p.position for p in payload.participants if p.team == 200}
-        assert team_200["YANSIMANIN OĞLU#4634"] == "JUNGLE"
-        assert team_200["Fugori#3818"] == "BOTTOM"
-        assert team_200["Çizgi Hükümdarı#PNTHR"] == "UTILITY"
+        assert team_200["Player23#FAKE"] == "JUNGLE"
+        assert team_200["Player24#FAKE"] == "BOTTOM"
+        assert team_200["Player19#FAKE"] == "UTILITY"
         # belirsiz kalan iki oyuncu — null gider, insan UI'dan düzeltir
-        assert team_200["ıııııMMAMMıııııı#TR1"] is None
-        assert team_200["Śhade#TR1"] is None
+        assert team_200["Player22#FAKE"] is None
+        assert team_200["Player11#FAKE"] is None
 
     def test_no_duplicate_position_within_team(self, mh_game_custom_real):
         """Zincir aynı rolü bir takımda iki kez atamamalı."""
@@ -448,6 +475,55 @@ class TestIsCustomOnRealListPage:
         # Tuzağın gerçekten fixture'da var olduğunu kanıtla: en az bir custom
         # maç sıfırdan farklı queueId taşıyor.
         assert seen_nonzero_custom_queue
+
+
+class TestFixtureAnonymity:
+    """Anonimlik değişmezleri (GÖREV 7): kimlikler sahte AMA dosyalar arasında
+    tutarlı — aynı kişi her fixture'da aynı `PlayerNN`/puuid'i taşır."""
+
+    def test_match_history_identities_follow_the_fake_pattern(
+        self, mh_game_custom_real, mh_list_page_real
+    ):
+        identities = [i["player"] for i in mh_game_custom_real["participantIdentities"]]
+        identities += [
+            i["player"]
+            for game in mh_list_page_real["games"]["games"]
+            for i in game["participantIdentities"]
+        ]
+        assert len(identities) == 31  # 10 + 21 (fixture bütünlüğü)
+        for player in identities:
+            n = int(player["gameName"].removeprefix("Player"))
+            assert player["gameName"] == f"Player{n:02d}"
+            assert player["tagLine"] == "FAKE"
+            assert player["puuid"] == f"00000000-0000-4000-8000-{n:012d}"
+            assert player["summonerId"] == 1000 + n
+        assert mh_list_page_real["accountId"] == 2011  # Player11'in hesabı
+
+    def test_same_player_maps_to_same_identity_across_fixtures(
+        self, eog_custom_real, mh_game_custom_real, mh_list_page_real
+    ):
+        """Eşleme deterministik: fixture'lar arası ortak oyuncular aynı kimliği
+        paylaşır (Player11 üç dosyada da aynı kişi)."""
+        eog = {
+            f"{p['riotIdGameName']}#{p['riotIdTagLine']}": p["puuid"]
+            for team in eog_custom_real["teams"]
+            for p in team["players"]
+        }
+        mh_game = {
+            f"{i['player']['gameName']}#{i['player']['tagLine']}": i["player"]["puuid"]
+            for i in mh_game_custom_real["participantIdentities"]
+        }
+        mh_list = {
+            f"{i['player']['gameName']}#{i['player']['tagLine']}": i["player"]["puuid"]
+            for game in mh_list_page_real["games"]["games"]
+            for i in game["participantIdentities"]
+        }
+        shared = set(eog) & set(mh_game)
+        assert len(shared) >= 5  # iki maçta da oynayan oyuncular
+        for riot_id in shared:
+            assert eog[riot_id] == mh_game[riot_id]
+        assert set(mh_list) == {"Player11#FAKE"}
+        assert mh_list["Player11#FAKE"] == eog["Player11#FAKE"]
 
 
 class TestRealChampionSummary:

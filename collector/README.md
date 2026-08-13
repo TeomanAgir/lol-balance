@@ -90,10 +90,20 @@ Kendi hesabının LCU match history'sini sayfalayarak geriye tarar; custom olan 
 **roster filtresinden** geçen maçları normalize edip gönderir.
 
 - Bilinen oyuncu kümesi = backend `GET /players` (riot_id) ∪ `collector/seed_roster.json`.
-- Sistem boşken ilk backfill için `seed_roster.json` dosyasını elle doldurun:
-  ```json
-  ["Teoman#TR1", "Kaan#TR1", "Mert#EUW"]
+- `seed_roster.json` repo'da **boş** (`[]`) gelir; şablonu
+  [`seed_roster.example.json`](seed_roster.example.json) dosyasındadır. Backend'de
+  oyuncu varsa dosyaya hiç dokunmanız gerekmez (küme backend'den gelir); dosya boş
+  ya da hiç yoksa collector düzgün çalışır.
+- Sistem tamamen boşken (backend'de de oyuncu yokken) ilk backfill için dosyayı
+  elle doldurun — düz riot_id listesi:
+  ```powershell
+  copy collector\seed_roster.example.json collector\seed_roster.json
   ```
+  ```json
+  ["Player01#TR1", "Player02#TR1", "Player03#EUW"]
+  ```
+  > Bu dosya arkadaşlarınızın gerçek Riot ID'lerini taşır; public bir fork'a
+  > doldurulmuş halde commit etmeyin.
 - Maçın 10 katılımcısından en az `MIN_KNOWN` (default 6) tanesi bilinen kümedeyse maç
   gönderilir. Bilinmeyen katılımcılar backend'de otomatik oyuncu kaydı oluşturur.
 - Çift gönderim zararsızdır: idempotency backend'de `source_game_id` ile sağlanır;
@@ -227,18 +237,22 @@ Fixture'lar iki sınıftır:
 | Dosya | Ne belgeler |
 |---|---|
 | `eog_custom.json`, `mh_game_custom.json`, ... | **sentetik** — yapıyı ve uç durumları (eksik stat, ms süre, dengesiz takım) belgeler |
-| `eog_custom_real.json` (gameId 1734664864) | **gerçek** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu |
-| `eog_custom_detected.json` (gameId 1734940206) | **gerçek şema, anonimleştirilmiş** EOG bloğu (yeni patch şekli): `selectedPosition` 10/10 BOŞ string, `detectedTeamPosition` 10/10 dolu — tespit katmanının kanıt maçı |
-| `mh_game_custom_real.json` (gameId 1734450310) | **gerçek** match-history kaydı: camelCase statlar, açık position yok |
+| `eog_custom_real.json` (gameId 1734664864) | **gerçek şema** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu |
+| `eog_custom_detected.json` (gameId 1734940206) | **gerçek şema** EOG bloğu (yeni patch şekli): `selectedPosition` 10/10 BOŞ string, `detectedTeamPosition` 10/10 dolu — tespit katmanının kanıt maçı |
+| `mh_game_custom_real.json` (gameId 1734450310) | **gerçek şema** match-history kaydı: camelCase statlar, açık position yok |
 | `mh_list_page_real.json`, `champion_summary_real.json` | **gerçek** liste sayfası / champion özeti |
 
-`*_real.json` dosyaları gerçek puuid ve riot_id içerir; repo private olduğu için
-olduğu gibi tutulur (anonimleştirme, gerçek şemayı belgeleme amacını bozardı).
-GÖREV 7 sonrası kural: **yeni** fixture'lara gerçek PII girmez —
-`eog_custom_detected.json` bu yüzden deterministik anonimleştirilmiştir (puuid
-`00000000-0000-4000-8000-{N:012d}`, riot_id `PlayerNN#FAKE`, summonerId `1000+N`;
-şema, boş `selectedPosition` stringleri, `detectedTeamPosition`, spell/stat/zaman
-değerleri olduğu gibi korunur).
+**Anonimlik (GÖREV 7, repo public):** fixture'ların hiçbirinde gerçek PII yoktur.
+`*_real.json` ve `eog_custom_detected.json` dosyalarında yalnız KİMLİKLER
+deterministik olarak sahtelenmiştir: puuid `00000000-0000-4000-8000-{N:012d}`,
+riot_id `PlayerNN#FAKE`, summonerId `1000+N`, accountId `2000+N`; chat JWT'leri
+`FAKE.FAKE.FAKE`. Aynı kişi dosyalar arasında aynı `N`'yi taşır
+(`eog_custom_detected.json` başka bir maç olduğu için 01-10'u, ortak grup maçları
+11+'yı kullanır). Şema/alan sırası, gameId'ler, zaman damgaları, statlar,
+şampiyon/spell/position alanları **hiç değişmedi** — gerçek şemayı belgeleme
+amacı korunur. Bu değişmezler `tests/test_real_fixtures.py::TestFixtureAnonymity`
+ile kilitlidir. `champion_summary_real.json` Riot'un statik şampiyon verisidir,
+kimlik taşımaz.
 Sentetik fixture'lar mevcut davranışı sabitler — gerçek şemayla farkları bilinçlidir,
 gerçek doğrulama `tests/test_real_fixtures.py` üzerinden yapılır.
 
@@ -264,5 +278,6 @@ collector/
   tests/           # pytest
   raw_archive/     # (runtime) ham payload arşivi
   outbox/          # (runtime) gönderilemeyen payload'lar
-  seed_roster.json # ilk backfill için elle doldurulan riot_id listesi
+  seed_roster.json # ilk backfill için elle doldurulan riot_id listesi (repo'da boş)
+  seed_roster.example.json  # şablon (2-3 sahte kayıt)
 ```

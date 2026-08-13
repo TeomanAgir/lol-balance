@@ -11,3 +11,6 @@ build/
 collector/outbox/
 collector/raw_archive/
 collector/.env
+
+# Kok dizindeki ham EOG teshis dosyalari (gercek PII/JWT icerir, asla commit'lenmez)
+/1734940206.json
