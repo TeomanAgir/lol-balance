@@ -75,9 +75,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: SSH kimliğini hazırla
+        # Anahtar base64 tek satır olarak saklanır (SSH_DEPLOY_KEY_B64):
+        # düz PEM yapıştırmada satır sonları kaybolup "error in libcrypto"
+        # üretebiliyor; base64 bu hata sınıfını tamamen kapatır.
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_DEPLOY_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
       - name: Rollout restart + bekle (VPS üzerinde)
