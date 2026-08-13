@@ -48,8 +48,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.mode.dry_run_suffix": " (dry-run)",
         # -- argparse texts --
         "cli.description": "LoL custom match collector",
-        "cli.help.command": "backfill-positions: infers roles for the matches in "
-                            "raw_archive and writes them to the backend",
+        "cli.help.command": "backfill: same as --backfill; backfill-positions: infers "
+                            "roles for the matches in raw_archive and writes them to "
+                            "the backend",
         "cli.help.backfill": "Scan match history backwards (with the roster filter)",
         "cli.help.since": "During backfill, ignore matches older than this date",
         "cli.help.dry_run": "backfill-positions: print what would be sent, do not send",
@@ -61,6 +62,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.live_hint": "Open the LoL client and play custom matches — each match "
                          "is sent automatically as soon as it ends.",
         "cli.live_stop_hint": "To stop: Ctrl+C (or close the window).",
+        # -- auto catch-up (limited backfill before the live loop) --
+        "catchup.start": "Catching up: scanning the last {days} days of match history "
+                         "(since {since}) for matches played while the collector was "
+                         "closed...",
+        "catchup.done": "Catch-up finished: {scanned} matches scanned, {sent} sent. "
+                        "Switching to live mode.",
+        "catchup.failed": "Catch-up could not be completed ({error}) - live mode starts "
+                          "anyway; you can run it later with `--backfill`.",
         "cli.stopped": "Stopped.",
         "cli.press_enter": "\nPress Enter to close...",
         "cli.no_env_no_tty": "No settings file ({path}) and the setup wizard cannot "
@@ -137,8 +146,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.mode.dry_run_suffix": " (dry-run)",
         # -- argparse metinleri --
         "cli.description": "LoL custom maç toplayıcı",
-        "cli.help.command": "backfill-positions: raw_archive'daki maçların rollerini "
-                            "tahmin edip backend'e yazar",
+        "cli.help.command": "backfill: --backfill ile aynı; backfill-positions: "
+                            "raw_archive'daki maçların rollerini tahmin edip "
+                            "backend'e yazar",
         "cli.help.backfill": "Match history'yi geriye tara (roster filtresiyle)",
         "cli.help.since": "Backfill'de bu tarihten eski maçlara bakma",
         "cli.help.dry_run": "backfill-positions: ne gönderileceğini yazdır, gönderme",
@@ -150,6 +160,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.live_hint": "LoL client'ini aç ve custom maç oyna — maç biter bitmez "
                          "otomatik gönderilir.",
         "cli.live_stop_hint": "Durdurmak için: Ctrl+C (ya da pencereyi kapat).",
+        # -- oto-yetişme (canlı döngüden önceki sınırlı backfill) --
+        "catchup.start": "Yetişiliyor: son {days} günün maç geçmişi taranıyor "
+                         "({since} sonrası) — collector kapalıyken oynanan maçlar "
+                         "için...",
+        "catchup.done": "Yetişme bitti: {scanned} maç tarandı, {sent} maç gönderildi. "
+                        "Canlı moda geçiliyor.",
+        "catchup.failed": "Yetişme tamamlanamadı ({error}) — canlı mod yine de "
+                          "başlıyor; daha sonra `--backfill` ile çalıştırabilirsin.",
         "cli.stopped": "Durduruldu.",
         "cli.press_enter": "\nKapatmak için Enter'a bas...",
         "cli.no_env_no_tty": "Ayar dosyası yok ({path}) ve kurulum sihirbazı "

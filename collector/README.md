@@ -29,6 +29,7 @@ notepad collector\.env   # LOL_DIR, BACKEND_URL, API_KEY doldurun
 | `API_KEY` | evet | Backend ile paylaşılan `X-API-Key` değeri |
 | `MIN_KNOWN` | hayır (6) | Backfill roster filtresi eşiği: 10 katılımcıdan en az kaçı bilinen oyuncu olmalı |
 | `POLL_INTERVAL_S` | hayır (2.5) | Gameflow polling aralığı (saniye) |
+| `CATCHUP_DAYS` | hayır (14) | Canlı modda açılışta koşan oto-yetişme penceresi (gün); `0` = kapalı |
 
 Ortam değişkenleri `.env` dosyasındaki değerleri ezer.
 
@@ -69,12 +70,20 @@ py -m collector
   (gerçek LCU şeması bu alanı taşır). Böylece proses gecikmesi, outbox retry ya da geç
   işleme maç zamanını kaydırmaz. Alan gelmeyen eski sürümlerde yakalama anına düşülür.
 - Client kapalıysa bekler, bağlantı koparsa yeniden bağlanır.
+- **Oto-yetişme:** LCU'ya her bağlandığında (ilk bağlantı ve yeniden bağlanmalar dahil)
+  canlı döngüye geçmeden önce son `CATCHUP_DAYS` gün (varsayılan 14, `0` = kapalı)
+  için sınırlı bir backfill koşar — collector kapalıyken oynanan custom'lar da
+  toplanır. Aynı roster filtresi ve kronolojik gönderim kuralları geçerlidir; çift
+  gönderim idempotency sayesinde zararsızdır. Yetişme herhangi bir nedenle
+  başarısız olursa (backend erişilemez, roster boş, LCU hatası) **canlı mod
+  engellenmez**: hata loglanır, döngü başlar.
 
 ### Backfill modu
 
 ```powershell
 py -m collector --backfill              # tüm geçmiş
 py -m collector --backfill --since 2026-06-01
+py -m collector backfill --since 2026-06-01   # aynısı (tiresiz alias)
 ```
 
 Kendi hesabının LCU match history'sini sayfalayarak geriye tarar; custom olan ve
@@ -237,7 +246,7 @@ gerçek doğrulama `tests/test_real_fixtures.py` üzerinden yapılır.
 
 ```
 collector/
-  __main__.py      # CLI: python -m collector [--backfill [--since ...] | backfill-positions]
+  __main__.py      # CLI: python -m collector [--backfill|backfill [--since ...] | backfill-positions]
   config.py        # .env + ortam değişkenleri
   lockfile.py      # LCU lockfile parse
   lcu.py           # LcuClient interface + HttpLcuClient (tek LCU bağımlılığı)
@@ -248,6 +257,7 @@ collector/
   roster.py        # backfill roster filtresi
   live.py          # canlı polling döngüsü
   backfill.py      # geçmiş tarama
+  catchup.py       # canlı moddan önce koşan sınırlı backfill (oto-yetişme)
   backfill_positions.py  # arşivdeki maçların rollerini backend'e yazma
   archive.py       # raw_archive yazımı
   fixtures/        # örnek LCU payload'ları (test verisi)

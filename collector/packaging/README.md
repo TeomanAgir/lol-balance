@@ -64,6 +64,13 @@ sabitlenmiştir (`collector/tests/test_packaging.py`).
 3. Pencereyi açık bırak ve custom maçları oyna. Maç biter bitmez otomatik gönderilir.
    Durdurmak için Ctrl+C ya da pencereyi kapat. Oyun akşamı başında tekrar aç.
 
+Program LoL client'ine bağlanır bağlanmaz **son 14 günü otomatik tarar** ve sen
+kapalıyken oynanmış custom maçları gönderir ("Yetişiliyor: ..."), sonra canlı moda
+geçer. Yani exe'yi kapalı bırakmış olman maç kaybettirmez. Pencereyi başka bir gün
+`CATCHUP_DAYS=30` gibi bir değerle (`.env` içinde) daha geniş tarayacak şekilde
+ayarlayabilirsin; `CATCHUP_DAYS=0` bu taramayı kapatır. Tarama bir sebeple
+başarısız olursa canlı mod yine de başlar.
+
 Program açılırken backend'e bağlanıp anahtarı dener; bir sorun varsa ilk saniyede
 Türkçe yazar (`API anahtarı REDDEDİLDİ`, `Backend'e ULAŞILAMADI` gibi).
 
@@ -72,7 +79,7 @@ Türkçe yazar (`API anahtarı REDDEDİLDİ`, `Backend'e ULAŞILAMADI` gibi).
 | Durum | Ne yapmalı |
 |---|---|
 | Yanlış anahtar/adres girdim | Exe'yi `--setup` ile çalıştır ya da yanındaki `.env`'i düzenle |
-| Programı kapalıyken maç oynadım | Maçlar kaçmaz: LoL client açıkken `--backfill` ile geriye tara |
+| Programı kapalıyken maç oynadım | Maçlar kaçmaz: exe açılışta son 14 günü kendi tarar; daha eskisi için `--backfill` |
 | Rolleri sonradan düzeltmek | `backfill-positions` (kontrol için `--dry-run` ekle) |
 | Pencere hemen kapanıyor | Kapanmaz; hata olsa bile "Kapatmak için Enter'a bas" der |
 
@@ -82,6 +89,7 @@ Argümanlı çalıştırmak için klasörde bir komut istemi aç:
 LoLBalanceCollector.exe --help
 LoLBalanceCollector.exe --setup
 LoLBalanceCollector.exe --backfill --since 2026-08-01
+LoLBalanceCollector.exe backfill --since 2026-08-01     (aynısı, tiresiz)
 LoLBalanceCollector.exe backfill-positions --dry-run
 ```
 

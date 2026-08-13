@@ -68,6 +68,8 @@ class Config:
     api_key: str
     min_known: int = 6
     poll_interval_s: float = 2.5
+    #: Canlı modda açılışta koşan oto-yetişme penceresi (gün); 0 = kapalı.
+    catchup_days: int = 14
     raw_archive_dir: Path = field(default_factory=lambda: app_dir() / "raw_archive")
     outbox_dir: Path = field(default_factory=lambda: app_dir() / "outbox")
     seed_roster_path: Path = field(default_factory=lambda: app_dir() / "seed_roster.json")
@@ -98,4 +100,5 @@ def load_config(env_file: Path | None = None) -> Config:
         api_key=merged["API_KEY"],
         min_known=int(merged.get("MIN_KNOWN", "6")),
         poll_interval_s=float(merged.get("POLL_INTERVAL_S", "2.5")),
+        catchup_days=int(merged.get("CATCHUP_DAYS", "14")),
     )
