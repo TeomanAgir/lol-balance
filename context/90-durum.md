@@ -20,6 +20,8 @@ Son güncelleme: 2026-08-13 (orkestratör)
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler
+Not: Görev listesi `new_modules.md` YEREL-ONLY'dir (gitignore'lu, public repo'da
+yok — Teoman'ın PC'sinde repo kökünde durur; orkestratör oradan okur).
 - **GÖREV 8** (new_modules.md): maç detay ekranı — rol-eşleşmeli karşılıklı stat
   bar graph'ları (gold/hasar/CS/+1 stat, graph üstü butonlarla değişir).
   Teoman ÖNCE PROTOTİP istiyor; onay sonrası tam iş.
