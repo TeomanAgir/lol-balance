@@ -16,15 +16,13 @@ Son güncelleme: 2026-08-13 (orkestratör)
 
 ## Tamamlanan görevler (new_modules.md)
 0 rol rating evreni · 1 oyuncu profili · 2 haftanın enleri · 3 nemesis ·
-4 harita rol enleri · 5 collector exe · 6 i18n (tr/en) · 7 public repo hazırlığı.
+4 harita rol enleri · 5 collector exe · 6 i18n (tr/en) · 7 public repo hazırlığı ·
+8 maç detay ekranı (rol-eşleşmeli karşılıklı stat barları; PR #23).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler
 Not: Görev listesi `new_modules.md` YEREL-ONLY'dir (gitignore'lu, public repo'da
 yok — Teoman'ın PC'sinde repo kökünde durur; orkestratör oradan okur).
-- **GÖREV 8** (new_modules.md): maç detay ekranı — rol-eşleşmeli karşılıklı stat
-  bar graph'ları (gold/hasar/CS/+1 stat, graph üstü butonlarla değişir).
-  Teoman ÖNCE PROTOTİP istiyor; onay sonrası tam iş.
 - Canlıda 2 eski maçın pozisyonları eksik (#16=1734940206, #17=1734956802;
   selectedPosition'ı boş gönderen client'ın exe-öncesi kayıtları). Çare: Teoman
   UI'dan elle giriyor / arkadaş `backfill-positions` koşuyor. Kod işi DEĞİL.
@@ -36,5 +34,7 @@ yok — Teoman'ın PC'sinde repo kökünde durur; orkestratör oradan okur).
 
 ## Bilinen tuzaklar (özet — ayrıntı 00-ortak.md)
 - GitHub Actions pull_request bazen run üretmez → PR'ı close/reopen.
+- Yerel `backend/data/lol_balance.db` ESKİ kopyadır (10 maç, pozisyonsuz) —
+  canlı DB değil; E2E'de rol senaryosu için scratch kopyaya elle pozisyon yazılır.
 - OneDrive altındaki repo yolu; PowerShell 5.1 tırnak tuzakları → çok satırlı
   python'ı dosyaya yazıp koş.

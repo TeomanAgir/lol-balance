@@ -24,6 +24,8 @@
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
+    matchDetail: null,          // açık maç detayı: GET /matches listesinden gelen maç nesnesi (GÖREV 8)
+    matchStat: "gold",          // maç detayında seçili stat (MD_STATS anahtarı)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -137,13 +139,16 @@
   const loaders = {
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
+    matchdetail: loadMatchDetail,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
   // zincir (harita → profil) özyinelemeyle gerçek sekmeye çözülür.
+  // Maç detayı (GÖREV 8) tek yerden açılır: her zaman Geçmiş sekmesi yanar.
   const tabOf = (name) =>
     name === "profile" ? tabOf(state.profileFrom) :
-    name === "map" ? tabOf(state.mapFrom) : name;
+    name === "map" ? tabOf(state.mapFrom) :
+    name === "matchdetail" ? "matches" : name;
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
@@ -771,7 +776,7 @@
       card.className = "match-card" + (voided ? " voided" : "");
       card.innerHTML =
         `<header class="match-head">
-           <span>${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</span>
+           <button class="md-open" type="button" title="${t("matches.open_detail")}">${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</button>
            ${headBadge}
          </header>
          <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>
@@ -780,6 +785,16 @@
            ${voidBtn}
          </div>` +
         roleEditor();
+
+      // Karta tıklama maç detayını açar (GÖREV 8). Düğmeler ve rol düzenleyici
+      // içindeki tıklamalar detayı AÇMAZ: aksi halde "Rolleri düzenle"/"void"/
+      // <select> her tıklamada görünüm değiştirirdi. Klavye erişimi başlıktaki
+      // .md-open düğmesindedir (kartın kendisi odaklanabilir bir öğe değildir).
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button, select, label, .role-editor")) return;
+        openMatchDetail(m);
+      });
+      card.querySelector(".md-open").addEventListener("click", () => openMatchDetail(m));
 
       const editor = card.querySelector(".role-editor");
       const btnRoles = card.querySelector(".btn-roles");
@@ -828,6 +843,141 @@
       }
       box.appendChild(card);
     }
+  }
+
+  // ── 3b) Maç detayı (GÖREV 8) ──────────────────────────────────
+  // Yeni endpoint YOK: veri, Geçmiş ekranının zaten çektiği GET /matches
+  // yanıtındaki `participants[].stats` alanından gelir; kart tıklanınca o maç
+  // nesnesi state'e konur ve görünüm ondan çizilir (yeniden istek atılmaz).
+  //
+  // Gösterim: 4 stat düğmesi (gold / hasar / CS / vizyon) + rol eşleşmeli
+  // karşılıklı bar graph (sol mavi = team 100, sağ kırmızı = team 200) + takım
+  // TOPLAM satırı. Bar ölçeği SATIR BAZLIDIR: satırdaki büyük değer %100'dür
+  // (takım toplamı satırı da kendi içinde ölçeklenir).
+  const MD_STATS = [
+    { key: "gold", label: "matchdetail.stat_gold", big: true },
+    { key: "damage_to_champs", label: "matchdetail.stat_damage", big: true },
+    { key: "cs", label: "matchdetail.stat_cs", big: false },
+    { key: "vision_score", label: "matchdetail.stat_vision", big: false },
+  ];
+
+  // Değerler nullable (contract: stats alanları nullable) → "—" ve 0 genişlikte bar.
+  const mdFmt = (stat, v) =>
+    v == null ? "—"
+      : stat.big ? t("matchdetail.thousands", { n: (v / 1000).toFixed(1) })
+      : String(v);
+  const mdValue = (p, key) => {
+    const v = p && p.stats ? p.stats[key] : null;
+    return typeof v === "number" ? v : null;
+  };
+
+  // Satır eşleştirme: önce kanonik rol sırasıyla İKİ tarafta da bulunan roller
+  // eşlenir (mükerrer rol olursa listede ilk gelen eşlenir), artakalanlar
+  // listelenme sırasıyla kalan satırlara düşer ve rol etiketi "?" olur.
+  // Canlıda position'ı null/mükerrer olan eski maçlar bu yolu kullanır.
+  function mdRows(m) {
+    const blue = m.participants.filter(p => p.team === 100);
+    const red = m.participants.filter(p => p.team === 200);
+    const rows = [];
+    for (const role of ROLES) {
+      const bi = blue.findIndex(p => p.position === role);
+      const ri = red.findIndex(p => p.position === role);
+      if (bi === -1 || ri === -1) continue;
+      rows.push({ role, blue: blue.splice(bi, 1)[0], red: red.splice(ri, 1)[0] });
+    }
+    while (blue.length || red.length)
+      rows.push({ role: null, blue: blue.shift() || null, red: red.shift() || null });
+    return rows;
+  }
+
+  // side: {name, champ, value} — katılımcı ya da takım toplamı olabilir.
+  const mdSide = (p, key) =>
+    p ? { name: p.display_name, champ: p.champion, value: mdValue(p, key) }
+      : { name: "—", champ: null, value: null };
+  const mdTeamTotal = (parts, key, nameKey) => {
+    const vals = parts.map(p => mdValue(p, key)).filter(v => v != null);
+    return {
+      name: t(nameKey),
+      champ: null,
+      value: vals.length ? vals.reduce((a, b) => a + b, 0) : null,
+    };
+  };
+
+  function mdRowHtml(label, left, right, stat, isTotal) {
+    const lv = left.value, rv = right.value;
+    const max = Math.max(lv || 0, rv || 0);
+    const width = (v) => (max > 0 ? Math.round(((v || 0) / max) * 100) : 0);
+    const lead = (a, b) => (a != null && a >= (b == null ? -1 : b) ? " lead" : "");
+    return `<div class="md-row${isTotal ? " md-total" : ""}">
+        <div class="md-row-names">
+          <span class="md-name blue">${esc(left.name)}${left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""}</span>
+          <span class="md-role">${esc(label)}</span>
+          <span class="md-name red">${right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : ""}${esc(right.name)}</span>
+        </div>
+        <div class="md-bars">
+          <span class="md-val left${lead(lv, rv)}">${mdFmt(stat, lv)}</span>
+          <div class="md-track">
+            <div class="md-half left"><div class="md-fill" style="width:${width(lv)}%"></div></div>
+            <div class="md-center-line"></div>
+            <div class="md-half right"><div class="md-fill" style="width:${width(rv)}%"></div></div>
+          </div>
+          <span class="md-val right${lead(rv, lv)}">${mdFmt(stat, rv)}</span>
+        </div>
+      </div>`;
+  }
+
+  function matchDetailHtml(m) {
+    const stat = MD_STATS.find(s => s.key === state.matchStat) || MD_STATS[0];
+    const voided = m.status === "void";
+    // Void maç kazananını değil void rozetini taşır (Geçmiş kartıyla aynı kural).
+    const outcome = voided
+      ? `<span class="md-void">${t("matches.void_badge")}</span>`
+      : `<span class="${m.winner_team === 100 ? "win-blue" : "win-red"}">${
+          m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
+    const head =
+      `<header class="md-head">
+         <div class="md-title">${t("matchdetail.title", { id: m.id })} — ${outcome}</div>
+         <div class="md-meta">${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</div>
+       </header>`;
+    const statbar =
+      `<div class="md-statbar">` +
+      MD_STATS.map(s =>
+        `<button type="button" class="md-statbtn${s.key === stat.key ? " active" : ""}" data-stat="${s.key}">${t(s.label)}</button>`
+      ).join("") + `</div>`;
+    const rows = mdRows(m).map(r =>
+      mdRowHtml(r.role ? roleAbbr(r.role) : "?", mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, false)
+    ).join("");
+    const totalRow = mdRowHtml(
+      t("matchdetail.total"),
+      mdTeamTotal(m.participants.filter(p => p.team === 100), stat.key, "matchdetail.blue_total"),
+      mdTeamTotal(m.participants.filter(p => p.team === 200), stat.key, "matchdetail.red_total"),
+      stat, true);
+    return head + statbar + `<div class="md-graph">${rows}${totalRow}</div>` +
+      `<p class="md-hint">${t("matchdetail.hint")}</p>`;
+  }
+
+  function openMatchDetail(m) {
+    state.matchDetail = m;
+    showView("matchdetail");
+  }
+  $("#btn-matchdetail-back").addEventListener("click", () => showView("matches"));
+
+  // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir.
+  async function loadMatchDetail() {
+    $("#btn-matchdetail-back").textContent = t("common.back_matches");
+    const box = $("#matchdetail-body");
+    const m = state.matchDetail;
+    if (!m) {
+      box.innerHTML = `<p class='empty'>${t("matchdetail.no_match")}</p>`;
+      return;
+    }
+    box.innerHTML = matchDetailHtml(m);
+    // Stat değişimi salt gösterimdir: istek atılmaz, aynı maç nesnesi yeniden çizilir.
+    box.querySelectorAll(".md-statbtn").forEach(btn =>
+      btn.addEventListener("click", () => {
+        state.matchStat = btn.dataset.stat;
+        loadMatchDetail();
+      }));
   }
 
   // ── 4) Manuel maç girişi ──────────────────────────────────────
