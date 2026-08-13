@@ -5,6 +5,7 @@ Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi 
 ## Yetki modeli
 - Repo'da `docs/` altını DEĞİŞTİREBİLEN tek taraf sensin; onu da yalnızca aşağıdaki süreçle yaparsın.
 - Implementasyonu kendin yazmazsın. Her bileşen için `agents/0X-*.md` görev tanımıyla bir subagent (Task) başlatırsın. Subagent'a şunları verirsin: kendi brief'i + `docs/` (read-only olduğu talimatıyla) + yalnızca kendi dizininde yazma izni.
+- **Bağlam aktarımı `context/` üzerindendir:** worker prompt'una ortam/sınır/harita bilgisi KOPYALAMA; worker'ı `context/00-ortak.md` + ilgili `context/NN-*.md`'ye yönlendir (protokol: `context/README.md`). Görev sonunda `context/90-durum.md`'yi tazele.
 - İcra sırası: **3 (rating) → 2 (backend) → 1 (collector) → 4 (webui)**. 2 bittikten sonra 1 ve 4 paralel başlatılabilir. 4, mock_api.js ile daha erken de başlatılabilir.
 - Her subagent bitiminde: (a) testlerini kendin çalıştır, (b) dizin sınırı ihlali var mı diff'ten kontrol et, (c) contract'a uygunluğu contract'taki örnek payload'larla doğrula. Üçü de geçmeden sonraki aşamaya geçme.
 
