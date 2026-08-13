@@ -1,5 +1,12 @@
 # VPS Deploy Raporu — lol-balance
 
+> **Sertleştirme durumu (2026-08-13, `VPS_HARDENING.md` §1 Seçenek A):** VPS tarafı HAZIR —
+> `cideploy` kullanıcısı + yalnızca rollout koşabilen zorunlu-komutlu SSH anahtarı kuruldu
+> ve test edildi. Bekleyen: (1) `SSH_DEPLOY_KEY`/`SSH_KNOWN_HOSTS` GitHub secret'ları
+> (VPS agent'ının yüklemesi güvenlik sınıflandırıcısınca engellendi — Teoman aksiyonu),
+> (2) `deploy/ci-deploy-ssh.patch`'in workflow'a uygulanması (workflow scope'lu push),
+> (3) sonrasında 6443'ün kapatılması (VPS agent'ı yapacak). Ayrıntı: sohbet raporu.
+
 Hazırlayan: VPS agent'ı, 2026-08-11. Kaynak brief: `deploy/VPS_AGENT_BRIEF.md`.
 Uygulanan manifest: `deploy/k8s.yaml` (secret'lar hariç — onlar imperatif oluşturuldu).
 
