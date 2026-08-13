@@ -83,5 +83,18 @@ jobs:
           echo "${{ secrets.SSH_DEPLOY_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Anahtarı doğrula (içerik sızdırmadan)
+        # ssh'a hiç gitmeden anahtarın kendisini test eder; hata mesajı yalnız
+        # boyut/başlık-var-mı gibi sızdırmayan teşhis bilgisi basar.
+        run: |
+          SIZE=$(wc -c < ~/.ssh/id_ed25519)
+          LINES=$(wc -l < ~/.ssh/id_ed25519)
+          HAS_HEADER=$(head -1 ~/.ssh/id_ed25519 | grep -c 'BEGIN OPENSSH PRIVATE KEY' || true)
+          echo "anahtar: ${SIZE} bayt, ${LINES} satır, OPENSSH başlığı: ${HAS_HEADER}"
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null 2>&1; then
+            echo "::error::SSH_DEPLOY_KEY_B64 decode edilen anahtar GEÇERSİZ (${SIZE} bayt, ${LINES} satır, başlık=${HAS_HEADER}). Secret'a base64'lenen kaynak dosya bozuk ya da yanlış dosya (.pub / eski kopya). VPS'te: 'ssh-keygen -y -f <anahtar>' ile doğrula, sonra 'base64 -w0 < <anahtar>' çıktısını TEK SATIR olarak secret'a koy."
+            exit 1
+          fi
+          echo "anahtar geçerli (ssh-keygen -y başarılı)"
       - name: Rollout restart + bekle (VPS üzerinde)
         run: ssh -i ~/.ssh/id_ed25519 cideploy@lol.teomanagir.com deploy
