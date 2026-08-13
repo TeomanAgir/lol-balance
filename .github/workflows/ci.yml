@@ -67,18 +67,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
-    # Yeni image GHCR'a çıkınca VPS'teki deployment'ı restart eder (imagePullPolicy: Always
-    # yeni imajı çeker). Kimlik: dar yetkili ci-deployer SA — bkz. deploy/ci-rbac.yaml.
+    # Yeni image GHCR'a çıkınca VPS'e SSH ile bağlanıp rollout restart tetikler.
+    # 6443 dışarıya kapalıdır (VPS_HARDENING.md §1 Seçenek A); SSH anahtarı VPS'te
+    # restrict+command= ile YALNIZCA /usr/local/bin/lol-balance-ci-deploy.sh'ı koşabilir.
     needs: image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Kubeconfig'i hazırla
+      - name: SSH kimliğini hazırla
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
-      - name: Rollout restart + bekle
-        run: |
-          kubectl -n lol-balance rollout restart deployment/lol-balance
-          kubectl -n lol-balance rollout status deployment/lol-balance --timeout=180s
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Rollout restart + bekle (VPS üzerinde)
+        run: ssh -i ~/.ssh/id_ed25519 cideploy@lol.teomanagir.com deploy
