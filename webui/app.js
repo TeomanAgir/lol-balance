@@ -135,7 +135,7 @@
   // JSON'lar bir kez çekilir ve önbelleğe alınır: loadAssets() ikinci çağrıda
   // istek atmaz, aynı promise'i döner ve ASLA reject etmez (varlık yokluğu
   // hata değil, gösterim modudur — profil/maç detayı bu yüzden bloke olmaz).
-  const DD = { loaded: false, version: null, items: null, champs: null };
+  const DD = { loaded: false, version: null, items: null, champs: null, positions: false };
   const DD_BASE = "assets/ddragon/";
   let ddPromise = null;
 
@@ -146,11 +146,19 @@
       window.fetch(DD_BASE + name)
         .then(r => (r.ok ? r.json() : null))
         .catch(() => null);
-    ddPromise = Promise.all([grab("manifest.json"), grab("items.json"), grab("champions.json")])
-      .then(([man, items, champs]) => {
+    // Pozisyon ikonları (GÖREV 15) sözlüklerde LİSTELENMEZ, dosya olarak durur:
+    // varlıkları TEK yoklamayla anlaşılır. Beş ikon için beş istek atılmaz —
+    // indirme betiği beşini aynı döngüde yazar, biri varsa hepsi vardır. Yoklanan
+    // dosya ikonun kendisidir, yani istek boşa gitmez: mask onu önbellekten okur.
+    const probe = (name) => window.fetch(DD_BASE + name).then(r => r.ok).catch(() => false);
+    ddPromise = Promise.all([
+      grab("manifest.json"), grab("items.json"), grab("champions.json"), probe("position/top.svg"),
+    ])
+      .then(([man, items, champs, hasPos]) => {
         DD.version = man && typeof man.version === "string" ? man.version : null;
         DD.items = items && typeof items === "object" ? items : null;
         DD.champs = champs && typeof champs === "object" ? champs : null;
+        DD.positions = hasPos === true;
         DD.loaded = true;
       });
     return ddPromise;
@@ -1280,6 +1288,32 @@
     ? `<span class="mc-champ">${ddIconHtml(champIconSrc(champ), champPh(champ), "champ", champ)}</span>`
     : `<span class="mc-champ mc-none" aria-hidden="true"></span>`;
 
+  // Kart satırındaki ROL sütunu (GÖREV 15 — Teoman kararı): metin etiket
+  // ("UST/ORMAN/...") yerine resmi oyun ici pozisyon simgesi. Simge <img> DEĞİL,
+  // CSS mask'idir: tek renkli SVG tema rengiyle boyanır (--muted, satırın üstüne
+  // gelince --brass) ve kartın kendi paletiyle uyumlu kalır; img olsaydı SVG'nin
+  // sabit altın rengi temadan bağımsız yanardı.
+  // Varlık katmanının "yoksa yer tutucu" ilkesi burada da geçerli: ikonlar
+  // indirilmemişse (DD.positions false) ya da tarayıcı mask desteklemiyorsa
+  // (style.css'teki @supports) ESKİ METİN etiket görünür — kırık\boş kutu
+  // imkânsızdır. Metin bu yüzden DOM'da HER ZAMAN durur; yalnız simge gerçekten
+  // çizilebiliyorken CSS ile gizlenir.
+  // Rol bilinmiyorsa (position null) eski "—" aynen kalır: simgesi yoktur.
+  // Kapsam yalnız bu sütundur — maç detayı, rol düzenleyici <select>, dengeleme
+  // kartları ve profil metin etiketi kullanmaya devam eder.
+  const POS_FILE = { TOP: "top", JUNGLE: "jungle", MIDDLE: "middle", BOTTOM: "bottom", UTILITY: "utility" };
+  function mcRoleHtml(pos) {
+    const label = roleLabel(pos);   // null → "—", bilinmeyen değer → değerin kendisi
+    const file = pos == null ? null : POS_FILE[pos];
+    if (!file || !DD.positions) return `<span class="pos-tag">${esc(label)}</span>`;
+    // role="img" + aria-label: simge görsel olarak metnin yerine geçtiğinde ekran
+    // okuyucu rolü yine ADIYLA duyar (sözlükteki common.role_*), title de aynı adı
+    // fare ucunda gösterir.
+    return `<span class="pos-tag mc-pos mc-pos-${file}" role="img"` +
+      ` aria-label="${esc(label)}" title="${esc(label)}">` +
+      `<span class="mc-pos-txt">${esc(label)}</span></span>`;
+  }
+
   async function loadMatches() {
     await fetchRoster();
     // Sözlükler bir kez yüklenir ve reject etmez; yoksa portreler yer tutucu
@@ -1302,7 +1336,7 @@
             const deltaHtml = rc
               ? `<span class="delta ${rc.mu_after - rc.mu_before >= 0 ? "up" : "down"}">${fmtDelta(rc.mu_after - rc.mu_before)}</span>`
               : `<span class="delta none">—</span>`;
-            return `<li><span class="pos-tag">${roleLabel(p.position)}</span>` +
+            return `<li>${mcRoleHtml(p.position)}` +
                    mcChampHtml(p.champion) +
                    `<span class="p-who">${p.display_name}</span>${deltaHtml}</li>`;
           }).join("") + "</ul>";
