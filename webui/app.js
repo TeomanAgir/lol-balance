@@ -195,7 +195,11 @@
 
   // Yer tutucu kutusu HER ZAMAN çizilir, görsel onun ÜSTÜNE biner: dosya 404
   // verirse img kaldırılır ve altındaki kutu görünür → kırık görsel imkânsız.
-  function ddIconHtml(src, ph, cls) {
+  // alt: görselin erişilebilir adı. VARSAYILAN BOŞTUR — build slotları ve favori
+  // eşya kartı adı zaten saran öğenin aria-label'ında taşır, orada alt yazmak
+  // ekran okuyucuya aynı adı iki kez okuturdu. Sarmalayıcısı olmayan yerlerde
+  // (maç kartı satırındaki şampiyon portresi) ad buraya verilir.
+  function ddIconHtml(src, ph, cls, alt = "") {
     // Yer tutucu metni SALT GÖRSELDİR (aria-hidden): erişilebilir adı slot'un
     // aria-label'ı ya da kartın kendi metni taşır, "58" gibi ekler okunmaz.
     return `<span class="dd-ico ${cls}">` +
@@ -203,7 +207,7 @@
       // loading="lazy" KULLANILMAZ: ikonlar aynı container'dan gelen ~5KB'lık
       // dosyalar, tembel yükleme kazanç getirmiyor; buna karşılık arka plandaki
       // sekmede istek hiç başlamayabiliyor (yer tutucu takılı kalırdı).
-      (src ? `<img class="dd-img" src="${esc(src)}" alt="">` : "") +
+      (src ? `<img class="dd-img" src="${esc(src)}" alt="${esc(alt)}">` : "") +
       `</span>`;
   }
   // Yükleme hatasında HEMEN yer tutucuya düşülmez: tek prosesli sunucuda ilk
@@ -1266,8 +1270,21 @@
   });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
+  // Kart satırındaki şampiyon portresi (GÖREV 14 uzantısı): kartlar arasında
+  // gezerken aranan maç yüzlerden tanınsın diye adın ÖNÜNE küçük portre girer.
+  // Yeni veri YOK — zaten çekilen participants[].champion kullanılır; varlık
+  // katmanı da yeni değil, build/favori eşya ile AYNI dd- yardımcılarıdır.
+  // champion null (manuel giriş) ise görünmez bir kutu çizilir: satır yüksekliği
+  // ve adların hizası şampiyonu bilinen satırlarla birebir aynı kalır.
+  const mcChampHtml = (champ) => champ
+    ? `<span class="mc-champ">${ddIconHtml(champIconSrc(champ), champPh(champ), "champ", champ)}</span>`
+    : `<span class="mc-champ mc-none" aria-hidden="true"></span>`;
+
   async function loadMatches() {
     await fetchRoster();
+    // Sözlükler bir kez yüklenir ve reject etmez; yoksa portreler yer tutucu
+    // moduna düşer (maç listesi varlık yokluğunda BLOKE OLMAZ).
+    await loadAssets();
     const list = await api("/matches?limit=20");
     state.matches = list;   // GÖREV 10: profil grafiğinden detaya atlarken önbellek
     const box = $("#match-list");
@@ -1286,6 +1303,7 @@
               ? `<span class="delta ${rc.mu_after - rc.mu_before >= 0 ? "up" : "down"}">${fmtDelta(rc.mu_after - rc.mu_before)}</span>`
               : `<span class="delta none">—</span>`;
             return `<li><span class="pos-tag">${roleLabel(p.position)}</span>` +
+                   mcChampHtml(p.champion) +
                    `<span class="p-who">${p.display_name}</span>${deltaHtml}</li>`;
           }).join("") + "</ul>";
       };
@@ -1385,6 +1403,9 @@
       }
       box.appendChild(card);
     }
+    // Portrelerin 404/geçici hata yolu (tek retry → yer tutucu) build satırlarıyla
+    // aynı yardımcıdan gelir; tüm kartlar eklendikten sonra bir kez bağlanır.
+    ddBindImages(box);
   }
 
   // ── 3b) Maç detayı (GÖREV 8) ──────────────────────────────────

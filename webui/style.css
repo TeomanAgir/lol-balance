@@ -1073,6 +1073,26 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--red); }
 .delta.none { color: var(--muted); }
+/* ── Maç kartı şampiyon portresi (GÖREV 14 uzantısı) — "mc-" öneki ──
+   Kutunun boyutunu KAPSAYICI verir (dd- sözleşmesi); satır yüksekliğini
+   büyütmemek için 19px'te kalır. Takım rengi çerçevesi YOK: satırın sol
+   kenarındaki mavi/kırmızı şerit tarafı zaten söylüyor.
+   champion null → kutu yer kaplar ama görünmez, adlar hizada kalır.
+   Boş kutunun sınıfı "mc-none"dur, "empty" DEĞİL: global `.empty` kuralı
+   (padding: 40px 0) satırı 88px'e şişiriyordu — bu tuzağa üçüncü düşüş. */
+.mc-champ { flex: 0 0 auto; align-self: center; width: 19px; height: 19px; }
+.mc-champ.mc-none { visibility: hidden; }
+/* Dar ekranda satır ÜÇ sabit parça taşır (rol · portre · delta) ve ada pay
+   kalmaz. Portrenin maliyeti burada geri kazanılır: rol etiketi min-width'siz
+   ve küçük punto, boşluklar/iç kenar kısılır. Ölçüm (320px, mock, Geçmiş):
+   TR taşma 3px → 0px, EN 14px → 9px; yani portre EKLENDİĞİ HALDE mevcut taşma
+   büyümez, küçülür. Adın gördüğü genişlik de artar (~32px → ~46px). */
+@media (max-width: 420px) {
+  .match-teams .team li { gap: 4px; padding-left: 6px; }
+  .match-teams .pos-tag { min-width: 0; font-size: 10px; letter-spacing: 0; }
+  .match-teams .delta { font-size: 12px; }
+  .match-teams .mc-champ { width: 16px; height: 16px; }
+}
 .match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .btn-void, .btn-roles {
   font-size: 13px;
