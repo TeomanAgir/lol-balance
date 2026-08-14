@@ -20,7 +20,7 @@
     selected: new Set(),        // dengeleme seçimi (player_id)
     manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
-    profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita)
+    profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita | maç detayı)
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
@@ -32,6 +32,7 @@
     badges: null,               // GET /players/{id}/badges yanıtı (GÖREV 11+12; null = çekilemedi)
     historyRange: "all",        // grafikteki zaman aralığı: PH_RANGES anahtarı (istemci tarafı)
     histOpen: null,             // grafikte popup'ı açık olan noktanın match_id'si
+    backStack: [],              // profil ⇄ maç detayı geri zinciri (bkz. pushBack)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -310,11 +311,25 @@
   // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
   // profile → profileFrom olarak çözülür.
   // Collector sağlığı (GÖREV 13) TEK yerden açılır (Manuel) → sabit eşleme.
-  const tabOf = (name) =>
-    name === "profile" ? tabOf(state.profileFrom) :
-    name === "map" ? tabOf(state.mapFrom) :
-    name === "matchdetail" ? tabOf(state.matchFrom) :
-    name === "health" ? "manual" : name;
+  //
+  // Zincir artık ÇİFT YÖNLÜ olabilir (GÖREV 15: maç detayı satırındaki addan
+  // profile) → profile→matchdetail→profile sonsuz özyinelemeye girerdi. Bu yüzden
+  // çözüm döngüsel yürütülür: bir ad ikinci kez gelirse zincirin GERÇEK kökü
+  // geri yığınının dibindeki karedir (zincire ilk girilen görünüm), o da yoksa
+  // maç detayının doğal sekmesi ("matches") kullanılır.
+  const DETAIL_FROM = {
+    profile: () => state.profileFrom,
+    map: () => state.mapFrom,
+    matchdetail: () => state.matchFrom,
+    health: () => "manual",
+  };
+  function tabOf(name, seen) {
+    seen = seen || new Set();
+    while (DETAIL_FROM[name] && !seen.has(name)) { seen.add(name); name = DETAIL_FROM[name](); }
+    if (!DETAIL_FROM[name]) return name;
+    const root = state.backStack[0];
+    return root && !seen.has(root.from) ? tabOf(root.from, seen) : "matches";
+  }
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
@@ -325,8 +340,10 @@
     window.scrollTo({ top: 0 });
     loaders[name](forceReload).catch(e => toast(e.message));
   }
+  // Sekmeye basmak zinciri TERK ETMEKTİR: birikmiş geri kareleri düşer
+  // (yeni zincir sıfırdan kurulur, bayat kare geri düğmesine karışmaz).
   document.querySelectorAll(".tab").forEach(tb =>
-    tb.addEventListener("click", () => showView(tb.dataset.view)));
+    tb.addEventListener("click", () => { clearBack(); showView(tb.dataset.view); }));
 
   async function fetchRoster(force = false) {
     if (state.roster.length && !force) return state.roster;
@@ -348,7 +365,7 @@
       card.classList.toggle("nem-pick", nemIds.has(p.id));
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
-        `<span class="p-name">${p.display_name}</span>` +
+        `<span class="p-name">${esc(p.display_name)}</span>` +
         `<span class="p-meta">${fmtRating(p.rating.score)} · ${t("common.n_matches", { n: p.matches_played })}</span>` +
         roleCells(p.role_ratings);
       card.addEventListener("click", () => {
@@ -445,8 +462,8 @@
     [...members].map(teamEntry)
       .sort((a, b) => roleOrder(a.position) - roleOrder(b.position))
       .map(m => `<li${nemIds && nemIds.has(m.player_id) ? ' class="nem-row"' : ""}>` +
-                `<span class="pos-tag">${roleLabel(m.position)}</span>` +
-                `<span class="p-who">${playerName(m.player_id)}</span></li>`)
+                `<span class="pos-tag">${esc(roleLabel(m.position))}</span>` +
+                `<span class="p-who">${esc(playerName(m.player_id))}</span></li>`)
       .join("") + "</ul>";
 
   // nemesis: yalnız POST /balance/nemesis yanıtında gelir ({source, role, player_ids}) —
@@ -458,7 +475,7 @@
       (nemesis && suggestions.length
         ? `<p class="sug-note">` + t("balance.nem_match_note", {
             pair: esc(nemesis.player_ids.map(playerName).join(" vs ")),
-            role: roleLabel(nemesis.role),
+            role: esc(roleLabel(nemesis.role)),
             source: t(nemesis.source === "weekly" ? "balance.pair_weekly" : "balance.pair_alltime"),
           }) + `</p>`
         : "");
@@ -507,14 +524,72 @@
       btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
   }
 
+  // ── 2a) Detaylar arası geri zinciri (GÖREV 15) ────────────────
+  // Profil grafiğindeki nokta maç detayını, maç detayı satırındaki ad da profili
+  // açar. İki yön AYNI iki görünümü kullandığı için tek bir "nereden geldim"
+  // alanı (profileFrom/matchFrom) zincirde döngüye giriyordu: profil A → maç →
+  // profil B → geri → maç → geri → profil B → geri → maç ... (A'ya hiç dönülmez).
+  //
+  // Çözüm: detaydan detaya geçerken TERK EDİLEN görünümün TAM bağlamı (hangi
+  // oyuncu / hangi maç + o görünümün kendi geri hedefi) bir yığına konur; geri
+  // düğmesi kareyi yığından ÇEKER. Kare tüketildiği için döngü kapanmaz ve
+  // zincir derinlikten bağımsız tutarlıdır (profil A → maç → profil B → geri →
+  // maç → geri → profil A → geri → Sıralama). Sekmeye basmak zinciri terk eder.
+  //
+  // Yığın "tarayıcı geçmişi" DEĞİLDİR: yalnız profil ⇄ maç detayı geçişlerinde
+  // kare birikir. Profilden profile (sinerji linki) eski davranışını korur —
+  // çıkış noktası ilk giriş yeridir, o yüzden orada kare konmaz.
+  const BACK_MAX = 20;   // makul zincir sınırı; taşarsa en eski kare düşer
+  const clearBack = () => { state.backStack.length = 0; };
+  function pushBack(frame) {
+    state.backStack.push(frame);
+    if (state.backStack.length > BACK_MAX) state.backStack.shift();
+  }
+  const profileFrame = () => ({
+    view: "profile", from: state.profileFrom,
+    playerId: state.profileId, range: state.historyRange,
+  });
+  const matchFrame = () => ({
+    view: "matchdetail", from: state.matchFrom,
+    match: state.matchDetail, stat: state.matchStat,
+  });
+
+  function restoreFrame(f) {
+    if (f.view === "profile") {
+      state.profileId = f.playerId;
+      state.profileFrom = f.from;
+      state.historyRange = f.range;
+      // Önbellekler başka oyuncuya ait olabilir: profil zaten her açılışta taze çeker.
+      state.ratingHistory = null;
+      state.badges = null;
+    } else {
+      state.matchDetail = f.match;
+      state.matchStat = f.stat;
+      state.matchFrom = f.from;
+    }
+    showView(f.view);
+  }
+
+  // Geri: yığının tepesi beklenen görünümse ona KENDİ bağlamıyla dönülür.
+  // Kare yoksa (zincir sekme değişimiyle kopmuş ya da BACK_MAX'ı taşmış) zincir
+  // temizlenip güvenli sekmeye düşülür — asla döngüye girilmez.
+  function goBack(expect, fallback) {
+    const top = state.backStack[state.backStack.length - 1];
+    if (top && top.view === expect) { restoreFrame(state.backStack.pop()); return; }
+    clearBack();
+    showView(fallback);
+  }
+
   // ── 2b) Oyuncu profili (GÖREV 1) ──────────────────────────────
   // Alt sekmelerin dışında bir "detay" görünümü: sıralamadan açılır, geri döner.
   // Geri düğmesi metinleri sözlükten gelir; dil değişince abone yeniden yazar.
-  const BACK_VIEWS = ["leaderboard", "highlights", "map"];
+  const BACK_VIEWS = ["leaderboard", "highlights", "map", "matchdetail"];
   const backLabel = (from) =>
     t("common.back_" + (BACK_VIEWS.includes(from) ? from : "leaderboard"));
 
-  function openProfile(id) {
+  // from: profilin hangi görünümden açıldığı (varsayılan: açık görünüm).
+  // Yalnız maç detayı satırındaki ad (GÖREV 15) bunu açıkça verir.
+  function openProfile(id, from) {
     // Yeni oyuncu → tarihçe grafiği baştan başlar (aralık seçimi taşınmaz),
     // rozet vitrini de önceki oyuncunun verisiyle bir an görünmesin diye sıfırlanır.
     if (id !== state.profileId) {
@@ -523,12 +598,19 @@
       state.badges = null;
     }
     state.profileId = id;
+    const src = from || currentView;
+    // Maç detayından geliniyorsa detayın kendi bağlamı saklanır (geri o maça döner).
+    if (src === "matchdetail") pushBack(matchFrame());
     // Profilden profile geçilebilir (sinerji linkleri) — çıkış noktası ilk giriş yeridir.
-    if (currentView !== "profile") state.profileFrom = currentView;
-    $("#btn-profile-back").textContent = backLabel(state.profileFrom);
+    else if (src !== "profile") clearBack();
+    if (src !== "profile") state.profileFrom = src;
     showView("profile");
   }
-  $("#btn-profile-back").addEventListener("click", () => showView(state.profileFrom));
+  $("#btn-profile-back").addEventListener("click", () => {
+    if (state.profileFrom === "matchdetail") { goBack("matchdetail", "matches"); return; }
+    clearBack();
+    showView(state.profileFrom);
+  });
 
   const num1 = (x) => (typeof x === "number" ? x.toFixed(1) : "—");
   const num2 = (x) => (typeof x === "number" ? x.toFixed(2) : "—");
@@ -601,7 +683,7 @@
         fc ? esc(fc.champion) : "—",
         fc ? t("profile.champ_line", { n: fc.matches, pct: pctText(fc.winrate) }) : t("profile.no_champion_data")) +
       statCard(t("profile.card_role"),
-        fr ? roleLabel(fr.role) : "—",
+        fr ? esc(roleLabel(fr.role)) : "—",
         fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data")) +
       // Favori eşya kartı yalnız uygun kayıt varsa şeride girer (GÖREV 14).
       (fi ? favItemCard(fi) : "");
@@ -639,6 +721,10 @@
   }
 
   async function loadProfile() {
+    // Geri düğmesi metni burada yazılır (maç detayındaki desenin aynısı): profil
+    // hem openProfile'dan hem geri zincirinden (restoreFrame) açılıyor, dil de
+    // değişebiliyor — tek yer yazarsa etiket her yolda doğru kalır.
+    $("#btn-profile-back").textContent = backLabel(state.profileFrom);
     const box = $("#profile-body");
     if (state.profileId == null) {
       box.innerHTML = `<p class='empty'>${t("profile.no_player")}</p>`;
@@ -1097,7 +1183,7 @@
     return `<div class="nem-card">
         ${nemLink(a, "nem-who")}
         <div class="nem-mid">
-          <span class="nem-role">${roleLabel(pair.role)}</span>
+          <span class="nem-role">${esc(roleLabel(pair.role))}</span>
           <span class="nem-score">${a.wins}–${b.wins}</span>
           <span class="nem-sub">${t("highlights.encounters", { n: pair.encounters })}</span>
         </div>
@@ -1121,7 +1207,7 @@
         body += `<p class="nem-weekly">` + t("highlights.weekly_pair", {
             a: nemLink(wa, "nem-link"),
             b: nemLink(wb, "nem-link"),
-            role: roleLabel(wk.role),
+            role: esc(roleLabel(wk.role)),
             enc: t("highlights.encounters", { n: wk.encounters }),
             close: t("highlights.close", { pct: nemPct(wk.closeness) }),
           }) +
@@ -1239,7 +1325,9 @@
   function openMap() {
     if (currentView !== "map") {
       const from = currentView === "profile" ? state.profileFrom : currentView;
-      state.mapFrom = from === "map" ? "highlights" : from; // kendine dönen geri düğmesi olmasın
+      // Kendine dönen geri düğmesi olmasın; maç detayı da harita için geri hedefi
+      // DEĞİLDİR (o zincir yığınla yürür, harita zincire girmez).
+      state.mapFrom = (from === "map" || from === "matchdetail") ? "highlights" : from;
     }
     $("#btn-map-back").textContent = backLabel(state.mapFrom);
     showView("map");
@@ -1353,7 +1441,7 @@
               : `<span class="delta none">—</span>`;
             return `<li>${mcRoleHtml(p.position)}` +
                    mcChampHtml(p.champion) +
-                   `<span class="p-who">${p.display_name}</span>${deltaHtml}</li>`;
+                   `<span class="p-who">${esc(p.display_name)}</span>${deltaHtml}</li>`;
           }).join("") + "</ul>";
       };
       // Rol düzeltme paneli: yalnız DEĞİŞEN roller PUT edilir (kısmi güncelleme serbest).
@@ -1365,9 +1453,9 @@
             const opts = `<option value=""${cur === "" ? " selected" : ""}>—</option>` +
               ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${roleName(r)}</option>`).join("");
             return `<li class="re-row ${p.team === 100 ? "blue" : "red"}">
-                <span class="p-who">${p.display_name}</span>
-                <select data-player="${p.player_id}" data-original="${cur}"
-                        aria-label="${t("matches.role_select_aria", { name: p.display_name })}">${opts}</select>
+                <span class="p-who">${esc(p.display_name)}</span>
+                <select data-player="${p.player_id}" data-original="${esc(cur)}"
+                        aria-label="${esc(t("matches.role_select_aria", { name: p.display_name }))}">${opts}</select>
               </li>`;
           }).join("");
         return `<div class="role-editor" hidden>
@@ -1512,10 +1600,11 @@
     return rows;
   }
 
-  // side: {name, champ, value} — eşleşmeyen satırda taraf boş olabilir.
+  // side: {id, name, champ, value} — eşleşmeyen satırda taraf boş olabilir.
+  // id = player_id (contract §3 katılımcı alanı): ad düğmesi profili buradan açar.
   const mdSide = (p, key) =>
-    p ? { name: p.display_name, champ: p.champion, value: mdValue(p, key) }
-      : { name: "—", champ: null, value: null };
+    p ? { id: p.player_id, name: p.display_name, champ: p.champion, value: mdValue(p, key) }
+      : { id: null, name: "—", champ: null, value: null };
   // Takım toplamı: null'lar toplama girmez; hepsi null ise toplam da null'dır.
   const mdTeamSum = (parts, key) => {
     const vals = parts.map(p => mdValue(p, key)).filter(v => v != null);
@@ -1548,6 +1637,17 @@
   // etiket "?") eski metin kısaltma aynen kalır. Beş sekme de bunu kullanır.
   const mdRoleHtml = (role) => posIconHtml(role, role ? roleAbbr(role) : "?", "md-role");
 
+  // Satır başlığındaki ad hücresi — BEŞ sekmenin de (build dahil) ortak şablonu.
+  // Oyuncu biliniyorsa profile giden GERÇEK düğmedir (Sıralama'daki .name-link
+  // deseni: Tab ile odaklanır, Enter/Space çalışır), eşleşmeyen taraf ("—") ve
+  // TOPLAM satırı düz metin kalır. Şampiyon alt yazısı tıklama alanına dahildir.
+  // inner ZATEN kaçırılmış HTML'dir (esc çağıranda yapılır).
+  function mdNameHtml(side, id, inner) {
+    if (id == null) return `<span class="md-name ${side}">${inner}</span>`;
+    return `<button type="button" class="md-name md-name-btn ${side}" data-player="${id}"` +
+      ` title="${esc(t("matchdetail.open_profile"))}"><span class="md-name-txt">${inner}</span></button>`;
+  }
+
   function mdRowHtml(roleHtml, left, right, stat, gmax) {
     const lv = left.value, rv = right.value;
     const width = (v) => (gmax > 0 && v != null ? (v / gmax) * 100 : 0).toFixed(1);
@@ -1559,9 +1659,11 @@
       : `<span class="md-star off" aria-hidden="true">⭐</span>`;
     return `<div class="md-row">
         <div class="md-row-names">
-          <span class="md-name blue">${esc(left.name)}${left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""}</span>
+          ${mdNameHtml("blue", left.id,
+            esc(left.name) + (left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""))}
           ${roleHtml}
-          <span class="md-name red">${right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : ""}${esc(right.name)}</span>
+          ${mdNameHtml("red", right.id,
+            (right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : "") + esc(right.name))}
         </div>
         <div class="md-bars">
           <span class="md-val left${mdLead(lv, rv)}">${star(isMax(lv))} ${mdFmt(stat, lv)}</span>
@@ -1666,12 +1768,15 @@
   // Satır başlığı diğer sekmelerle aynı (ad · rol · ad) — şampiyon adı portrede
   // zaten var, bu yüzden burada tekrarlanmaz.
   function mbRowHtml(roleHtml, blue, red) {
-    const nm = (p) => esc(p ? p.display_name : "—");
+    // Ad hücresi diğer dört sekmeyle AYNI şablondur (mdNameHtml) → profile tık
+    // beş sekmede de aynı davranır.
+    const cell = (p, side) =>
+      mdNameHtml(side, p ? p.player_id : null, esc(p ? p.display_name : "—"));
     return `<div class="md-row mb-row">
         <div class="md-row-names">
-          <span class="md-name blue">${nm(blue)}</span>
+          ${cell(blue, "blue")}
           ${roleHtml}
-          <span class="md-name red">${nm(red)}</span>
+          ${cell(red, "red")}
         </div>
         <div class="mb-sides">${mbSideHtml(blue, "blue")}${mbSideHtml(red, "red")}</div>
       </div>`;
@@ -1753,11 +1858,19 @@
   // "profile" (GÖREV 10: rating tarihçesi grafiğindeki nokta). Geri düğmesi ve
   // yanan sekme (tabOf) buna bakar.
   function openMatchDetail(m, from) {
+    // Profilden geliniyorsa profilin bağlamı (kim, kendi geri hedefi, grafik
+    // aralığı) yığına konur: detayın geri düğmesi TAM o profile döner (GÖREV 15).
+    if (from === "profile") pushBack(profileFrame());
+    else clearBack();   // Geçmiş kartı: yeni zincirin başı
     state.matchDetail = m;
     state.matchFrom = from === "profile" ? "profile" : "matches";
     showView("matchdetail");
   }
-  $("#btn-matchdetail-back").addEventListener("click", () => showView(state.matchFrom));
+  $("#btn-matchdetail-back").addEventListener("click", () => {
+    if (state.matchFrom === "profile") { goBack("profile", "leaderboard"); return; }
+    clearBack();
+    showView(state.matchFrom);
+  });
 
   // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir.
   async function loadMatchDetail() {
@@ -1781,6 +1894,10 @@
         state.matchStat = btn.dataset.stat;
         loadMatchDetail();
       }));
+    // Satır başlığındaki ad → o oyuncunun profili (GÖREV 15). "matchdetail"
+    // kaynağı geri zincirine bu maçın bağlamını koydurur.
+    box.querySelectorAll(".md-name-btn").forEach(btn =>
+      btn.addEventListener("click", () => openProfile(Number(btn.dataset.player), "matchdetail")));
   }
 
   // Fare ve klavye aynı tooltip'i açar; ayrılmak (mouseleave/blur) kapatır.
@@ -1805,7 +1922,7 @@
       const row = document.createElement("div");
       row.className = "manual-row";
       row.innerHTML =
-        `<span class="p-name">${p.display_name}</span>
+        `<span class="p-name">${esc(p.display_name)}</span>
          <div class="team-toggle">
            <button type="button" class="tt-blue" aria-pressed="false">${t("common.blue")}</button>
            <button type="button" class="tt-red" aria-pressed="false">${t("common.red")}</button>

@@ -1285,6 +1285,36 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .md-name.red { text-align: right; }
 .md-champ { color: var(--muted); font-size: 11px; }
+/* Ad artık profile giden GERÇEK düğme (GÖREV 15) — görünüm değişmez:
+   - justify-self start/end + max-width:100% → düğme metnin genişliğinde durur,
+     ızgara sütunları (minmax(0,1fr) auto minmax(0,1fr)) dokunulmaz kalır, yani
+     rol göstergesinin tam merkez hizası korunur;
+   - kırpma İÇ span'dadır: button'un anonim iç kutusu yüzünden text-overflow
+     doğrudan düğmede her tarayıcıda çalışmaz;
+   - tıklanabilirlik yalnız hover/klavye odağında belli olur (Sıralama'daki
+     .name-link vurgusunun aynısı: pirinç renk + noktalı alt çizgi). Alt çizgi
+     text-decoration'dır, border DEĞİL: satır yüksekliğini 1px bile oynatmaz.
+   Şampiyon alt yazısı düğmenin içindedir ama .md-champ rengini korur. */
+.md-name-btn {
+  padding: 0;
+  max-width: 100%;
+  min-width: 0;
+  justify-self: start;
+  text-align: left;
+}
+.md-name-btn.red { justify-self: end; }
+.md-name-btn > .md-name-txt {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-name-btn:hover, .md-name-btn:focus-visible { color: var(--brass); }
+.md-name-btn:hover > .md-name-txt,
+.md-name-btn:focus-visible > .md-name-txt {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
 /* Rol göstergesi: metin etiket ya da (varlıklar varsa) ortak .pos-ico simgesi.
    --pos-ico = 17.5px: metnin ölçülen render yüksekliği 15.95px (11px x 1.45
    satır yüksekliği), simge onun ~%10 üstünde. Satır yüksekliğini isim sütunu
