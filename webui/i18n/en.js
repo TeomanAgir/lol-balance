@@ -197,7 +197,7 @@ window.I18N_DICTS.en = {
   "matchdetail.legend_gauge": "needle = share (center line 50%)",
   "matchdetail.no_items": "No item data",
   "matchdetail.champ_unknown": "Unknown champion",
-  "matchdetail.build_hint": "Items are shown in end-of-game inventory order, the last slot is the trinket. Tap an icon or focus it with the keyboard to see its name and a short description (Esc closes).",
+  "matchdetail.build_hint": "Items are shown in end-of-game inventory order; the trinket is always shown in the last slot. Tap an icon or focus it with the keyboard to see its name and a short description (Esc closes).",
   "matchdetail.hint": "Bars use a global scale: the best value in the selected stat is 100% (marked with a star), everyone else is scaled to it. The TOTAL row has no bars. Players with an unknown role are paired on \"?\" rows.",
   "manual.hint": "If the collector didn't run, enter the match here. Assign a team to every player: 5 blue, 5 red.",
   "manual.health_link": "Collector health →",

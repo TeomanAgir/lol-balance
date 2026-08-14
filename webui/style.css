@@ -1435,7 +1435,9 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 /* ── Maç detayı BUILD sekmesi (GÖREV 14) — "mb-" öneki ──
    Rol-eşleşmeli satır: solda mavi (portre + eşyalar), sağda kırmızı AYNALI
    (row-reverse → portre dış kenarda, eşyalar içeri doğru dizilir).
-   Eşya sırası HAM sıradır (son slot totem), yeniden sıralanmaz.
+   Eşya sırası HAM sıradır; tek istisna ziynet eşyasıdır (Trinket etiketi):
+   o her zaman 7. slota alınır, boş kutular ondan ÖNCE toplanır (bkz. app.js
+   mbOrderItems). Kırmızı taraf aynası row-reverse ile korunur.
    Slotlar sarar ve --mb-slot ile küçülür → 320px'de yatay taşma yok. */
 .mb-graph { --mb-slot: 26px; --mb-champ: 32px; }
 .mb-sides { display: flex; align-items: flex-start; gap: 10px; }

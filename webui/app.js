@@ -179,14 +179,19 @@
   // Sözlükte olmayan/kaldırılmış eşya adı "Esya #id" olarak gösterilir.
   const itemName = (id) => ddText(itemMeta(id), "name") || t("common.item_unknown", { id });
   const itemDesc = (id) => ddText(itemMeta(id), "desc");
+  // Etiketler yalnız dd varlıkları yüklüyken bilinir; varlık yoksa BOŞ dizi
+  // döner → etikete dayalı her karar (eleme, totem tespiti) devre dışı kalır.
+  const itemTags = (id) => {
+    const meta = itemMeta(id);
+    return meta && Array.isArray(meta.tags) ? meta.tags : [];
+  };
   // Favori eşya seçiminde atlanan etiketler (api_contract §2 "top_items":
   // eleme backend'de DEĞİL burada yapılır, backend eşya meta verisi bilmez).
   const SKIP_TAGS = ["Trinket", "Consumable"];
-  const itemSkipped = (id) => {
-    const meta = itemMeta(id);
-    const tags = meta && Array.isArray(meta.tags) ? meta.tags : [];
-    return tags.some(x => SKIP_TAGS.indexOf(x) !== -1);
-  };
+  const itemSkipped = (id) => itemTags(id).some(x => SKIP_TAGS.indexOf(x) !== -1);
+  // Ziynet eşyası (totem): "Trinket" etiketi. Kontrol totemi (2055) Consumable'dır,
+  // Trinket DEĞİL — bilerek taşınmaz, normal eşya gibi sırasında kalır.
+  const itemIsTrinket = (id) => itemTags(id).indexOf("Trinket") !== -1;
   const itemIconSrc = (id) =>
     itemMeta(id) ? DD_BASE + "item/" + encodeURIComponent(String(id)) + ".png" : null;
   const champIconSrc = (name) => {
@@ -1581,8 +1586,27 @@
   // Slot sayısı EOG envanteriyle aynıdır: 6 eşya + son slotta totem. Eksik slotlar
   // boş kutu olarak çizilir ki satırlar hizada kalsın.
   // items alanı üç durumu ayırır (api_contract §3): NULL = bilinmiyor (kısa metin),
-  // [] = bilgi var/envanter boş (boş slotlar), dolu dizi = HAM sıra (yeniden sıralanmaz).
+  // [] = bilgi var/envanter boş (boş slotlar), dolu dizi = HAM sıra.
   const MB_SLOTS = 7;
+
+  // Ziynet eşyası HER ZAMAN 7. (son) slotta durur. EOG envanteri totemi ortada
+  // bırakabiliyor (oyuncu envanterinde nereye düştüyse orada); satırlar arasında
+  // göz karşılaştırması yapılabilsin diye görüntü sırası sabitlenir.
+  // SADECE GÖRÜNTÜ SIRASIDIR: API/mock verisi ve tooltip içerikleri değişmez.
+  // Varlıklar yoksa etiket bilinmez → tahmin YOK, ham sıra aynen korunur.
+  // Dönüş dizisinde null = boş kutu (boşluklar totemden ÖNCE, sona doğru toplanır).
+  function mbOrderItems(list) {
+    if (!DD.items) return list;
+    const i = list.findIndex(itemIsTrinket);
+    // Totem yoksa ham sıra: 7 eşya da yerinde kalır, eksikler sonda boş kutu olur.
+    if (i === -1) return list;
+    // Birden çok Trinket etiketli eşya varsa yalnız İLKİ sona taşınır, diğerleri
+    // normal sırasında kalır. i çıkarıldığı için rest en fazla MB_SLOTS-1 uzundur.
+    const rest = list.slice(0, i).concat(list.slice(i + 1));
+    while (rest.length < MB_SLOTS - 1) rest.push(null);
+    rest.push(list[i]);
+    return rest;
+  }
 
   // Tooltip taşıyan slot: role="img" + tabindex → klavyeyle odaklanır ama
   // TIKLANABİLİR DEĞİLDİR (button değil, bir yere gitmez). Ad/açıklama data-*
@@ -1616,8 +1640,8 @@
     if (p.items == null) {
       body = `<span class="mb-none">${t("matchdetail.no_items")}</span>`;
     } else {
-      const list = Array.isArray(p.items) ? p.items.slice(0, MB_SLOTS) : [];
-      const slots = list.map(mbItemHtml);
+      const list = mbOrderItems(Array.isArray(p.items) ? p.items.slice(0, MB_SLOTS) : []);
+      const slots = list.map(id => (id == null ? mbEmptySlot() : mbItemHtml(id)));
       while (slots.length < MB_SLOTS) slots.push(mbEmptySlot());
       body = `<span class="mb-items">${slots.join("")}</span>`;
     }
