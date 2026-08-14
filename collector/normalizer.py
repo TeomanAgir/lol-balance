@@ -35,6 +35,11 @@ _CS_NEUTRAL_KEYS = ["NEUTRAL_MINIONS_KILLED", "neutralMinionsKilled"]
 
 _POSITION_ALIASES = {"MID": "MIDDLE", "BOT": "BOTTOM", "SUPPORT": "UTILITY", "SUP": "UTILITY"}
 
+#: Envanterdeki en fazla eşya sayısı: 6 slot + trinket (ingest_contract "items").
+MAX_ITEMS = 7
+#: Match-history kayıtlarında envanter slotlarının alan adları (sıra = slot sırası).
+MH_ITEM_KEYS = tuple(f"item{index}" for index in range(MAX_ITEMS))
+
 
 def _pick_int(raw: dict[str, Any], candidates: list[str]) -> Optional[int]:
     for key in candidates:
@@ -102,14 +107,14 @@ def _declared_position(raw_player: dict[str, Any]) -> Optional[str]:
     return _explicit_position(raw_player) or _detected_position(raw_player)
 
 
-def _declared_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
-    """Ham maçtaki beyan edilen position alanları (açık > tespit) → `{key: rol}`.
+def _keyed_participants(raw: dict[str, Any]) -> list[tuple[Any, dict[str, Any]]]:
+    """Ham maçtaki katılımcılar → `[(anahtar, ham katılımcı kaydı)]`.
 
     Anahtarlama `role_infer.infer_positions` ile BİREBİR aynıdır (puuid varsa
-    puuid, yoksa participantId/index) — iki sözlük bu sayede birleştirilebilir.
+    puuid, yoksa participantId/index) — bu sayede buradan üretilen sözlükler
+    (rol, eşya) tahmin sözlükleriyle birleştirilebilir ve `backfill-*`
+    komutlarında aynı puuid → player_id eşlemesi kullanılabilir.
     """
-    declared: dict[Any, Optional[str]] = {}
-
     if raw.get("participants"):  # match-history formatı
         identities: dict[int, dict[str, Any]] = {}
         for identity in raw.get("participantIdentities") or []:
@@ -117,22 +122,28 @@ def _declared_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
                 identities[int(identity.get("participantId", -1))] = identity.get("player") or {}
             except (TypeError, ValueError):
                 continue
+        keyed: list[tuple[Any, dict[str, Any]]] = []
         for index, p in enumerate(raw["participants"]):
             try:
                 participant_id = int(p.get("participantId", index))
             except (TypeError, ValueError):
                 participant_id = index
             player = identities.get(participant_id, {})
-            key = player.get("puuid") or p.get("puuid") or participant_id
-            declared[key] = _declared_position(p)
-        return declared
+            keyed.append((player.get("puuid") or p.get("puuid") or participant_id, p))
+        return keyed
 
-    index = 0  # EOG formatı
+    keyed = []  # EOG formatı
+    index = 0
     for team in raw.get("teams") or []:
         for player in team.get("players") or []:
-            declared[player.get("puuid") or index] = _declared_position(player)
+            keyed.append((player.get("puuid") or index, player))
             index += 1
-    return declared
+    return keyed
+
+
+def _declared_positions(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
+    """Ham maçtaki beyan edilen position alanları (açık > tespit) → `{key: rol}`."""
+    return {key: _declared_position(p) for key, p in _keyed_participants(raw)}
 
 
 def positions_from_raw(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
@@ -150,6 +161,72 @@ def positions_from_raw(raw: dict[str, Any]) -> dict[Any, Optional[str]]:
         if position:
             resolved[key] = position
     return resolved
+
+
+def _clean_item_ids(values: Any) -> list[int]:
+    """Ham eşya id dizisi → contract'a uygun liste (GÖREV 14).
+
+    Kurallar (ingest_contract "items"): ham SIRA korunur, boş slotlar (`0`) ve
+    anlamsız değerler (negatif, int'e çevrilemeyen) ATILIR, en fazla `MAX_ITEMS`
+    eleman kalır. Boş envanter `[]` döner — "bilgi var ama envanter boş".
+    """
+    cleaned: list[int] = []
+    for value in values or []:
+        if isinstance(value, bool):  # True/False int'e çevrilebilir ama eşya değildir
+            continue
+        try:
+            item_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if item_id <= 0:  # 0 = boş slot, negatif = bozuk veri
+            continue
+        cleaned.append(item_id)
+        if len(cleaned) >= MAX_ITEMS:
+            break
+    return cleaned
+
+
+def eog_items(raw_player: dict[str, Any]) -> Optional[list[int]]:
+    """Canlı EOG oyuncusunun maç sonu envanteri (`items` dizisi) → id listesi.
+
+    Alan hiç yoksa (eski şema) `None` döner — "bilgi yok"; bu durumda payload'a
+    `items` alanı KONMAZ (bkz. `models.Participant`).
+    """
+    values = raw_player.get("items")
+    if not isinstance(values, list):
+        return None
+    return _clean_item_ids(values)
+
+
+def mh_items(raw_participant: dict[str, Any]) -> Optional[list[int]]:
+    """Match-history katılımcısının `item0..item6` slotları → id listesi.
+
+    Gerçek kayıtlarda slotlar `stats` altındadır (bkz.
+    `fixtures/mh_game_custom_real.json`); bazı sürümler katılımcı kaydının
+    kendisinde taşır, ikisi de denenir. Hiçbir slot alanı yoksa `None`.
+    """
+    stats = raw_participant.get("stats")
+    sources = [stats if isinstance(stats, dict) else {}, raw_participant]
+    values: list[Any] = []
+    found = False
+    for key in MH_ITEM_KEYS:
+        for source in sources:
+            if key in source:
+                values.append(source[key])
+                found = True
+                break
+    return _clean_item_ids(values) if found else None
+
+
+def items_from_raw(raw: dict[str, Any]) -> dict[Any, Optional[list[int]]]:
+    """Ham maç (EOG veya match-history) → `{key: eşya listesi veya None}`.
+
+    Anahtarlama `positions_from_raw` ile aynıdır (puuid varsa puuid), böylece
+    `backfill-items` rolle aynı oyuncu eşleme yolunu kullanabilir. `None`,
+    kaynakta o katılımcı için hiç eşya bilgisi olmadığı anlamına gelir.
+    """
+    extract = mh_items if raw.get("participants") else eog_items
+    return {key: extract(participant) for key, participant in _keyed_participants(raw)}
 
 
 def _riot_id(gamename: Any, tagline: Any, fallback_name: Any = None) -> Optional[str]:
@@ -322,6 +399,8 @@ def normalize_eog(
                     position=position_for(resolved_positions, puuid, index_key),
                     champion=champion or None,
                     stats=_extract_stats(player.get("stats") or {}),
+                    # GÖREV 14: maç sonu envanteri; alan yoksa None → payload'a girmez
+                    items=eog_items(player),
                 )
             )
 
@@ -431,6 +510,8 @@ def normalize_match_history_game(
                 position=position_for(resolved_positions, puuid, participant_id),
                 champion=champion,
                 stats=_extract_stats(p.get("stats") or {}),
+                # GÖREV 14: item0..item6 slotları; hiç slot yoksa None → payload'a girmez
+                items=mh_items(p),
             )
         )
 

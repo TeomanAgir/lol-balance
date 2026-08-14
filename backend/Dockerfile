@@ -13,6 +13,11 @@ COPY backend/app/ ./app/
 COPY backend/migrations/ ./migrations/
 COPY webui/ ./webui/
 
+# GÖREV 14: Data Dragon varlıkları imaj kurulumunda indirilir (build-time
+# vendoring, api_contract §8) — canlıda tarayıcı dışarı istek atmaz.
+COPY deploy/fetch_ddragon.py ./fetch_ddragon.py
+RUN python fetch_ddragon.py && rm fetch_ddragon.py
+
 ENV DB_PATH=/data/lol_balance.db \
     WEBUI_DIR=/app/webui
 

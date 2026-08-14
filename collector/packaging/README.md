@@ -81,6 +81,7 @@ Türkçe yazar (`API anahtarı REDDEDİLDİ`, `Backend'e ULAŞILAMADI` gibi).
 | Yanlış anahtar/adres girdim | Exe'yi `--setup` ile çalıştır ya da yanındaki `.env`'i düzenle |
 | Programı kapalıyken maç oynadım | Maçlar kaçmaz: exe açılışta son 14 günü kendi tarar; daha eskisi için `--backfill` |
 | Rolleri sonradan düzeltmek | `backfill-positions` (kontrol için `--dry-run` ekle) |
+| Eski maçlarda eşyalar görünmüyor | `backfill-items` — arşivdeki maçların eşya envanterlerini yükler (kontrol için `--dry-run`) |
 | Pencere hemen kapanıyor | Kapanmaz; hata olsa bile "Kapatmak için Enter'a bas" der |
 
 Argümanlı çalıştırmak için klasörde bir komut istemi aç:
@@ -91,6 +92,7 @@ LoLBalanceCollector.exe --setup
 LoLBalanceCollector.exe --backfill --since 2026-08-01
 LoLBalanceCollector.exe backfill --since 2026-08-01     (aynısı, tiresiz)
 LoLBalanceCollector.exe backfill-positions --dry-run
+LoLBalanceCollector.exe backfill-items --dry-run
 ```
 
 Aynı maç iki kez gönderilse bile backend'de tek kayıt olur (idempotent), bu yüzden

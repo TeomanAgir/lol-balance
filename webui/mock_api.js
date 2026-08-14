@@ -77,6 +77,29 @@
   let nextMatchId = 100;
   const matches = [];
 
+  // ── Eşya envanterleri (GÖREV 14) ──
+  // api_contract §3: `items` HAM sıradır (son slot totem), 0-7 eleman; NULL =
+  // "bilinmiyor" (eski exe/eski maç), [] = "bilgi var, envanter boş".
+  // Roller gerçekçi build'ler taşır; 5. slot seed'e göre değişir → top_items
+  // sayımları oyuncudan oyuncuya farklılaşır. Totem her build'in SON slotudur:
+  // profildeki favori eşya süzgeci (Trinket/Consumable atlanır) böylece görünür
+  // bir yol izler — sayımda en tepede totem çıkar, kart ilk gerçek eşyayı gösterir.
+  const BUILDS = {
+    TOP:     [3068, 3075, 3047, 3065, 3143, 1031, 3340],
+    JUNGLE:  [6692, 3142, 3814, 3047, 3036, 1037, 3340],
+    MIDDLE:  [6655, 3157, 3020, 4645, 3135, 1058, 3340],
+    BOTTOM:  [3031, 3094, 3006, 3072, 3036, 1055, 3340],
+    UTILITY: [3877, 3011, 3222, 3504, 2055, 3107, 3364],
+  };
+  const ALT_ITEMS = [3033, 3026, 3156, 3053, 3742, 3115];
+
+  function mkItems(pid, position, seed) {
+    const base = BUILDS[position] || BUILDS.MIDDLE;
+    const build = base.slice();
+    build[4] = ALT_ITEMS[(pid + seed) % ALT_ITEMS.length];
+    return build;
+  }
+
   // Tek katılımcı üretici (ana geçmiş + nemesis senaryosu ortak kullanır).
   // seed yalnız istatistikleri çeşitlendirir; hepsi deterministiktir.
   function mkParticipant(pid, team, position, winner, seed) {
@@ -100,6 +123,7 @@
         damage_to_champs: 9000 + ((pid * 1723 + seed * 431) % 22000),
         vision_score: 5 + ((pid * 3 + seed) % 40),
       },
+      items: mkItems(pid, position, seed),
       rating_change: {
         mu_before: +((p ? p.rating.mu : 25) - delta).toFixed(2),
         sigma_before: +((p ? p.rating.sigma : 8.333) + 0.05).toFixed(3),
@@ -137,6 +161,14 @@
         // m === 3 maçında mavi takımda MÜKERRER rol (iki ORMAN, TOP yok) — maç
         // detayının rol eşleştirmesi artakalanları "?" satırına düşürmeli.
         if (m === 3 && i === 0) part.position = "JUNGLE";
+        // Eşya senaryoları (GÖREV 14) — BUILD sekmesinin üç yolu da denenebilsin:
+        //   null = bilinmiyor ("eşya bilgisi yok"), [] = boş slotlar,
+        //   kısa dizi = dolu + boş slot karışımı, 9999 = kaldırılmış/bilinmeyen
+        //   id (yer tutucu kutuya düşer).
+        if (m === 0 && i === 3) part.items = null;
+        if (m === 0 && i === 8) part.items = [];
+        if (m === 2 && i === 5) part.items = [3031, 1055];
+        if (m === 4 && i === 1) part.items[2] = 9999;
         return part;
       }),
     });
@@ -244,6 +276,7 @@
     favorite_champion: null,
     favorite_role: null,
     synergy: [],
+    top_items: [],
   });
 
   function playerStats(id) {
@@ -329,9 +362,23 @@
                       a.display_name.localeCompare(b.display_name))
       .slice(0, 3);
 
+    // top_items (GÖREV 14): yalnız items DOLU maçlar (null olanlar atlanır);
+    // aynı maçta aynı eşya BİR KEZ sayılır; sıra sayım azalan → item_id artan;
+    // en fazla 10 kayıt. Totem/tüketilebilir ELEMESİ BURADA YOKTUR — contract
+    // gereği o seçim web UI'dadır (backend eşya meta verisi bilmez).
+    const itemCounts = new Map();
+    for (const { part } of mine) {
+      if (!Array.isArray(part.items)) continue;
+      for (const id of new Set(part.items)) itemCounts.set(id, (itemCounts.get(id) || 0) + 1);
+    }
+    const top_items = [...itemCounts.entries()]
+      .map(([item_id, n]) => ({ item_id, matches: n }))
+      .sort((a, b) => b.matches - a.matches || a.item_id - b.item_id)
+      .slice(0, 10);
+
     return {
       player: { id: p.id, display_name: p.display_name, riot_id: p.riot_id },
-      totals, kda, favorite_champion, favorite_role, synergy,
+      totals, kda, favorite_champion, favorite_role, synergy, top_items,
     };
   }
 
@@ -877,6 +924,8 @@
             champion: null,
             stats: { kills: null, deaths: null, assists: null, gold: null,
                      cs: null, damage_to_champs: null, vision_score: null },
+            // Manuel girişte envanter bilinmez (GÖREV 14): contract'ta NULL bunu anlatır.
+            items: null,
             rating_change: {
               mu_before: +mu.toFixed(2),
               sigma_before: +sigma.toFixed(3),

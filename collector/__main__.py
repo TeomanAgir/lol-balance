@@ -4,6 +4,7 @@ Canlı mod:    python -m collector            (exe: çift tıklama)
 Backfill:     python -m collector --backfill [--since YYYY-MM-DD]
               python -m collector backfill  [--since YYYY-MM-DD]   (aynısı)
 Rol backfill: python -m collector backfill-positions [--dry-run]
+Eşya backfill:python -m collector backfill-items [--dry-run]
 Kurulum:      python -m collector --setup    (.env'i yeniden oluşturur)
 
 Canlı mod, LCU'ya her bağlandığında canlı döngüden ÖNCE sınırlı bir "oto-yetişme"
@@ -26,6 +27,7 @@ from datetime import date
 
 from . import __version__, i18n
 from .backfill import run_backfill
+from .backfill_items import run_items_backfill
 from .backfill_positions import run_position_backfill
 from .catchup import run_catchup
 from .config import app_dir, find_env_file, is_frozen, load_config
@@ -59,10 +61,13 @@ def _wants_backfill(args: argparse.Namespace) -> bool:
 def _mode_label(args: argparse.Namespace) -> str:
     if args.setup:
         return msg("cli.mode.setup")
-    if args.command == "backfill-positions":
-        return msg("cli.mode.backfill_positions") + (
-            msg("cli.mode.dry_run_suffix") if args.dry_run else ""
+    if args.command in ("backfill-positions", "backfill-items"):
+        label = msg(
+            "cli.mode.backfill_positions"
+            if args.command == "backfill-positions"
+            else "cli.mode.backfill_items"
         )
+        return label + (msg("cli.mode.dry_run_suffix") if args.dry_run else "")
     if _wants_backfill(args):
         return msg("cli.mode.backfill")
     return msg("cli.mode.live")
@@ -89,7 +94,8 @@ def _ensure_env(force_setup: bool = False) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="collector", description=msg("cli.description"))
-    parser.add_argument("command", nargs="?", choices=["backfill", "backfill-positions"],
+    parser.add_argument("command", nargs="?",
+                        choices=["backfill", "backfill-positions", "backfill-items"],
                         default=None, help=msg("cli.help.command"))
     parser.add_argument("--backfill", action="store_true", help=msg("cli.help.backfill"))
     parser.add_argument("--since", type=_parse_since, default=None, metavar="YYYY-MM-DD",
@@ -133,6 +139,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "backfill-positions":
         # LCU'ya ihtiyaç yok: kaynak raw_archive, hedef backend.
         stats = run_position_backfill(config, dry_run=args.dry_run)
+        return 0 if not stats.errors else 1
+
+    if args.command == "backfill-items":
+        # Aynı desen (GÖREV 14): kaynak raw_archive, hedef backend, LCU yok.
+        stats = run_items_backfill(config, dry_run=args.dry_run)
         return 0 if not stats.errors else 1
 
     sender = Sender(config)

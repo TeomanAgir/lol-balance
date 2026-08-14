@@ -69,6 +69,12 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
 - `synergy`: AYNI TAKIMDA birlikte oynanan valid maçlar; en az 2 ortak maç; sıralama
   winrate azalan → matches_together azalan → display_name alfabetik; en fazla 3 kayıt
   döner (UI ilkini "en yüksek sinerji" olarak vurgular). Uygun kimse yoksa `[]`.
+- `top_items` (GÖREV 14): oyuncunun `items` bilgisi DOLU valid maçlarındaki eşya
+  sayımları — `[{"item_id": 3031, "matches": 5}]`, en fazla 10 kayıt, sıralama
+  sayım azalan → item_id artan. Aynı maçta aynı eşya bir kez sayılır. Hiç items'lı
+  maç yoksa `[]`. "Favori eşya" SEÇİMİ web UI'dadır: üretilmiş eşya haritasındaki
+  `tags` ile trinket/tüketilebilir olanlar atlanır, kalan ilk kayıt favori gösterilir
+  (backend eşya meta verisi bilmez).
 - Bilinmeyen oyuncu → `404`.
 - Hassasiyet: tüm oran/ortalama alanları (`*_avg`, `ratio`, `winrate`) 2 ondalığa
   yuvarlanır; sıralama ve eşitlik kırılımları yuvarlanmamış değerle yapılır.
@@ -227,6 +233,8 @@ GET  /matches?limit=20             → son maçlar, katılımcılar ve rating de
 GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı şekil,
                                      bilinmeyen id → 404 (GÖREV 10: profil grafiğinden
                                      maç detayına atlama)
+PUT  /matches/{id}/items           → katılımcı envanterlerini yazar (GÖREV 14
+                                     backfill-items; rating'e etkisi YOK, replay koşmaz)
 POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
@@ -243,6 +251,17 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
 - Ham `ingest_events` değişmez; güncellenen yalnız `match_participants.position`'dır
   (bkz. db_schema "küratörlü alan" notu).
 
+`PUT /matches/{id}/items` (GÖREV 14 — collector `backfill-items` raw_archive'dan çağırır):
+```json
+{ "items": { "1": [6697, 6676, 3036, 3031, 1055, 2523, 3340], "4": [] } }
+```
+- Anahtarlar bu maçın `player_id`'leri (string), değerler 0-7 elemanlı int dizisi
+  (ham sıra; `[]` = "bilgi var, envanter boş"). Kısmi güncelleme serbest; mevcut
+  değerin ÜZERİNE yazar (ham arşiv otoritedir). Maçta olmayan `player_id` veya
+  7'den uzun/int-olmayan dizi → `422`; bilinmeyen maç → `404`.
+- Yanıt: `{"updated": 2}`. Rating'e etkisi yoktur, hiçbir replay tetiklenmez;
+  ham `ingest_events` değişmez (güncellenen yalnız `match_participants.items_json`).
+
 `GET /matches` yanıt örneği (CHANGE_REQUESTS: web-ui 2026-08-11 — kanonik şekil budur):
 ```json
 [{
@@ -253,12 +272,14 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
     "position": "MIDDLE", "champion": "Ahri",
     "stats": {"kills": 7, "deaths": 2, "assists": 9, "gold": 13250,
               "cs": 201, "damage_to_champs": 24810, "vision_score": 21},
+    "items": [6697, 6676, 3036, 3031, 1055, 2523, 3340],
     "rating_change": {"mu_before": 25.0, "sigma_before": 8.333,
                       "mu_after": 26.1, "sigma_after": 7.9}
   }]
 }]
 ```
-- `stats` alanları nullable (ingest_contract ile tutarlı).
+- `stats` alanları nullable (ingest_contract ile tutarlı). `items` nullable: NULL =
+  "bilinmiyor" (eski exe/eski maç), `[]` = "bilgi var, boş" (GÖREV 14).
 - `rating_change` **nullable**: maç `void` ise veya bu maç için rating satırı yoksa `null` gelir.
   Rating değişimi düz alan olarak DEĞİL, bu iç nesnede taşınır — `null`, "rating'e girmedi"
   durumunu ifade edebilmek için gereklidir.
@@ -354,4 +375,17 @@ Kurallar:
 Tüm hatalar: `{"detail": "insan-okur açıklama"}` + uygun HTTP kodu. Web UI bu `detail`'i kullanıcıya aynen gösterebilir, o yüzden mesajlar Türkçe yazılır.
 
 ## 8. Statik servis
-Backend, `webui/` dizinindeki dosyaları `/` altından servis eder (FastAPI StaticFiles). API `/api/v1` prefix'inde kaldığı için çakışma yoktur. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).
+Backend, `webui/` dizinindeki dosyaları `/` altından servis eder (FastAPI StaticFiles). API `/api/v1` prefix'inde kaldığı için çakışma yoktur.
+
+**Data Dragon varlıkları (GÖREV 14, build-time vendoring — Teoman kararı):** Eşya/şampiyon
+görselleri ve adları Riot Data Dragon'dan DEPLOY imajı kurulurken indirilir; canlı sitede
+tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui/assets/ddragon/`):
+- `manifest.json` — `{"version": "16.16.1"}` (sabitlenmiş patch; güncelleme = sürümü değiştir + redeploy)
+- `items.json` — `{"<item_id>": {"name_tr", "name_en", "desc_tr", "desc_en", "tags": ["Trinket", ...]}}`
+  (Data Dragon `item.json` tr_TR + en_US'ten üretilir; `desc_*` düz metin, HTML etiketleri temizlenir)
+- `champions.json` — `{"<championName>": {"icon": "champion/<Name>.png"}}` (ad eşleşmesi
+  participants.champion string'iyle)
+- `item/<id>.png`, `champion/<Name>.png` — ikonlar
+İndirme betiği `deploy/fetch_ddragon.py`'dir; Dockerfile imaj kurulumunda koşturur. Yerel
+geliştirmede varlıklar yoksa web UI YER TUTUCU gösterir (kırık görsel değil) — betik elle de
+koşulabilir. Kaldırılmış/bilinmeyen eşya id'si de yer tutucuya düşer. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).

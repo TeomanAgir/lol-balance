@@ -8,7 +8,13 @@ from rating import ROLES
 
 from ..config import Settings, get_settings
 from ..deps import get_db
-from ..schemas import PositionsUpdate, PositionsUpdateResponse
+from ..schemas import (
+    ItemsUpdate,
+    ItemsUpdateResponse,
+    PositionsUpdate,
+    PositionsUpdateResponse,
+)
+from ..services.items import dump_items, load_items, validate_items
 from ..services.ratings import replay
 from ..services.role_ratings import replay_roles
 
@@ -29,7 +35,7 @@ def _serialize_match(
     participants = conn.execute(
         "SELECT mp.player_id, p.display_name, mp.team, mp.position, mp.champion,"
         " mp.kills, mp.deaths, mp.assists, mp.gold, mp.cs,"
-        " mp.damage_to_champs, mp.vision_score,"
+        " mp.damage_to_champs, mp.vision_score, mp.items_json,"
         " rh.mu_before, rh.sigma_before, rh.mu_after, rh.sigma_after "
         "FROM match_participants mp "
         "JOIN players p ON p.id = mp.player_id "
@@ -56,6 +62,9 @@ def _serialize_match(
                     "damage_to_champs": row["damage_to_champs"],
                     "vision_score": row["vision_score"],
                 },
+                # api_contract §3 (GÖREV 14): null = "bilinmiyor" (eski exe/maç),
+                # [] = "bilgi var, envanter boş".
+                "items": load_items(row["items_json"]),
                 "rating_change": (
                     {
                         "mu_before": row["mu_before"],
@@ -134,6 +143,70 @@ def void_match(
     }
 
 
+def _match_participant_ids(conn: sqlite3.Connection, match_id: int) -> set[int]:
+    return {
+        r["player_id"]
+        for r in conn.execute(
+            "SELECT player_id FROM match_participants WHERE match_id = ?",
+            (match_id,),
+        )
+    }
+
+
+@router.put("/matches/{match_id}/items")
+def update_items(
+    match_id: int,
+    body: ItemsUpdate,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> ItemsUpdateResponse:
+    """Katılımcı envanterlerini yazar (api_contract §3, GÖREV 14).
+
+    Collector `backfill-items` ham arşivden çağırır; ham arşiv OTORİTEDİR, bu
+    yüzden mevcut değerin ÜZERİNE yazılır. `items_json` küratörlü alandır
+    (position deseni): ham `ingest_events` DEĞİŞMEZ. Rating'e etkisi yoktur —
+    hiçbir replay tetiklenmez.
+    """
+    row = conn.execute(
+        "SELECT id FROM matches WHERE id = ?", (match_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+
+    participants = _match_participant_ids(conn, match_id)
+
+    # Önce TÜM girdi doğrulanır, sonra yazılır (positions deseni): hata
+    # durumunda DB'ye hiç dokunulmaz, kısmen uygulanmış güncelleme olmaz.
+    updates: list[tuple[int, str]] = []
+    for raw_key, value in body.items.items():
+        try:
+            player_id = int(raw_key)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                422,
+                detail=f"items anahtarı oyuncu id'si olmalı, geldi: {raw_key!r}.",
+            ) from None
+        if player_id not in participants:
+            raise HTTPException(
+                422,
+                detail=f"Oyuncu {player_id} bu maçta yer almıyor (maç {match_id}).",
+            )
+        updates.append(
+            (player_id, dump_items(validate_items(value, f"Oyuncu {player_id}")))
+        )
+
+    updated = 0
+    with conn:
+        for player_id, value in updates:
+            cur = conn.execute(
+                "UPDATE match_participants SET items_json = ? "
+                "WHERE match_id = ? AND player_id = ?",
+                (value, match_id, player_id),
+            )
+            updated += cur.rowcount
+
+    return ItemsUpdateResponse(updated=updated)
+
+
 @router.put("/matches/{match_id}/positions")
 def update_positions(
     match_id: int,
@@ -153,13 +226,7 @@ def update_positions(
     if row is None:
         raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
 
-    participants = {
-        r["player_id"]
-        for r in conn.execute(
-            "SELECT player_id FROM match_participants WHERE match_id = ?",
-            (match_id,),
-        )
-    }
+    participants = _match_participant_ids(conn, match_id)
 
     # Önce TÜM girdi doğrulanır, sonra yazılır: kısmen uygulanmış güncelleme
     # olmaz (hata durumunda DB'ye hiç dokunulmaz).

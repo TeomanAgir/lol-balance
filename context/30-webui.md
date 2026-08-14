@@ -17,6 +17,10 @@ Yazma izni: yalnız `webui/`. React/bundler/build zinciri ÖNERME (CLAUDE.md kar
 - `i18n/` — tr+en sözlükleri; `I18n.t()` + `data-i18n` kalıbı; dil düğmesi sağ üst,
   seçim localStorage'da; YENİ her metin iki sözlüğe de girer (CI'da pytest bütünlük testi).
 - `mock_api.js` — backend'siz geliştirme; api_contract şekilleriyle senkron tutulur.
+- Data Dragon varlık katmanı (GÖREV 14): `assets/ddragon/` (gitignore'lu, build-time
+  vendoring) — `dd-` yardımcıları (tek yükleme, img hatasında 600ms tek retry,
+  yer tutucu fallback; lazy-loading BİLEREK yok), BUILD sekmesi `mb-`, favori
+  eşya kartı `fi-`.
 
 ## Konvansiyonlar
 - API çağrıları `X-API-Key` ile; anahtar localStorage'da (modalla girilir), koda gömülmez.

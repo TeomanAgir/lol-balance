@@ -1,23 +1,24 @@
-"""Geçmiş maçların rollerini backend'e yazan tek seferlik backfill (GÖREV 0).
+"""Geçmiş maçların eşya envanterlerini backend'e yazan backfill (GÖREV 14).
 
-`python -m collector backfill-positions [--dry-run]`
+`python -m collector backfill-items [--dry-run]`
 
-Akış:
-1. `raw_archive/*.json` içindeki her ham maç için roller çözülür
-   (`normalizer.positions_from_raw`: açık `selectedPosition` alanı kazanır,
-   boşsa Riot tespiti `detectedTeamPosition`, o da yoksa `role_infer` kısıt
-   zinciri — ingest_contract "Rol önceliği", 2026-08-13 revizyonu). Arşivde iki
-   format bulunur — backfill'den gelen match-history kaydında açık alan yoktur
-   (zincir koşar), canlı EOG bloğunda vardır (10/10 rol doğrudan okunur; bazı
-   patch'lerde `selectedPosition` boş gelir ve tespit katmanı devralır).
+`backfill-positions` ile birebir aynı desen (ortak parçalar:
+`backfill_common.py`), tek fark taşınan veridir:
+
+1. `raw_archive/*.json` içindeki her ham maçtan katılımcı envanterleri çözülür
+   (`normalizer.items_from_raw`: canlı EOG bloğunda oyuncunun `items` dizisi,
+   match-history kaydında `item0..item6` slotları; boş slotlar atılır, ham sıra
+   korunur — ingest_contract "items").
 2. `GET /api/v1/matches` ile `source_game_id → match.id` eşlenir.
 3. `GET /api/v1/players` ile `puuid → player_id` eşlenir (api_contract §2).
-4. `PUT /api/v1/matches/{id}/positions` ile `{"positions": {"<player_id>": "ROL"}}`
-   gönderilir. `None` kalan roller GÖNDERİLMEZ (kısmi güncelleme serbesttir;
-   böylece daha önce elle düzeltilmiş bir rol tahminle ezilmez).
+4. `PUT /api/v1/matches/{id}/items` ile `{"items": {"<player_id>": [...]}}`
+   gönderilir. Arşivde eşya BİLGİSİ olmayan katılımcı (None) GÖNDERİLMEZ;
+   kısmi güncelleme serbesttir. Boş envanter (`[]`) ise gönderilir — "bilgi
+   var, envanter boş" ile "bilgi yok" backend'de farklı şeylerdir.
 
-Eşleşmeyen maç/oyuncu ölümcül değildir: uyarı yazılır, tarama devam eder.
-Komut idempotenttir; istenildiği kadar tekrar koşturulabilir.
+Rating'e etkisi yoktur (replay koşmaz). Eşleşmeyen maç/oyuncu ölümcül değildir:
+uyarı yazılır, tarama devam eder. Komut idempotenttir; ham arşiv otoritedir,
+aynı maç için tekrar koşmak aynı sonucu yazar.
 """
 
 from __future__ import annotations
@@ -32,8 +33,6 @@ import httpx
 
 from .backfill_common import (
     MATCH_LIST_LIMIT,
-    MATCHES_PATH,
-    PLAYERS_PATH,
     archive_files,
     fetch_match_index,
     fetch_player_index,
@@ -41,47 +40,38 @@ from .backfill_common import (
     open_client,
 )
 from .config import Config
-from .normalizer import positions_from_raw
+from .normalizer import items_from_raw
 
-log = logging.getLogger("collector.backfill_positions")
+log = logging.getLogger("collector.backfill_items")
 
-POSITIONS_PATH = "/api/v1/matches/{match_id}/positions"
-
-__all__ = [
-    "MATCH_LIST_LIMIT",
-    "MATCHES_PATH",
-    "PLAYERS_PATH",
-    "POSITIONS_PATH",
-    "PositionBackfillStats",
-    "run_position_backfill",
-]
+ITEMS_PATH = "/api/v1/matches/{match_id}/items"
 
 
 @dataclass
-class PositionBackfillStats:
+class ItemsBackfillStats:
     archives: int = 0  # okunan ham maç dosyası
     matched: int = 0  # backend'de karşılığı bulunan maç
     updated: int = 0  # PUT gönderilen (dry-run'da gönderilecek olan) maç
-    positions_sent: int = 0  # gönderilen rol sayısı
-    unresolved: int = 0  # tahmin zinciri çözemedi → gönderilmedi
+    participants_sent: int = 0  # gönderilen envanter sayısı
+    without_items: int = 0  # arşivde eşya bilgisi yok → gönderilmedi
     unmatched_matches: list[str] = field(default_factory=list)
     unknown_players: int = 0
     errors: list[str] = field(default_factory=list)
 
 
-def run_position_backfill(
+def run_items_backfill(
     config: Config,
     *,
     dry_run: bool = False,
     transport: httpx.BaseTransport | None = None,
     archive_dir: Optional[Path] = None,
     limit: int = MATCH_LIST_LIMIT,
-) -> PositionBackfillStats:
-    stats = PositionBackfillStats()
+) -> ItemsBackfillStats:
+    stats = ItemsBackfillStats()
     files = archive_files(config, archive_dir)
     if not files:
         log.warning(
-            "Raw match archive is empty (%s): backfill-positions found nothing to do",
+            "Raw match archive is empty (%s): backfill-items found nothing to do",
             archive_dir or config.raw_archive_dir,
         )
         return stats
@@ -118,10 +108,10 @@ def run_position_backfill(
                 continue
             stats.matched += 1
 
-            positions: dict[str, str] = {}
-            for key, role in positions_from_raw(raw).items():
-                if role is None:
-                    stats.unresolved += 1
+            items: dict[str, list[int]] = {}
+            for key, inventory in items_from_raw(raw).items():
+                if inventory is None:  # kaynakta eşya bilgisi yok — üzerine yazma
+                    stats.without_items += 1
                     continue
                 player_id = players.get(str(key))
                 if player_id is None:
@@ -138,55 +128,55 @@ def run_position_backfill(
                         player_id, source_game_id,
                     )
                     continue
-                positions[str(player_id)] = role
+                items[str(player_id)] = inventory
 
-            if not positions:
-                log.warning("No roles to send: %s", source_game_id)
+            if not items:
+                log.warning("No items to send: %s", source_game_id)
                 continue
 
             if dry_run:
                 log.info(
                     "[dry-run] PUT %s ← %s",
-                    POSITIONS_PATH.format(match_id=match["id"]),
-                    json.dumps(positions, ensure_ascii=False, sort_keys=True),
+                    ITEMS_PATH.format(match_id=match["id"]),
+                    json.dumps(items, ensure_ascii=False, sort_keys=True),
                 )
                 stats.updated += 1
-                stats.positions_sent += len(positions)
+                stats.participants_sent += len(items)
                 continue
 
             try:
                 response = client.put(
-                    POSITIONS_PATH.format(match_id=match["id"]),
-                    json={"positions": positions},
+                    ITEMS_PATH.format(match_id=match["id"]),
+                    json={"items": items},
                 )
             except httpx.HTTPError as exc:
                 stats.errors.append(f"{source_game_id}: {exc}")
-                log.error("Could not send role update (%s): %s", source_game_id, exc)
+                log.error("Could not send item update (%s): %s", source_game_id, exc)
                 continue
 
             if 200 <= response.status_code < 300:
                 stats.updated += 1
-                stats.positions_sent += len(positions)
+                stats.participants_sent += len(items)
                 log.info(
-                    "Roles updated: match %s (id=%s), %d roles",
-                    source_game_id, match["id"], len(positions),
+                    "Items updated: match %s (id=%s), %d participants",
+                    source_game_id, match["id"], len(items),
                 )
             else:
                 stats.errors.append(
                     f"{source_game_id}: HTTP {response.status_code} {response.text[:300]}"
                 )
                 log.error(
-                    "Backend rejected the role update (%s, HTTP %s): %s",
+                    "Backend rejected the item update (%s, HTTP %s): %s",
                     source_game_id, response.status_code, response.text[:300],
                 )
 
     log.info(
-        "backfill-positions finished%s: %d raw matches, %d matched, %d matches updated, "
-        "%d roles sent, %d roles unresolved, %d matches missing in backend, "
-        "%d players unmatched, %d errors",
+        "backfill-items finished%s: %d raw matches, %d matched, %d matches updated, "
+        "%d inventories sent, %d participants without item data, %d matches missing in "
+        "backend, %d players unmatched, %d errors",
         " (DRY-RUN — nothing was sent)" if dry_run else "",
-        stats.archives, stats.matched, stats.updated, stats.positions_sent,
-        stats.unresolved, len(stats.unmatched_matches), stats.unknown_players,
+        stats.archives, stats.matched, stats.updated, stats.participants_sent,
+        stats.without_items, len(stats.unmatched_matches), stats.unknown_players,
         len(stats.errors),
     )
     return stats

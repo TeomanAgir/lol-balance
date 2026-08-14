@@ -126,6 +126,117 @@
     return cells ? `<div class="role-strip${long ? " long" : ""}">${cells}</div>` : "";
   }
 
+  // ── Data Dragon varlıkları (GÖREV 14) ─────────────────────────
+  // api_contract §8: eşya/şampiyon görselleri ve adları DEPLOY sırasında
+  // webui/assets/ddragon/ altına indirilir; tarayıcı dışarı istek atmaz.
+  // Varlıklar hiç yoksa (yerel geliştirme, indirme yarım) ya da bir id sözlükte
+  // değilse KIRIK GÖRSEL gösterilmez: sessizce yer tutucu moduna düşülür.
+  //
+  // JSON'lar bir kez çekilir ve önbelleğe alınır: loadAssets() ikinci çağrıda
+  // istek atmaz, aynı promise'i döner ve ASLA reject etmez (varlık yokluğu
+  // hata değil, gösterim modudur — profil/maç detayı bu yüzden bloke olmaz).
+  const DD = { loaded: false, version: null, items: null, champs: null };
+  const DD_BASE = "assets/ddragon/";
+  let ddPromise = null;
+
+  function loadAssets() {
+    if (ddPromise) return ddPromise;
+    // Varlık dosyaları API DEĞİLDİR: X-API-Key taşımaz, USE_MOCK yolundan geçmez.
+    const grab = (name) =>
+      window.fetch(DD_BASE + name)
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null);
+    ddPromise = Promise.all([grab("manifest.json"), grab("items.json"), grab("champions.json")])
+      .then(([man, items, champs]) => {
+        DD.version = man && typeof man.version === "string" ? man.version : null;
+        DD.items = items && typeof items === "object" ? items : null;
+        DD.champs = champs && typeof champs === "object" ? champs : null;
+        DD.loaded = true;
+      });
+    return ddPromise;
+  }
+
+  const itemMeta = (id) => (DD.items ? DD.items[String(id)] || null : null);
+  // Ad/açıklama aktif dile göre okunur (name_tr/name_en, desc_tr/desc_en);
+  // alan yoksa diğer dile düşülür, o da yoksa boş döner.
+  function ddText(meta, field) {
+    if (!meta) return "";
+    const order = window.I18n.getLang() === "tr" ? ["_tr", "_en"] : ["_en", "_tr"];
+    for (const suffix of order) {
+      const v = meta[field + suffix];
+      if (typeof v === "string" && v) return v;
+    }
+    return "";
+  }
+  // Sözlükte olmayan/kaldırılmış eşya adı "Esya #id" olarak gösterilir.
+  const itemName = (id) => ddText(itemMeta(id), "name") || t("common.item_unknown", { id });
+  const itemDesc = (id) => ddText(itemMeta(id), "desc");
+  // Favori eşya seçiminde atlanan etiketler (api_contract §2 "top_items":
+  // eleme backend'de DEĞİL burada yapılır, backend eşya meta verisi bilmez).
+  const SKIP_TAGS = ["Trinket", "Consumable"];
+  const itemSkipped = (id) => {
+    const meta = itemMeta(id);
+    const tags = meta && Array.isArray(meta.tags) ? meta.tags : [];
+    return tags.some(x => SKIP_TAGS.indexOf(x) !== -1);
+  };
+  const itemIconSrc = (id) =>
+    itemMeta(id) ? DD_BASE + "item/" + encodeURIComponent(String(id)) + ".png" : null;
+  const champIconSrc = (name) => {
+    const c = DD.champs && name ? DD.champs[name] : null;
+    return c && typeof c.icon === "string" ? DD_BASE + c.icon : null;
+  };
+  // Yer tutucu metni: eşyada id'nin son 2 hanesi, şampiyonda baş harf, ikisi de
+  // çıkmazsa soru işareti.
+  const itemPh = (id) => {
+    const s = String(id);
+    return /^\d+$/.test(s) ? s.slice(-2) : "?";
+  };
+  const champPh = (name) => (name ? String(name).slice(0, 1).toUpperCase() : "?");
+
+  // Yer tutucu kutusu HER ZAMAN çizilir, görsel onun ÜSTÜNE biner: dosya 404
+  // verirse img kaldırılır ve altındaki kutu görünür → kırık görsel imkânsız.
+  function ddIconHtml(src, ph, cls) {
+    // Yer tutucu metni SALT GÖRSELDİR (aria-hidden): erişilebilir adı slot'un
+    // aria-label'ı ya da kartın kendi metni taşır, "58" gibi ekler okunmaz.
+    return `<span class="dd-ico ${cls}">` +
+      `<span class="dd-ph" aria-hidden="true">${esc(ph)}</span>` +
+      // loading="lazy" KULLANILMAZ: ikonlar aynı container'dan gelen ~5KB'lık
+      // dosyalar, tembel yükleme kazanç getirmiyor; buna karşılık arka plandaki
+      // sekmede istek hiç başlamayabiliyor (yer tutucu takılı kalırdı).
+      (src ? `<img class="dd-img" src="${esc(src)}" alt="">` : "") +
+      `</span>`;
+  }
+  // Yükleme hatasında HEMEN yer tutucuya düşülmez: tek prosesli sunucuda ilk
+  // açılışta ~80 ikon isteği aynı ana denk gelince bir kısmı GEÇİCİ olarak
+  // düşebiliyor (dosyalar aslında 200 dönüyor). Bu yüzden kısa gecikmeyle AYNI
+  // URL bir kez daha denenir — cache-buster parametresi YOKTUR, yoksa her
+  // yeniden çizim önbelleği ıskalar. İkinci hatada img kaldırılır, altındaki
+  // yer tutucu görünür (kırık görsel yine imkânsız).
+  const DD_RETRY_MS = 600;
+
+  function ddRetryImage(img) {
+    if (img.dataset.ddRetried === "1") { img.remove(); return; }
+    img.dataset.ddRetried = "1";
+    const src = img.getAttribute("src");
+    setTimeout(() => {
+      // Sekme/dil değişimiyle yeniden çizildiyse düğüm artık DOM'da değildir.
+      if (!img.isConnected || !src) return;
+      // Aynı URL'yi yeniden istemenin güvenilir yolu: src'yi düşürüp geri koymak
+      // (aynı değeri yeniden atamak bazı tarayıcılarda yeni istek doğurmuyor).
+      img.removeAttribute("src");
+      img.setAttribute("src", src);
+    }, DD_RETRY_MS);
+  }
+
+  // innerHTML sonrası çağrılır: yüklenemeyen görselleri tek denemeden sonra kaldırır.
+  function ddBindImages(root) {
+    (root || document).querySelectorAll(".dd-img").forEach(img => {
+      img.addEventListener("error", () => ddRetryImage(img));
+      // Dinleyici bağlanmadan önce düşmüş olabilir (önbellekten gelen hata).
+      if (img.complete && img.naturalWidth === 0) ddRetryImage(img);
+    });
+  }
+
   // ── API key modalı ────────────────────────────────────────────
   function openKeyModal() {
     $("#key-input").value = state.apiKey;
@@ -387,6 +498,32 @@
        ${sub ? `<div class="sc-sub">${sub}</div>` : ""}
      </article>`;
 
+  // ── Favori eşya kartı (GÖREV 14) ──────────────────────────────
+  // Veri: GET /players/{id}/stats → top_items (sayım azalan, en fazla 10 kayıt).
+  // Contract §2: "favori eşya" SEÇİMİ web UI'dadır — totem/tüketilebilir etiketli
+  // kayıtlar atlanır, kalan İLK kayıt favoridir. Uygun kayıt yoksa kart çizilmez.
+  // Varlıklar yoksa tags bilinemez → eleme yapılamaz, ilk kayıt olduğu gibi alınır
+  // (ad "Esya #id", ikon yer tutucu; kartı gizlemek veriyi büsbütün saklardı).
+  function favItem(list) {
+    if (!Array.isArray(list)) return null;
+    const rows = list.filter(x => x && Number.isFinite(Number(x.item_id)));
+    const usable = DD.items ? rows.filter(x => !itemSkipped(x.item_id)) : rows;
+    return usable.length ? usable[0] : null;
+  }
+
+  function favItemCard(x) {
+    const id = Number(x.item_id);
+    const n = Number.isFinite(Number(x.matches)) ? Number(x.matches) : 0;
+    return `<article class="stat-card fi-card">
+        <h3 class="sc-title">${t("profile.card_fav_item")}</h3>
+        <div class="fi-row">
+          ${ddIconHtml(itemIconSrc(id), itemPh(id), "item")}
+          <span class="sc-main fi-name">${esc(itemName(id))}</span>
+        </div>
+        <div class="sc-sub">${t("profile.fav_item_matches", { n })}</div>
+      </article>`;
+  }
+
   // s = GET /players/{id}/stats yanıtı. kda / favoriler null, synergy boş,
   // winrate null olabilir — hepsi kısa notla gösterilir.
   function profileHtml(s) {
@@ -396,6 +533,7 @@
     const played = tot.matches || 0;
     const k = s.kda, fc = s.favorite_champion, fr = s.favorite_role;
     const syn = s.synergy || [];
+    const fi = favItem(s.top_items);
 
     const scoreHtml = rp
       ? `<div class="prof-score">${fmtRating(rp.rating.score)}<span>${t("common.points_word")}</span></div>`
@@ -419,7 +557,9 @@
         fc ? t("profile.champ_line", { n: fc.matches, pct: pctText(fc.winrate) }) : t("profile.no_champion_data")) +
       statCard(t("profile.card_role"),
         fr ? roleLabel(fr.role) : "—",
-        fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data"));
+        fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data")) +
+      // Favori eşya kartı yalnız uygun kayıt varsa şeride girer (GÖREV 14).
+      (fi ? favItemCard(fi) : "");
 
     const strip = rp ? roleCells(rp.role_ratings, true) : "";
     const roleSec = strip
@@ -464,14 +604,18 @@
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
       // rating-history ve badges ayrı uçlardır (GÖREV 10, 11+12): düşerlerse
       // profilin kalanı çalışsın — /nemesis'teki desenin aynısı, o bölüm çizilmez.
+      // loadAssets (GÖREV 14) reject etmez: varlık yoksa favori eşya kartı yer
+      // tutucuyla çizilir, profil beklemez.
       const [s, h, b] = await Promise.all([
         api(`/players/${state.profileId}/stats`),
         api(`/players/${state.profileId}/rating-history`).catch(() => null),
         api(`/players/${state.profileId}/badges`).catch(() => null),
+        loadAssets(),
       ]);
       state.ratingHistory = h;
       state.badges = b;
       box.innerHTML = profileHtml(s);
+      ddBindImages(box);
       renderHistory();
       renderBadges();
       // Sinerji listesindeki isimler o oyuncunun profiline geçer.
@@ -1118,6 +1262,7 @@
     closeRoleModal();
     closeHistPopup();   // GÖREV 10: tarihçe popup'ı da Esc ile kapanır
     closeBadgeTip();    // GÖREV 11+12: rozet tooltip'i (klavye erişimi)
+    closeBuildTip();    // GÖREV 14: build ikonu tooltip'i (klavye erişimi)
   });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
@@ -1258,7 +1403,10 @@
   // TOPLAM satırında bar YOKTUR: iki büyük takım değeri + büyütülmüş takım
   // ibresi. Toplamlar global ölçeğe DAHİL EDİLMEZ (yoksa 10 oyuncu barı
   // toplamın yanında ezilirdi).
+  // BUILD (GÖREV 14) düğmelerin İLKİDİR ve bar/ibre çizmez: aynı rol-eşleşmeli
+  // satırlarda iki tarafın şampiyon portresi + eşya ikonları gösterilir.
   const MD_STATS = [
+    { key: "build", label: "matchdetail.stat_build", build: true },
     { key: "gold", label: "matchdetail.stat_gold", big: true },
     { key: "damage_to_champs", label: "matchdetail.stat_damage", big: true },
     { key: "cs", label: "matchdetail.stat_cs", big: false },
@@ -1374,6 +1522,96 @@
       </div>`;
   }
 
+  // ── Maç detayı: BUILD satırları (GÖREV 14, "mb-" = match build) ──
+  // Slot sayısı EOG envanteriyle aynıdır: 6 eşya + son slotta totem. Eksik slotlar
+  // boş kutu olarak çizilir ki satırlar hizada kalsın.
+  // items alanı üç durumu ayırır (api_contract §3): NULL = bilinmiyor (kısa metin),
+  // [] = bilgi var/envanter boş (boş slotlar), dolu dizi = HAM sıra (yeniden sıralanmaz).
+  const MB_SLOTS = 7;
+
+  // Tooltip taşıyan slot: role="img" + tabindex → klavyeyle odaklanır ama
+  // TIKLANABİLİR DEĞİLDİR (button değil, bir yere gitmez). Ad/açıklama data-*
+  // özniteliklerinde taşınır: tooltip açılırken yeniden çeviri gerekmez.
+  const mbSlotHtml = (cls, label, name, desc, icon) =>
+    `<span class="mb-slot ${cls}" tabindex="0" role="img" aria-label="${esc(label)}"` +
+    ` data-name="${esc(name)}" data-desc="${esc(desc)}">${icon}</span>`;
+
+  function mbItemHtml(id) {
+    const name = itemName(id);
+    const desc = itemDesc(id);
+    // Erişilebilir ad açıklamayı da taşır: tooltip aria-hidden'dır (rozet deseni).
+    return mbSlotHtml("mb-item", desc ? name + " — " + desc : name, name, desc,
+      ddIconHtml(itemIconSrc(id), itemPh(id), "item"));
+  }
+
+  const mbEmptySlot = () => `<span class="mb-slot empty" aria-hidden="true"></span>`;
+
+  function mbChampHtml(champ) {
+    const name = champ || t("matchdetail.champ_unknown");
+    return mbSlotHtml("mb-champ", name, name, "",
+      ddIconHtml(champIconSrc(champ), champPh(champ), "champ"));
+  }
+
+  function mbSideHtml(p, side) {
+    if (!p) return `<div class="mb-side ${side}"></div>`;
+    let body;
+    if (p.items == null) {
+      body = `<span class="mb-none">${t("matchdetail.no_items")}</span>`;
+    } else {
+      const list = Array.isArray(p.items) ? p.items.slice(0, MB_SLOTS) : [];
+      const slots = list.map(mbItemHtml);
+      while (slots.length < MB_SLOTS) slots.push(mbEmptySlot());
+      body = `<span class="mb-items">${slots.join("")}</span>`;
+    }
+    return `<div class="mb-side ${side}">${mbChampHtml(p.champion)}${body}</div>`;
+  }
+
+  // Satır başlığı diğer sekmelerle aynı (ad · rol · ad) — şampiyon adı portrede
+  // zaten var, bu yüzden burada tekrarlanmaz.
+  function mbRowHtml(label, blue, red) {
+    const nm = (p) => esc(p ? p.display_name : "—");
+    return `<div class="md-row mb-row">
+        <div class="md-row-names">
+          <span class="md-name blue">${nm(blue)}</span>
+          <span class="md-role">${esc(label)}</span>
+          <span class="md-name red">${nm(red)}</span>
+        </div>
+        <div class="mb-sides">${mbSideHtml(blue, "blue")}${mbSideHtml(red, "red")}</div>
+      </div>`;
+  }
+
+  // Tooltip: rozet vitrinindeki (pb-tip) desenin aynısı — hover VE odakta açılır,
+  // ayrılınca/Esc ile kapanır, kutu kenardan taşarsa ölçülüp içeri çekilir.
+  let buildTipOwner = null;
+
+  function openBuildTip(el) {
+    if (!el || buildTipOwner === el) return;
+    closeBuildTip();
+    const name = el.dataset.name || "";
+    const desc = el.dataset.desc || "";
+    if (!name) return;
+    el.insertAdjacentHTML("beforeend",
+      `<span class="mb-tip" aria-hidden="true">
+         <span class="mb-tip-name">${esc(name)}</span>
+         ${desc ? `<span class="mb-tip-desc">${esc(desc)}</span>` : ""}
+       </span>`);
+    buildTipOwner = el;
+    const tip = el.querySelector(".mb-tip");
+    const box = el.closest(".mb-graph");
+    if (!tip || !box) return;
+    const tr = tip.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    const shift = tr.left < br.left ? br.left - tr.left
+      : tr.right > br.right ? br.right - tr.right : 0;
+    if (shift) tip.style.marginLeft = Math.round(shift) + "px";
+  }
+
+  function closeBuildTip() {
+    const tip = document.querySelector(".mb-tip");
+    if (tip) tip.remove();
+    buildTipOwner = null;
+  }
+
   function matchDetailHtml(m) {
     const stat = MD_STATS.find(s => s.key === state.matchStat) || MD_STATS[0];
     const voided = m.status === "void";
@@ -1392,6 +1630,13 @@
       MD_STATS.map(s =>
         `<button type="button" class="md-statbtn${s.key === stat.key ? " active" : ""}" data-stat="${s.key}">${t(s.label)}</button>`
       ).join("") + `</div>`;
+    // BUILD: bar/ibre/TOPLAM yok, gösterge yerine ikon satırları (GÖREV 14).
+    if (stat.build) {
+      const buildRows = mdRows(m)
+        .map(r => mbRowHtml(r.role ? roleAbbr(r.role) : "?", r.blue, r.red)).join("");
+      return head + statbar + `<div class="md-graph mb-graph">${buildRows}</div>` +
+        `<p class="md-hint">${t("matchdetail.build_hint")}</p>`;
+    }
     const gmax = mdGlobalMax(m, stat.key);
     const rows = mdRows(m).map(r =>
       mdRowHtml(r.role ? roleAbbr(r.role) : "?", mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, gmax)
@@ -1423,17 +1668,35 @@
       t(state.matchFrom === "profile" ? "common.back_profile" : "common.back_matches");
     const box = $("#matchdetail-body");
     const m = state.matchDetail;
+    closeBuildTip();   // yeniden çizim açık tooltip'in düğümünü siler
     if (!m) {
       box.innerHTML = `<p class='empty'>${t("matchdetail.no_match")}</p>`;
       return;
     }
+    // Varlık sözlükleri bir kez yüklenir; yoksa yer tutucu modunda çizilir (GÖREV 14).
+    await loadAssets();
     box.innerHTML = matchDetailHtml(m);
+    ddBindImages(box);
+    bindBuildTips(box);
     // Stat değişimi salt gösterimdir: istek atılmaz, aynı maç nesnesi yeniden çizilir.
     box.querySelectorAll(".md-statbtn").forEach(btn =>
       btn.addEventListener("click", () => {
         state.matchStat = btn.dataset.stat;
         loadMatchDetail();
       }));
+  }
+
+  // Fare ve klavye aynı tooltip'i açar; ayrılmak (mouseleave/blur) kapatır.
+  // Açma "toggle" DEĞİLDİR: fare tıklamasında focus+click ard arda gelir, toggle
+  // olsaydı tooltip açılıp hemen kapanırdı (rozet vitrinindeki ders).
+  function bindBuildTips(root) {
+    root.querySelectorAll(".mb-slot[tabindex]").forEach(el => {
+      const close = () => { if (buildTipOwner === el) closeBuildTip(); };
+      el.addEventListener("mouseenter", () => openBuildTip(el));
+      el.addEventListener("mouseleave", close);
+      el.addEventListener("focus", () => openBuildTip(el));
+      el.addEventListener("blur", close);
+    });
   }
 
   // ── 4) Manuel maç girişi ──────────────────────────────────────

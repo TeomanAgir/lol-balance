@@ -40,6 +40,12 @@ Content-Type: application/json
 - **Rol önceliği (üç katman, 2026-08-13 revizyonu):** (a) oyuncunun AÇIK seçimi — `selectedPosition` / `position`, boş-olmayan — her şeyi kazanır; (b) açık alan boşsa Riot'un kendi tespiti **`detectedTeamPosition`** (boş-olmayan) kullanılır — bazı patch'lerde custom draft EOG'unda `selectedPosition` tüm oyuncular için boş string gelirken `detectedTeamPosition` 10/10 dolu gelir (kanıt: gameId 1734940206; Smite taşıyıcılarıyla ve takım başına tam rol setiyle tutarlı); (c) ikisi de yoksa KISIT-ÇÖZÜMLÜ tahmin zinciri. Aynı öncelik `backfill-positions` yolunda da geçerlidir.
 - **Kısıt-çözümlü zincir (GÖREV 0):** Takım başına deterministik: (1) Smite taşıyan tam 1 kişi → JUNGLE; (2) Riot lane/role etiketleriyle UTILITY → BOTTOM → MIDDLE; (3) kalanlar içinde `lane=TOP` etiketli tam 1 kişi → TOP; (4) atanmamış tam 1 kişi ve boş tam 1 rol kaldıysa eleme ile eşle. Herhangi bir adım belirsizse (0 veya 2+ aday) ilgili slotlar null bırakılır — tahmin ZORLANMAZ. Backend değeri olduğu gibi kaydeder; düzeltme `PUT /matches/{id}/positions` iledir (api_contract §3). (Zincir revizyonu: CHANGE_REQUESTS lcu-collector 2026-08-11; detectedTeamPosition katmanı: 2026-08-13.)
 - Tüm zamanlar UTC ISO8601.
+- **`items` (GÖREV 14, opsiyonel):** Her katılımcıya `"items": [6697, 6676, 3036, 3031, 1055, 2523, 3340]`
+  eklenebilir — maç SONU envanteri, 0-7 eleman, ham SIRA korunur (son eleman genelde
+  trinket). Kaynak: canlı EOG'de oyuncunun `items` dizisi; MH kayıtlarında `item0..item6`.
+  HER İKİ kaynakta da `0` değeri "boş slot" demektir ve ATILIR (gerçek EOG dizisi de
+  boş slotu 0 taşır); int'e çevrilemeyen/negatif değerler de atılır, kalanların sırası korunur. Alan yoksa/null ise backend `NULL`
+  saklar (eski exe'ler göndermez — geriye uyumlu). Manuel girişte alan yoktur.
 - **`client_id` (GÖREV 13, opsiyonel):** Gövdeye üst seviyede `"client_id": "Ali-PC"`
   eklenebilir (string, ≤64, boş-olmayan; trim'lenir). Gönderen collector'ın cihaz
   kimliğidir (kaynak: `.env` `CLIENT_ID`, sihirbaz sorar; yoksa hostname). Backend

@@ -1,7 +1,7 @@
 """Pydantic request/response modelleri (docs/api_contract.md + ingest_contract.md)."""
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,6 +30,11 @@ class IngestParticipant(BaseModel):
     position: Optional[Position] = None
     champion: Optional[str] = None
     stats: Optional[ParticipantStats] = None
+    # GÖREV 14 (ingest_contract "items"): maç sonu envanteri, OPSİYONEL —
+    # eski exe'ler alanı hiç göndermez (alan yok/None → NULL "bilinmiyor").
+    # 0-7 eleman + int kuralının tanımı services/items.validate_items'tadır
+    # (detail Türkçe ve tek-string olsun diye pydantic'e bırakılmaz).
+    items: Optional[Any] = None
 
 
 class IngestMatch(BaseModel):
@@ -136,6 +141,13 @@ class SynergyOut(BaseModel):
     winrate: float
 
 
+class TopItemOut(BaseModel):
+    # api_contract §2 `top_items` (GÖREV 14): yalnız SAYIM taşınır — eşya adı /
+    # ikonu / tags backend'de TUTULMAZ, "favori eşya" seçimi web UI'dadır.
+    item_id: int
+    matches: int
+
+
 class PlayerStatsOut(BaseModel):
     # api_contract §2 "Oyuncu profili (GÖREV 1)". kda / favorite_* alanları
     # veri yoksa null; synergy uygun kimse yoksa [].
@@ -145,6 +157,7 @@ class PlayerStatsOut(BaseModel):
     favorite_champion: Optional[FavoriteChampionOut]
     favorite_role: Optional[FavoriteRoleOut]
     synergy: list[SynergyOut]
+    top_items: list[TopItemOut]
 
 
 class RatingHistoryStatsOut(BaseModel):
@@ -264,6 +277,20 @@ class PositionsUpdate(BaseModel):
 class PositionsUpdateResponse(BaseModel):
     updated: int
     role_matches_replayed: int
+
+
+class ItemsUpdate(BaseModel):
+    # api_contract §3 (GÖREV 14): anahtarlar bu maçın player_id'leri (JSON
+    # nesne anahtarı olduğu için string), değerler 0-7 elemanlı int dizisi
+    # (`[]` = "bilgi var, envanter boş"). Kısmi güncelleme serbest; mevcut
+    # değerin ÜZERİNE yazar. Doğrulama router + services/items'tadır
+    # (Türkçe detail üretebilmek için).
+    items: dict[str, Any]
+
+
+class ItemsUpdateResponse(BaseModel):
+    # Rating'e etkisi YOK: replay alanı bilinçli olarak yoktur.
+    updated: int
 
 
 class BalanceRequest(BaseModel):

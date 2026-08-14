@@ -1,0 +1,122 @@
+"""Data Dragon varlıklarını webui/assets/ddragon/ altına indirir (GÖREV 14).
+
+Build-time vendoring (Teoman kararı, CHANGE_REQUESTS 2026-08-14): bu betik deploy
+imajı kurulurken (Dockerfile) koşar; canlı sitede tarayıcı dışarı istek atmaz.
+Yerel geliştirmede elle de koşulabilir:
+
+    backend\\.venv\\Scripts\\python.exe deploy\\fetch_ddragon.py
+
+Patch güncellemesi = DDRAGON_VERSION'ı değiştir + redeploy. Çıktı yerleşimi
+api_contract §8'de sabittir: manifest.json, items.json, champions.json,
+item/<id>.png, champion/<Name>.png.
+
+Yalnız stdlib kullanır (imaj kurulumunda ek bağımlılık istemiyoruz).
+"""
+from __future__ import annotations
+
+import html
+import json
+import re
+import sys
+import urllib.request
+from pathlib import Path
+
+# Sabitlenmiş patch. Güncellerken https://ddragon.leagueoflegends.com/api/versions.json
+DDRAGON_VERSION = "16.16.1"
+
+CDN = f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VERSION}"
+# Çıktı kökü: önce CWD/webui (Docker imajında WORKDIR /app, webui ./webui'dedir),
+# yoksa betiğe göre repo kökü (yerelde herhangi bir dizinden koşulabilsin).
+_cwd_webui = Path.cwd() / "webui"
+_repo_webui = Path(__file__).resolve().parent.parent / "webui"
+OUT = (_cwd_webui if _cwd_webui.is_dir() else _repo_webui) / "assets" / "ddragon"
+
+TAG_RE = re.compile(r"<[^>]+>")
+
+
+def fetch_json(url: str) -> dict:
+    with urllib.request.urlopen(url, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def fetch_binary(url: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with urllib.request.urlopen(url, timeout=60) as r:
+        dest.write_bytes(r.read())
+
+
+def plain_text(desc: str) -> str:
+    """Data Dragon açıklaması HTML/özel etiket taşır; tooltip için düz metin."""
+    text = TAG_RE.sub(" ", desc or "")
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def build_items() -> dict[str, dict]:
+    tr = fetch_json(f"{CDN}/data/tr_TR/item.json")["data"]
+    en = fetch_json(f"{CDN}/data/en_US/item.json")["data"]
+    items: dict[str, dict] = {}
+    for item_id, en_item in en.items():
+        tr_item = tr.get(item_id, en_item)
+        items[item_id] = {
+            "name_tr": tr_item.get("name", en_item.get("name", item_id)),
+            "name_en": en_item.get("name", item_id),
+            "desc_tr": plain_text(tr_item.get("plaintext") or tr_item.get("description", "")),
+            "desc_en": plain_text(en_item.get("plaintext") or en_item.get("description", "")),
+            "tags": en_item.get("tags", []),
+        }
+    return items
+
+
+def build_champions() -> dict[str, dict]:
+    en = fetch_json(f"{CDN}/data/en_US/champion.json")["data"]
+    # Anahtar, participants.champion string'iyle eşleşen görünen ad olmalı
+    # (EOG "championName" görünen adı taşır, ör. "Lee Sin"; DD anahtarı "LeeSin").
+    champs: dict[str, dict] = {}
+    for dd_key, c in en.items():
+        display_name = c.get("name", dd_key)
+        champs[display_name] = {"icon": f"champion/{c['image']['full']}", "dd_key": dd_key}
+    return champs
+
+
+def main() -> int:
+    print(f"Data Dragon {DDRAGON_VERSION} -> {OUT}")
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    items = build_items()
+    champions = build_champions()
+
+    (OUT / "manifest.json").write_text(
+        json.dumps({"version": DDRAGON_VERSION}, ensure_ascii=False), encoding="utf-8"
+    )
+    (OUT / "items.json").write_text(
+        json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+    )
+    (OUT / "champions.json").write_text(
+        json.dumps(
+            {name: {"icon": v["icon"]} for name, v in champions.items()},
+            ensure_ascii=False, separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+
+    for i, item_id in enumerate(sorted(items), 1):
+        dest = OUT / "item" / f"{item_id}.png"
+        if not dest.exists():
+            fetch_binary(f"{CDN}/img/item/{item_id}.png", dest)
+        if i % 50 == 0:
+            print(f"  item {i}/{len(items)}")
+
+    for i, (name, v) in enumerate(sorted(champions.items()), 1):
+        dest = OUT / v["icon"]
+        if not dest.exists():
+            fetch_binary(f"{CDN}/img/champion/{Path(v['icon']).name}", dest)
+        if i % 50 == 0:
+            print(f"  champion {i}/{len(champions)}")
+
+    print(f"OK: {len(items)} esya, {len(champions)} sampiyon.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -17,3 +17,6 @@ collector/.env
 
 # Gorev listesi yalniz yerelde tutulur (public'e girmez)
 /new_modules.md
+
+# GOREV 14: Data Dragon varliklari build-time indirilir, repo'ya girmez
+webui/assets/ddragon/
