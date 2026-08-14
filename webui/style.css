@@ -539,6 +539,102 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 }
 .ph-pop-hint { color: var(--muted); font-size: 10px; margin-top: 2px; }
 
+/* ── Rozet vitrini (GÖREV 11+12) — "pb-" öneki profil rozetlerine aittir ──
+   Kartçık ızgarası dar ekranda sarar (320px'de 2 sütun, geniş ekranda 6).
+   İkon satır içi SVG'dir ve rengini currentColor ile kartçıktan alır; renk tek
+   başına anlam taşımaz, rozet adı her kartçıkta yazılıdır. */
+.pb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.pb-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 92px;
+  padding: 10px 6px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: border-color 0.15s;
+}
+.pb-card:hover { border-color: var(--brass-dim); }
+.pb-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--brass-dim);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pb-icon .pb-fill { fill: currentColor; stroke: none; }
+.pb-name {
+  font-family: var(--display);
+  font-size: 11px;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+/* margin-top: auto → ad iki satıra sarsa bile ×N satırı kartçığın DİBİNE oturur,
+   satırdaki kartçıklarda aynı hizada kalır. */
+.pb-count {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+/* MVP (GÖREV 12'nin yıldız rozeti) vitrinin ilkidir ve hafif pirinç vurguludur. */
+.pb-mvp { background: var(--surface-2); border-color: var(--brass-dim); }
+.pb-mvp .pb-icon, .pb-mvp .pb-name { color: var(--brass); }
+/* "Sonsuz Bench" espridir, kıracak bir vurgusu yoktur: nötr gri. */
+.pb-bench .pb-icon, .pb-bench .pb-name, .pb-bench .pb-count { color: var(--muted); }
+
+/* Ekran okuyucu metni: açıklama + kaç kez + son maç düğmenin adına girer,
+   böylece görsel tooltip'e (aria-hidden) bağımlılık kalmaz. */
+.pb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pb-tip {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 190px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: none;   /* kutu kendisi tıklama hedefi değildir */
+}
+.pb-tip-last { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
 /* ── Haftanın enleri (GÖREV 2) ── */
 .hl-window {
   display: flex;

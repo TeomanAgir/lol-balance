@@ -104,6 +104,52 @@ Kurallar (salt-okur; rating'e etkisi yok):
 - Zaman aralığı filtresi SUNUCUDA YOKTUR: yanıt tam tarihçedir, aralık seçimi web UI'da
   istemci tarafında yapılır (maç hacmi küçük; parametre gerekirse ayrı karar).
 
+### Rozetler (GÖREV 11+12)
+```
+GET /players/{id}/badges
+→ 200 {
+  "player_id": 3,
+  "badges": [
+    {"key": "mvp", "count": 4, "last_match_id": 42},
+    {"key": "win_streak_5", "count": 1, "last_match_id": 37}
+  ]
+}
+```
+Kurallar (salt-okur GÖSTERİM katmanı; rating'e etkisi yok; yalnız valid maçlar;
+determinizm: `POST /admin/replay` sonrası yanıt aynı kalmalıdır):
+- Yalnız `count > 0` rozetler döner; sıra SABİT katalog sırası: `mvp, vision, damage,
+  cs_per_min, gold, deathless, comeback, win_streak_5, bench_3, versatile,
+  veteran_10, veteran_25, veteran_50`. Bilinmeyen oyuncu → `404`; rozetsiz oyuncuda
+  `badges: []`. `last_match_id` = rozeti son kazandıran maç (blok rozetlerinde bloğun
+  son maçı, eşik rozetlerinde eşiği tamamlayan maç).
+- **mvp** (GÖREV 12): maç başına, KAZANAN takımın aktif engine `rating_history`
+  satırındaki en yüksek `perf_score`'lusu (yuvarlanmamış). Kırılım: perf → kills
+  çok → assists çok → deaths az → player_id küçük. `perf_score` NULL satır aday
+  değildir; kazanan takımda hiç perf yoksa o maçta MVP yoktur. Kırılımda NULL
+  kills/assists en düşük, NULL deaths en yüksek sayılır (son anahtar player_id
+  olduğundan sonuç her hâlükârda deterministiktir).
+- **vision / damage / gold**: maçtaki 10 oyuncu içinde ilgili statın (vision_score /
+  damage_to_champs / gold) en yükseği; NULL statlılar aday değildir; EŞİTLİKTE eşit
+  olan HERKES rozeti alır; hiç non-null yoksa o maçta rozet yoktur. **cs_per_min**:
+  aynı kural, metrik `cs / (duration_s/60)`; `duration_s` NULL veya `<= 0` olan maç
+  bu rozet için dışıdır (diğer rekor rozetleri etkilenmez).
+- **deathless**: `deaths == 0` (NULL değil) bitirilen her maç.
+- **comeback**: oyuncu kazanan takımda + İKİ takımın da 5 oyuncusunun gold'u non-null
+  + kazanan takımın gold toplamı kaybedenden KÜÇÜK.
+- **win_streak_5**: oyuncunun kronolojik (replay sort-key) valid maçlarında her
+  TAMAMLANAN ardışık 5 galibiyet bloğu 1 rozet; bloklar ayrıktır (6-9. galibiyetler
+  yeni bloğu doldurur), mağlubiyet sayacı sıfırlar.
+- **bench_3** ("Sonsuz Bench"): oyuncunun kronolojik valid maçlarında, KENDİ
+  takımının TEK BAŞINA en düşük `perf_score`'lusu olduğu her tamamlanan ardışık
+  3 maç bloğu 1 rozet (ayrık bloklar). Karşılaştırılabilirlik: kendi takımının
+  5 oyuncusunun da perf'i non-null olmalıdır; karşılaştırılamayan maç seriyi KIRAR.
+  En düşükte eşitlik varsa o maç bench SAYILMAZ ve seriyi kırar (kırılım uygulanmaz).
+- **versatile**: 5 rolün hepsinde (position; NULL sayılmaz) ≥1 valid maç — tek seferlik.
+- **veteran_10 / veteran_25 / veteran_50**: valid maç sayısı eşikleri — her biri tek
+  seferlik, bağımsız (50 maçlıda üçü de görünür).
+- Rozet adları/açıklamaları backend'de TUTULMAZ (yanıt yalnız `key` taşır); çeviri
+  web UI i18n sözlüklerindedir (i18n_contract kuralı).
+
 ### Haftanın enleri (GÖREV 2)
 ```
 GET /highlights/weekly

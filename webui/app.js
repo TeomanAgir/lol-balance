@@ -29,6 +29,7 @@
     matchStat: "gold",          // maç detayında seçili stat (MD_STATS anahtarı)
     matchFrom: "matches",       // maç detayı hangi görünümden açıldı (geçmiş | profil, GÖREV 10)
     ratingHistory: null,        // GET /players/{id}/rating-history yanıtı (GÖREV 10; null = çekilemedi)
+    badges: null,               // GET /players/{id}/badges yanıtı (GÖREV 11+12; null = çekilemedi)
     historyRange: "all",        // grafikteki zaman aralığı: PH_RANGES anahtarı (istemci tarafı)
     histOpen: null,             // grafikte popup'ı açık olan noktanın match_id'si
   };
@@ -356,8 +357,13 @@
     t("common.back_" + (BACK_VIEWS.includes(from) ? from : "leaderboard"));
 
   function openProfile(id) {
-    // Yeni oyuncu → tarihçe grafiği baştan başlar (aralık seçimi taşınmaz).
-    if (id !== state.profileId) { state.historyRange = "all"; state.ratingHistory = null; }
+    // Yeni oyuncu → tarihçe grafiği baştan başlar (aralık seçimi taşınmaz),
+    // rozet vitrini de önceki oyuncunun verisiyle bir an görünmesin diye sıfırlanır.
+    if (id !== state.profileId) {
+      state.historyRange = "all";
+      state.ratingHistory = null;
+      state.badges = null;
+    }
     state.profileId = id;
     // Profilden profile geçilebilir (sinerji linkleri) — çıkış noktası ilk giriş yeridir.
     if (currentView !== "profile") state.profileFrom = currentView;
@@ -438,8 +444,11 @@
     // Tarihçe bölümü (GÖREV 10) burada yalnız YER AÇAR: içeriğini renderHistory()
     // doldurur — aralık düğmeleri profil yeniden çekilmeden yeniden çizebilsin diye.
     const histSec = `<section class="prof-section" id="prof-history" hidden></section>`;
+    // Rozet vitrini (GÖREV 11+12) tarihçe grafiğinin ALTINDA; aynı desenle yalnız
+    // yer açar, içeriğini renderBadges() doldurur (uç düşerse hiç görünmez).
+    const badgeSec = `<section class="prof-section" id="prof-badges" hidden></section>`;
 
-    return head + `<div class="stat-grid">${cards}</div>` + histSec + roleSec + synSec;
+    return head + `<div class="stat-grid">${cards}</div>` + histSec + badgeSec + roleSec + synSec;
   }
 
   async function loadProfile() {
@@ -451,15 +460,18 @@
     box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     try {
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
-      // rating-history ayrı bir uçtur (GÖREV 10): düşerse profilin kalanı çalışsın —
-      // /nemesis'teki desenin aynısı, bölüm o durumda hiç çizilmez.
-      const [s, h] = await Promise.all([
+      // rating-history ve badges ayrı uçlardır (GÖREV 10, 11+12): düşerlerse
+      // profilin kalanı çalışsın — /nemesis'teki desenin aynısı, o bölüm çizilmez.
+      const [s, h, b] = await Promise.all([
         api(`/players/${state.profileId}/stats`),
         api(`/players/${state.profileId}/rating-history`).catch(() => null),
+        api(`/players/${state.profileId}/badges`).catch(() => null),
       ]);
       state.ratingHistory = h;
+      state.badges = b;
       box.innerHTML = profileHtml(s);
       renderHistory();
+      renderBadges();
       // Sinerji listesindeki isimler o oyuncunun profiline geçer.
       box.querySelectorAll(".syn-link").forEach(btn =>
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
@@ -701,6 +713,132 @@
     if (e.target.closest && e.target.closest(".ph-pop, .ph-hit")) return;
     closeHistPopup(false);
   });
+
+  // ── 2b3) Rozet vitrini (GÖREV 11+12) ──────────────────────────
+  // Veri: GET /players/{id}/badges — yanıt yalnız {key, count, last_match_id}
+  // taşır; ad ve açıklama BURADA, sözlüktedir (api_contract §2 "Rozetler").
+  // Sıra contract'ta SABİT katalog sırasıdır; yine de burada katalog sırasına göre
+  // dizilir (ileri sürüm backend'i sırayı değiştirirse vitrin bozulmasın diye).
+  // Bilinmeyen anahtar SESSİZCE atlanır: backend yeni rozet eklediğinde eski UI
+  // "profile.badge_xxx" anahtar adını ekrana yazmaz.
+  //
+  // İkon emoji değil, satır içi SVG'dir (tema rengini currentColor ile alır,
+  // platformdan platforma değişmez). Renk tek başına anlam taşımaz: rozet adı
+  // her kartçıkta yazılıdır, açıklama da ekran okuyucuya .pb-sr ile verilir.
+  const BADGE_KEYS = [
+    "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
+    "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+  ];
+
+  // 24×24 viewBox, tek renk çizgi grafikleri (pb-fill sınıfı dolu parçalar için).
+  const BADGE_ICONS = {
+    mvp: `<path class="pb-fill" d="M12 3.2l2.6 5.4 5.9.9-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.9z"/>`,
+    vision: `<path d="M2.5 12s3.6-5.5 9.5-5.5S21.5 12 21.5 12s-3.6 5.5-9.5 5.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/>`,
+    damage: `<circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.5M12 17.9v3.5M2.6 12h3.5M17.9 12h3.5M5.4 5.4l2.5 2.5M16.1 16.1l2.5 2.5M18.6 5.4l-2.5 2.5M7.9 16.1l-2.5 2.5"/>`,
+    cs_per_min: `<circle cx="12" cy="12" r="8.6"/><path d="M12 6.8v5.4l3.4 2"/>`,
+    gold: `<ellipse cx="12" cy="6.4" rx="7.4" ry="2.9"/><path d="M4.6 6.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/><path d="M4.6 11.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/>`,
+    deathless: `<path d="M12 2.8l7.4 2.7v6c0 4.4-3 8-7.4 9.7-4.4-1.7-7.4-5.3-7.4-9.7v-6z"/><path d="M8.8 12.1l2.3 2.3 4.1-4.5"/>`,
+    comeback: `<path d="M4.8 19.5V13a5.6 5.6 0 0 1 11.2 0v6.5"/><path d="M12.4 16.3l3.6 3.4 3.6-3.4"/>`,
+    win_streak_5: `<path d="M12 21c3.5 0 6-2.4 6-5.6 0-4.2-4.1-5.9-3.3-11.4-2.9 1.2-5.2 4-5.2 6.4 0 1.2.4 2 .4 2S8.1 11.6 7 10c-.6 1.2-1 2.9-1 4.6C6 18.3 8.5 21 12 21z"/>`,
+    bench_3: `<path d="M3.6 9.6h16.8M3.6 13.1h16.8"/><path d="M5.8 13.1v6.1M18.2 13.1v6.1M5.8 9.6V5.4M18.2 9.6V5.4"/>`,
+    versatile: `<path d="M12 3.1l8.6 6.2-3.3 10.1H6.7L3.4 9.3z"/><circle class="pb-fill" cx="12" cy="12" r="1.7"/>`,
+    veteran_10: `<path d="M4.8 15.2L12 9l7.2 6.2"/>`,
+    veteran_25: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
+    veteran_50: `<path d="M4.8 10.2L12 4l7.2 6.2M4.8 15L12 8.8l7.2 6.2M4.8 19.8L12 13.6l7.2 6.2"/>`,
+  };
+
+  const badgeIcon = (key) =>
+    `<svg class="pb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${BADGE_ICONS[key]}</svg>`;
+
+  // Yanıttaki rozetler → katalog sırasında, tanınmayanlar atılmış liste.
+  function badgeList() {
+    const raw = (state.badges && state.badges.badges) || [];
+    return raw
+      .filter(b => b && BADGE_KEYS.indexOf(b.key) !== -1)
+      .sort((a, b) => BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key));
+  }
+
+  const badgeCount = (b) => (typeof b.count === "number" && b.count > 1 ? b.count : 0);
+  // last_match_id contract'ta zorunlu ama ileri sürümde null gelebilir → satır düşer.
+  const badgeLast = (b) =>
+    Number.isFinite(Number(b.last_match_id))
+      ? t("profile.badge_last", { id: Number(b.last_match_id) })
+      : "";
+
+  function badgeCard(b) {
+    // MVP vitrinin ilkidir (katalog sırası zaten öyle) ve pirinç vurgulu;
+    // bench_3 esprili olduğu için nötr gri tonda kalır.
+    const tone = b.key === "mvp" ? " pb-mvp" : b.key === "bench_3" ? " pb-bench" : "";
+    const n = badgeCount(b);
+    const last = badgeLast(b);
+    // Görsel tooltip aria-hidden'dır; aynı bilgi ekran okuyucuya .pb-sr ile
+    // düğmenin erişilebilir adının parçası olarak zaten verilir.
+    const sr = [t("profile.badge_" + b.key + "_desc"),
+      n ? t("profile.badge_count_aria", { n }) : "", last].filter(Boolean).join(" ");
+    return `<button type="button" class="pb-card${tone}" data-key="${b.key}">
+        ${badgeIcon(b.key)}
+        <span class="pb-name">${t("profile.badge_" + b.key)}</span>
+        ${n ? `<span class="pb-count" aria-hidden="true">${t("profile.badge_count", { n })}</span>` : ""}
+        <span class="pb-sr">${sr}</span>
+      </button>`;
+  }
+
+  let badgeOpen = null;   // tooltip'i açık olan kartçık düğümü
+
+  function renderBadges() {
+    const sec = $("#prof-badges");
+    if (!sec) return;
+    badgeOpen = null;
+    // Uç yoksa/düştüyse bölüm hiç görünmez (profilin kalanı etkilenmez).
+    if (!state.badges) { sec.hidden = true; sec.innerHTML = ""; return; }
+    sec.hidden = false;
+
+    const title = `<h3 class="ps-title">${t("profile.badges_title")}</h3>`;
+    const list = badgeList();
+    if (!list.length) {
+      sec.innerHTML = title + `<p class="ps-empty">${t("profile.badges_empty")}</p>`;
+      return;
+    }
+    sec.innerHTML = title + `<div class="pb-grid">${list.map(badgeCard).join("")}</div>`;
+
+    sec.querySelectorAll(".pb-card").forEach(card => {
+      const b = list.find(x => x.key === card.dataset.key);
+      // Tıklama ve odak AÇAR (kapatmaz): fare tıklamasında odak+tık ard arda
+      // gelir, "toggle" olsaydı tooltip açılıp hemen kapanırdı.
+      card.addEventListener("click", () => openBadgeTip(card, b));
+      card.addEventListener("focus", () => openBadgeTip(card, b));
+      card.addEventListener("blur", () => { if (badgeOpen === card) closeBadgeTip(); });
+    });
+  }
+
+  function openBadgeTip(card, b) {
+    if (!card || !b || badgeOpen === card) return;
+    closeBadgeTip();
+    const last = badgeLast(b);
+    card.insertAdjacentHTML("beforeend",
+      `<span class="pb-tip" aria-hidden="true">
+         <span>${t("profile.badge_" + b.key + "_desc")}</span>
+         ${last ? `<span class="pb-tip-last">${last}</span>` : ""}
+       </span>`);
+    badgeOpen = card;
+    // Kenardaki kartçıkta kutu ızgaranın dışına taşabilir: ölçüp içeri çekilir
+    // (320px'de yatay taşma yok kuralı; tarihçe popup'ındaki desenin aynısı).
+    const tip = card.querySelector(".pb-tip");
+    const grid = card.closest(".pb-grid");
+    if (!tip || !grid) return;
+    const tr = tip.getBoundingClientRect();
+    const gr = grid.getBoundingClientRect();
+    const shift = tr.left < gr.left ? gr.left - tr.left
+      : tr.right > gr.right ? gr.right - tr.right : 0;
+    if (shift) tip.style.marginLeft = Math.round(shift) + "px";
+  }
+
+  // Esc ile kapanır; odak kartçıkta KALIR (tetikleyici zaten kartçığın kendisi).
+  function closeBadgeTip() {
+    const tip = document.querySelector("#prof-badges .pb-tip");
+    if (tip) tip.remove();
+    badgeOpen = null;
+  }
 
   // ── 2c) Haftanın enleri (GÖREV 2) ─────────────────────────────
   // Salt-okur ekran: GET /highlights/weekly. Contract'taki her alan null olabilir;
@@ -977,6 +1115,7 @@
     if (e.key !== "Escape") return;
     closeRoleModal();
     closeHistPopup();   // GÖREV 10: tarihçe popup'ı da Esc ile kapanır
+    closeBadgeTip();    // GÖREV 11+12: rozet tooltip'i (klavye erişimi)
   });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────

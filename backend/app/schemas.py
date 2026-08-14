@@ -170,6 +170,22 @@ class RatingHistoryOut(BaseModel):
     points: list[RatingHistoryPointOut]
 
 
+class BadgeOut(BaseModel):
+    # api_contract §2 "Rozetler": yalnız `key` taşınır — rozet adı/açıklaması
+    # backend'de TUTULMAZ, çeviri web UI i18n sözlüklerindedir.
+    # last_match_id: rozeti son kazandıran maç (blok rozetinde bloğun son maçı,
+    # eşik rozetinde eşiği tamamlayan maç).
+    key: str
+    count: int
+    last_match_id: int
+
+
+class PlayerBadgesOut(BaseModel):
+    # Yalnız count > 0 rozetler, SABİT katalog sırasında; rozetsiz oyuncuda [].
+    player_id: int
+    badges: list[BadgeOut]
+
+
 class HighlightsWindowOut(BaseModel):
     # api_contract §2 "Haftanın enleri": UTC ISO8601, `start < played_at <= end`.
     # fallback=True → pencere boştu, end en son valid maça çapalandı.

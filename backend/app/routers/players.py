@@ -9,6 +9,7 @@ from rating import ROLES, Engine, Rating
 from ..config import Settings, get_settings
 from ..deps import get_db
 from ..schemas import (
+    PlayerBadgesOut,
     PlayerCreate,
     PlayerOut,
     PlayerPatch,
@@ -17,6 +18,7 @@ from ..schemas import (
     RatingOut,
     RoleRatingOut,
 )
+from ..services.badges import player_badges
 from ..services.player_stats import player_stats
 from ..services.rating_history import rating_history
 from ..services.ratings import (
@@ -166,6 +168,24 @@ def player_rating_history(
     if history is None:
         raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
     return history
+
+
+@router.get("/players/{player_id}/badges")
+def player_badge_list(
+    player_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> PlayerBadgesOut:
+    """Oyuncunun rozetleri (api_contract §2 "Rozetler", GÖREV 11+12).
+
+    Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz — rozetler her
+    istekte mevcut maç/rating satırlarından hesaplanır. Rozetsiz oyuncuda
+    `badges: []`.
+    """
+    badges = player_badges(conn, player_id, settings.engine_version)
+    if badges is None:
+        raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
+    return badges
 
 
 @router.post("/players", status_code=201)

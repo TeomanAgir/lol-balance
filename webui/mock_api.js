@@ -392,6 +392,124 @@
     };
   }
 
+  // ── Rozetler (GÖREV 11+12) ──
+  // api_contract §2 "Rozetler": yanıt yalnız {key, count, last_match_id} taşır
+  // (ad/açıklama web UI sözlüğünde), sıra SABİT katalog sırasıdır, yalnız
+  // count > 0 rozetler döner, rozetsiz oyuncuda badges: [].
+  //
+  // Gerçek hesapta mvp/bench rating satırındaki perf_score'a bakar; mock'ta
+  // perf_score yok, bu yüzden deterministik bir VEKİL kullanılır — şekil ve
+  // kenar durumları doğru olsun diye, sayılar backend'le aynı olmak zorunda değil.
+  //
+  // SENARYO BAYRAĞI (test için elle değiştir):
+  //   BADGES_FULL_PLAYER = <id> → o oyuncuda eksik katalog rozetleri deterministik
+  //     sayılarla tamamlanır (13 kartçıklı vitrin bir bakışta görülebilsin) ve
+  //     sona BİLİNMEYEN bir anahtar eklenir: UI'ın "tanımadığın key'i sessizce atla"
+  //     ileri uyumluluk yolu böyle denenir. null yaparsan yalnız gerçek rozetler döner.
+  // Ece (14) hiç maç oynamadı → badges: [] (boş durum metni).
+  const BADGE_CATALOG = [
+    "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
+    "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+  ];
+  const BADGES_FULL_PLAYER = 1;
+
+  // perf_score vekili: NULL stat varsa perf de NULL sayılır (contract: perf_score
+  // NULL satır mvp/bench için aday değildir).
+  function perfProxy(part) {
+    const s = part.stats;
+    if (!s) return null;
+    const need = [s.kills, s.deaths, s.assists, s.gold, s.damage_to_champs];
+    if (need.some(v => typeof v !== "number")) return null;
+    return s.kills * 3 + s.assists * 1.5 - s.deaths * 2 + s.gold / 4000 + s.damage_to_champs / 9000;
+  }
+
+  function playerBadges(id) {
+    if (!players.some(x => x.id === id)) return null;
+    const mine = matches
+      .filter(m => m.status === "valid" && m.participants.some(x => x.player_id === id))
+      .sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at));
+
+    const acc = new Map();   // key -> {count, last_match_id}
+    const add = (key, mid) => {
+      const e = acc.get(key) || { count: 0, last_match_id: null };
+      e.count++; e.last_match_id = mid;
+      acc.set(key, e);
+    };
+
+    const roles = new Set();
+    let winRun = 0, benchRun = 0, played = 0;
+
+    for (const m of mine) {
+      played++;
+      const me = m.participants.find(x => x.player_id === id);
+      const win = m.winner_team === me.team;
+      if (me.position) roles.add(me.position);
+      if (roles.size === 5 && !acc.has("versatile")) add("versatile", m.id);
+      [10, 25, 50].forEach(n => { if (played === n) add("veteran_" + n, m.id); });
+
+      // Maçın en'leri: NULL aday değil, EŞİTLİKTE eşit olan herkes alır.
+      const statBadge = (key, fn) => {
+        const nums = m.participants.map(fn).filter(v => typeof v === "number");
+        const v = fn(me);
+        if (nums.length && typeof v === "number" && v === Math.max(...nums)) add(key, m.id);
+      };
+      statBadge("vision", x => (x.stats ? x.stats.vision_score : null));
+      statBadge("damage", x => (x.stats ? x.stats.damage_to_champs : null));
+      statBadge("gold", x => (x.stats ? x.stats.gold : null));
+      statBadge("cs_per_min", x =>
+        m.duration_s > 0 && x.stats && typeof x.stats.cs === "number"
+          ? x.stats.cs / (m.duration_s / 60) : null);
+
+      // MVP: kazanan takımın en yüksek perf'lisi; kırılım perf → kills → assists
+      // → az deaths → küçük player_id.
+      const winners = m.participants
+        .filter(x => x.team === m.winner_team && perfProxy(x) !== null)
+        .sort((a, b) =>
+          perfProxy(b) - perfProxy(a) ||
+          b.stats.kills - a.stats.kills ||
+          b.stats.assists - a.stats.assists ||
+          a.stats.deaths - b.stats.deaths ||
+          a.player_id - b.player_id);
+      if (winners.length && winners[0].player_id === id) add("mvp", m.id);
+
+      if (me.stats && me.stats.deaths === 0) add("deathless", m.id);
+
+      // Comeback: kazandı + 10 gold'un hepsi non-null + kazananın toplamı küçük.
+      const golds = m.participants.map(x => (x.stats ? x.stats.gold : null));
+      if (win && golds.every(g => typeof g === "number")) {
+        const sum = (team) => m.participants
+          .filter(x => x.team === team).reduce((a, x) => a + x.stats.gold, 0);
+        if (sum(m.winner_team) < sum(m.winner_team === 100 ? 200 : 100)) add("comeback", m.id);
+      }
+
+      // Ayrık bloklar: 5 galibiyet / 3 bench maçı tamamlanınca sayaç sıfırlanır.
+      winRun = win ? winRun + 1 : 0;
+      if (winRun === 5) { add("win_streak_5", m.id); winRun = 0; }
+
+      const team = m.participants.filter(x => x.team === me.team);
+      const perfs = team.map(perfProxy);
+      const mineP = perfProxy(me);
+      const comparable = perfs.every(v => v !== null) && mineP !== null;
+      const lowest = comparable && perfs.filter(v => v === Math.min(...perfs)).length === 1
+        && mineP === Math.min(...perfs);
+      benchRun = lowest ? benchRun + 1 : 0;
+      if (benchRun === 3) { add("bench_3", m.id); benchRun = 0; }
+    }
+
+    const badges = BADGE_CATALOG
+      .filter(k => acc.has(k))
+      .map(k => ({ key: k, count: acc.get(k).count, last_match_id: acc.get(k).last_match_id }));
+
+    if (id === BADGES_FULL_PLAYER && mine.length) {
+      const lastId = mine[mine.length - 1].id;
+      const full = BADGE_CATALOG.map((k, i) =>
+        badges.find(b => b.key === k) || { key: k, count: 1 + (i % 3), last_match_id: lastId });
+      full.push({ key: "future_badge_unknown", count: 2, last_match_id: lastId });
+      return { player_id: id, badges: full };
+    }
+    return { player_id: id, badges };
+  }
+
   // ── Haftanın enleri (GÖREV 2) ──
   // api_contract §2 "Haftanın enleri": pencere = son 7 gün; o pencerede hiç valid maç
   // yoksa end = en son valid maçın zamanı olur ve fallback: true döner.
@@ -609,6 +727,13 @@
     if (method === "GET" && histPath) {
       const h = ratingHistory(Number(histPath[1]));
       return h ? json(h) : err(404, "Oyuncu bulunamadı.");
+    }
+
+    // Rozetler (GÖREV 11+12) — profil vitrininin verisi.
+    const badgePath = path.match(/^\/players\/(\d+)\/badges$/);
+    if (method === "GET" && badgePath) {
+      const b = playerBadges(Number(badgePath[1]));
+      return b ? json(b) : err(404, "Oyuncu bulunamadı.");
     }
 
     if (method === "GET" && path === "/leaderboard")
