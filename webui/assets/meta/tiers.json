@@ -1,23 +1,153 @@
 {
   "patch": "16.16",
   "updated": "2026-08-15",
-  "source": "manual-seed",
-  "note": "Baslangic tohumu (konsept verisi). Gercek veri deploy/fetch_meta.py ile cekilir, Teoman onayiyla bu dosyaya yazilir ve commit'lenir. Sampiyon adlari Data Dragon gorunen adlaridir (webui/assets/ddragon/champions.json anahtarlari).",
+  "source": "op.gg (global, platinum_plus)",
   "tiers": {
-    "top":     { "S": ["Darius", "Irelia", "Shen", "Mordekaiser"],
-                 "A": ["Fiora", "Ornn", "Riven", "Jayce"],
-                 "B": ["Poppy", "Kennen", "Gwen", "Gnar"] },
-    "jungle":  { "S": ["Vi", "Warwick", "Nocturne"],
-                 "A": ["Lee Sin", "Ekko", "Amumu"],
-                 "B": ["Rengar", "Kha'Zix", "Shaco"] },
-    "middle":  { "S": ["Ahri", "Yone", "Viktor"],
-                 "A": ["Zed", "Orianna", "Syndra"],
-                 "B": ["Yasuo", "Lux", "Galio"] },
-    "bottom":  { "S": ["Jinx", "Kai'Sa", "Ezreal"],
-                 "A": ["Caitlyn", "Ashe", "Jhin"],
-                 "B": ["Vayne", "Sivir", "Xayah"] },
-    "utility": { "S": ["Thresh", "Lulu", "Leona"],
-                 "A": ["Nami", "Braum", "Rakan"],
-                 "B": ["Blitzcrank", "Morgana", "Pyke"] }
+    "top": {
+      "S": [
+        "Nasus",
+        "Garen",
+        "Malphite"
+      ],
+      "A": [
+        "Teemo",
+        "Sett",
+        "Singed",
+        "Darius",
+        "Aatrox",
+        "Mordekaiser",
+        "Yone",
+        "Gangplank"
+      ],
+      "B": [
+        "Renekton",
+        "Ornn",
+        "Kayle",
+        "Shen",
+        "Dr. Mundo",
+        "Camille",
+        "Jax",
+        "Yorick"
+      ]
+    },
+    "jungle": {
+      "S": [
+        "Wukong",
+        "Nocturne",
+        "Briar",
+        "Graves",
+        "Kayn",
+        "Warwick",
+        "Lee Sin",
+        "Shyvana"
+      ],
+      "A": [
+        "Rammus",
+        "Sylas",
+        "Lillia",
+        "Vi",
+        "Viego",
+        "Shaco",
+        "Zac",
+        "Ekko"
+      ],
+      "B": [
+        "Sejuani",
+        "Naafiri",
+        "Amumu",
+        "Fiddlesticks",
+        "Xin Zhao",
+        "Udyr",
+        "Talon",
+        "Evelynn"
+      ]
+    },
+    "middle": {
+      "S": [
+        "Ahri",
+        "Xerath",
+        "Viktor",
+        "Syndra"
+      ],
+      "A": [
+        "Fizz",
+        "Zed",
+        "Malzahar",
+        "Lissandra",
+        "Katarina",
+        "Vex",
+        "Veigar",
+        "Hwei"
+      ],
+      "B": [
+        "Lux",
+        "Sylas",
+        "Gwen",
+        "Locke",
+        "Ekko",
+        "Akali",
+        "Yasuo",
+        "Diana"
+      ]
+    },
+    "bottom": {
+      "S": [
+        "Jinx",
+        "Kai'Sa",
+        "Tristana"
+      ],
+      "A": [
+        "Caitlyn",
+        "Xayah",
+        "Viktor",
+        "Twitch",
+        "Jhin",
+        "Xerath",
+        "Zeri",
+        "Veigar"
+      ],
+      "B": [
+        "Ziggs",
+        "Yunara",
+        "Kog'Maw",
+        "Lucian",
+        "Sivir",
+        "Hwei",
+        "Swain",
+        "Smolder"
+      ]
+    },
+    "utility": {
+      "S": [
+        "Thresh",
+        "Leona",
+        "Lulu",
+        "Nami",
+        "Nautilus",
+        "Seraphine",
+        "Senna",
+        "Blitzcrank"
+      ],
+      "A": [
+        "Milio",
+        "Braum",
+        "Janna",
+        "Rell",
+        "Lux",
+        "Soraka",
+        "Rakan",
+        "Sona"
+      ],
+      "B": [
+        "Bard",
+        "Zyra",
+        "Xerath",
+        "Pantheon",
+        "Vel'Koz",
+        "Taric",
+        "Maokai",
+        "Brand"
+      ]
+    }
   }
 }
