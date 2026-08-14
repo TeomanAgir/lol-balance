@@ -105,6 +105,20 @@ GROUP BY rrh.player_id, rrh.role, rrh.engine_version
 HAVING m.played_at = MAX(m.played_at);
 ```
 
+-- ── GÖREV 13 (migration 0004) ──────────────────────────────────────────────
+-- Collector sağlık takibi. Heartbeat upsert'tir; ingest'ten bağımsız yaşar.
+```sql
+CREATE TABLE collector_health (
+    client_id      TEXT PRIMARY KEY,           -- cihaz kimliği (sihirbaz/CLIENT_ID)
+    last_seen      TEXT NOT NULL,              -- SUNUCU saati, UTC Z (client saatine güvenilmez)
+    version        TEXT,                       -- collector sürümü (nullable)
+    outbox_pending INTEGER                     -- son heartbeat'teki bekleyen outbox sayısı (nullable)
+);
+
+-- matches'a kaynak cihaz izi (nullable; eski kayıtlar ve eski exe'ler NULL kalır):
+ALTER TABLE matches ADD COLUMN client_id TEXT;
+```
+
 ## Kenar durumlar
 - **Remake / erken bitiş:** backend, `duration_s < 300` olan maçları otomatik `void` işaretler; `void` maçlar veri olarak saklanır ama rating replay'ine girmez.
 - **Yeni oyuncu:** Misafir/üye ayrımı YOKTUR. Payload'daki puuid `players`'ta yoksa backend önce riot_id ile (case-insensitive) puuid'i NULL olan bir kayıt arar — bulursa puuid'i o kayda bağlar (manuel eklenen oyuncunun ilk maçı senaryosu). Bulamazsa yeni oyuncu oluşturur (display_name = riot_id'nin GameName kısmı). Aynı kişi için asla iki player satırı oluşmaz. Oyuncu havuzu ~13-14 kişi; maç günü hazır bulunanlar web UI'daki roster listesinden seçilir.

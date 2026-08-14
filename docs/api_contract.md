@@ -325,8 +325,33 @@ GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
 
 **Sıra-dışı ingest auto-replay (2026-08-13):** Duplicate olmayan bir maç, rating'e girmiş mevcut en yeni valid maçtan daha ESKİ `played_at` ile gelirse (geriye dönük backfill senaryosu), backend incremental yerine HER İKİ evreni otomatik replay eder — sonuç, tüm maçlar kronolojik gelmiş gibi bire bir aynıdır (determinizm). Tetik koşulu, "incremental == replay" değişmezini koruyacak şekilde replay'in sıralama anahtarıyla hizalıdır. Ingest yanıt şekli DEĞİŞMEZ; elle `POST /admin/replay` yalnız engine değişimi ve olağandışı durumlar için kalır.
 
-## 6. Hata formatı
+## 6. Collector sağlığı (GÖREV 13)
+```
+POST /health/heartbeat
+Body: {"client_id": "Ali-PC", "version": "1.5.0", "outbox_pending": 0}
+→ 200 {"ok": true}
+
+GET /health/collectors
+→ 200 [{
+  "client_id": "Ali-PC", "last_seen": "2026-08-14T20:41:03Z",
+  "version": "1.5.0", "outbox_pending": 0,
+  "last_ingest_at": "2026-08-13T22:10:00Z", "last_ingest_game_id": "1734999999"
+}]
+```
+Kurallar:
+- Heartbeat: `client_id` zorunlu (string ≤64, trim sonrası boş olamaz → `422`);
+  `version` ve `outbox_pending` opsiyonel/nullable. `last_seen` SUNUCUDA atanır
+  (client saatine güvenilmez). Kayıt upsert'tir (`collector_health`, migration 0004).
+- Collector heartbeat'i şu anlarda atar: LCU bağlantısı kurulunca, canlı modda her
+  `HEARTBEAT_MINUTES` dakikada bir (varsayılan 5, `0` = kapalı) ve backfill/yetişme
+  bitiminde. Heartbeat hatası collector'ı ASLA durdurmaz (logla, devam et).
+- `GET /health/collectors`: `last_seen` azalan sıralı. `last_ingest_at` /
+  `last_ingest_game_id` = o cihazın `matches.client_id` izinden en son maçı
+  (yoksa `null`; void dahil — bu operasyonel izdir, rating süzgeci değil).
+- Bu uçlar da `X-API-Key` ister; yanıtlar gösterim içindir, rating'e etkisi yoktur.
+
+## 7. Hata formatı
 Tüm hatalar: `{"detail": "insan-okur açıklama"}` + uygun HTTP kodu. Web UI bu `detail`'i kullanıcıya aynen gösterebilir, o yüzden mesajlar Türkçe yazılır.
 
-## 7. Statik servis
+## 8. Statik servis
 Backend, `webui/` dizinindeki dosyaları `/` altından servis eder (FastAPI StaticFiles). API `/api/v1` prefix'inde kaldığı için çakışma yoktur. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).
