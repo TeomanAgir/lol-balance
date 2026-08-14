@@ -850,10 +850,17 @@
   // yanıtındaki `participants[].stats` alanından gelir; kart tıklanınca o maç
   // nesnesi state'e konur ve görünüm ondan çizilir (yeniden istek atılmaz).
   //
-  // Gösterim: 4 stat düğmesi (gold / hasar / CS / vizyon) + rol eşleşmeli
-  // karşılıklı bar graph (sol mavi = team 100, sağ kırmızı = team 200) + takım
-  // TOPLAM satırı. Bar ölçeği SATIR BAZLIDIR: satırdaki büyük değer %100'dür
-  // (takım toplamı satırı da kendi içinde ölçeklenir).
+  // Gösterim (tasarım KS1, GÖREV 9): 4 stat düğmesi (gold / hasar / CS / vizyon)
+  // + rol eşleşmeli satırlar (sol mavi = team 100, sağ kırmızı = team 200).
+  // Her oyuncu satırında:
+  //   (a) karşılıklı bar — ölçek GLOBAL'dir: seçili statta maçtaki 10 oyuncunun
+  //       en büyük değeri %100'dür, herkes ona oranlanır; en iyi bar pirinç
+  //       çerçeve + parıltı, değeri de ⭐ alır (eşitlikte hepsi alır),
+  //   (b) ibre — koridor payı mavi/(mavi+kırmızı); %50 çentikli ray üzerinde
+  //       önde olan takımın renginde üçgen iğne (fark <%2 ise nötr gri).
+  // TOPLAM satırında bar YOKTUR: iki büyük takım değeri + büyütülmüş takım
+  // ibresi. Toplamlar global ölçeğe DAHİL EDİLMEZ (yoksa 10 oyuncu barı
+  // toplamın yanında ezilirdi).
   const MD_STATS = [
     { key: "gold", label: "matchdetail.stat_gold", big: true },
     { key: "damage_to_champs", label: "matchdetail.stat_damage", big: true },
@@ -890,38 +897,82 @@
     return rows;
   }
 
-  // side: {name, champ, value} — katılımcı ya da takım toplamı olabilir.
+  // side: {name, champ, value} — eşleşmeyen satırda taraf boş olabilir.
   const mdSide = (p, key) =>
     p ? { name: p.display_name, champ: p.champion, value: mdValue(p, key) }
       : { name: "—", champ: null, value: null };
-  const mdTeamTotal = (parts, key, nameKey) => {
+  // Takım toplamı: null'lar toplama girmez; hepsi null ise toplam da null'dır.
+  const mdTeamSum = (parts, key) => {
     const vals = parts.map(p => mdValue(p, key)).filter(v => v != null);
-    return {
-      name: t(nameKey),
-      champ: null,
-      value: vals.length ? vals.reduce((a, b) => a + b, 0) : null,
-    };
+    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
   };
+  // Global ölçek: yalnız OYUNCU değerleri (toplam hariç), null'lar yok sayılır.
+  // Hiç değer yoksa 0 → tüm barlar boş kalır, değerler "—" gösterilir.
+  const mdGlobalMax = (m, key) => {
+    const vals = m.participants.map(p => mdValue(p, key)).filter(v => v != null);
+    return vals.length ? Math.max(...vals) : 0;
+  };
+  const mdLead = (a, b) => (a != null && a >= (b == null ? -1 : b) ? " lead" : "");
 
-  function mdRowHtml(label, left, right, stat, isTotal) {
+  // İbre: pay = mavi/(mavi+kırmızı), null = 0 sayılır. İki değer de null/0 ise
+  // gösterilecek pay yoktur → boş string döner (satır gizlenir).
+  function mdGaugeHtml(lv, rv, cls, titleKey) {
+    const sum = (lv || 0) + (rv || 0);
+    if (sum <= 0) return "";
+    const pct = ((lv || 0) / sum) * 100;
+    const side = Math.abs(pct - 50) < 2 ? "neutral" : (pct >= 50 ? "blue" : "red");
+    const title = t(titleKey, { pct: pct.toFixed(0) });
+    return `<div class="${cls}">
+          <div class="md-rail"></div><div class="md-notch"></div>
+          <div class="md-needle ${side}" style="left:${pct.toFixed(1)}%" title="${esc(title)}"></div>
+        </div>`;
+  }
+
+  function mdRowHtml(label, left, right, stat, gmax) {
     const lv = left.value, rv = right.value;
-    const max = Math.max(lv || 0, rv || 0);
-    const width = (v) => (max > 0 ? Math.round(((v || 0) / max) * 100) : 0);
-    const lead = (a, b) => (a != null && a >= (b == null ? -1 : b) ? " lead" : "");
-    return `<div class="md-row${isTotal ? " md-total" : ""}">
+    const width = (v) => (gmax > 0 && v != null ? (v / gmax) * 100 : 0).toFixed(1);
+    const isMax = (v) => gmax > 0 && v === gmax;
+    // ⭐ yeri HER satırda ayrılır (en iyi değilse görünmez): değer sütunları eşit
+    // genişlikte kalır, barlar ve ibre rayları satırdan satıra hizalı durur.
+    const star = (on) => on
+      ? `<span class="md-star" title="${esc(t("matchdetail.best_title"))}">⭐</span>`
+      : `<span class="md-star off" aria-hidden="true">⭐</span>`;
+    return `<div class="md-row">
         <div class="md-row-names">
           <span class="md-name blue">${esc(left.name)}${left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""}</span>
           <span class="md-role">${esc(label)}</span>
           <span class="md-name red">${right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : ""}${esc(right.name)}</span>
         </div>
         <div class="md-bars">
-          <span class="md-val left${lead(lv, rv)}">${mdFmt(stat, lv)}</span>
+          <span class="md-val left${mdLead(lv, rv)}">${star(isMax(lv))} ${mdFmt(stat, lv)}</span>
           <div class="md-track">
-            <div class="md-half left"><div class="md-fill" style="width:${width(lv)}%"></div></div>
+            <div class="md-half left"><div class="md-fill${isMax(lv) ? " best" : ""}" style="width:${width(lv)}%"></div></div>
             <div class="md-center-line"></div>
-            <div class="md-half right"><div class="md-fill" style="width:${width(rv)}%"></div></div>
+            <div class="md-half right"><div class="md-fill${isMax(rv) ? " best" : ""}" style="width:${width(rv)}%"></div></div>
           </div>
-          <span class="md-val right${lead(rv, lv)}">${mdFmt(stat, rv)}</span>
+          <span class="md-val right${mdLead(rv, lv)}">${mdFmt(stat, rv)} ${star(isMax(rv))}</span>
+        </div>
+        ${mdGaugeHtml(lv, rv, "md-gauge", "matchdetail.gauge_title")}
+      </div>`;
+  }
+
+  // TOPLAM: bar yok — yatay karşılaştırmayı iki büyük sayı + takım ibresi yapar.
+  // İbre gizlenirse yerine boş bir esnek alan kalır (sayılar kenarlarda durur).
+  function mdTotalHtml(m, stat) {
+    const bv = mdTeamSum(m.participants.filter(p => p.team === 100), stat.key);
+    const rv = mdTeamSum(m.participants.filter(p => p.team === 200), stat.key);
+    const gauge = mdGaugeHtml(bv, rv, "md-team-gauge", "matchdetail.team_gauge_title")
+      || `<div class="md-team-gauge"></div>`;
+    return `<div class="md-row md-total">
+        <div class="md-row-names">
+          <span class="md-name">&nbsp;</span>
+          <span class="md-role">${t("matchdetail.total")}</span>
+          <span class="md-name">&nbsp;</span>
+        </div>
+        <div class="md-team-vals">
+          <span class="md-team-val blue${mdLead(bv, rv)}">${mdFmt(stat, bv)}<small>${t("matchdetail.blue_team")}</small></span>
+          ${gauge}
+          <span class="md-team-val red${mdLead(rv, bv)}">${mdFmt(stat, rv)}<small>${t("matchdetail.red_team")}</small></span>
         </div>
       </div>`;
   }
@@ -944,16 +995,19 @@
       MD_STATS.map(s =>
         `<button type="button" class="md-statbtn${s.key === stat.key ? " active" : ""}" data-stat="${s.key}">${t(s.label)}</button>`
       ).join("") + `</div>`;
+    const gmax = mdGlobalMax(m, stat.key);
     const rows = mdRows(m).map(r =>
-      mdRowHtml(r.role ? roleAbbr(r.role) : "?", mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, false)
+      mdRowHtml(r.role ? roleAbbr(r.role) : "?", mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, gmax)
     ).join("");
-    const totalRow = mdRowHtml(
-      t("matchdetail.total"),
-      mdTeamTotal(m.participants.filter(p => p.team === 100), stat.key, "matchdetail.blue_total"),
-      mdTeamTotal(m.participants.filter(p => p.team === 200), stat.key, "matchdetail.red_total"),
-      stat, true);
-    return head + statbar + `<div class="md-graph">${rows}${totalRow}</div>` +
-      `<p class="md-hint">${t("matchdetail.hint")}</p>`;
+    const keys =
+      `<div class="md-keys">
+         <span><i class="md-sw blue"></i>${t("common.blue")}</span>
+         <span><i class="md-sw red"></i>${t("common.red")}</span>
+         <span><span class="md-star">⭐</span> ${t("matchdetail.legend_best")}</span>
+         <span><span class="md-key-needle">▼</span> ${t("matchdetail.legend_gauge")}</span>
+       </div>`;
+    return head + statbar + `<div class="md-graph">${rows}${mdTotalHtml(m, stat)}</div>` +
+      keys + `<p class="md-hint">${t("matchdetail.hint")}</p>`;
   }
 
   function openMatchDetail(m) {
