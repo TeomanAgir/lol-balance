@@ -125,11 +125,14 @@ determinizm: `POST /admin/replay` sonrası yanıt aynı kalmalıdır):
 - **mvp** (GÖREV 12): maç başına, KAZANAN takımın aktif engine `rating_history`
   satırındaki en yüksek `perf_score`'lusu (yuvarlanmamış). Kırılım: perf → kills
   çok → assists çok → deaths az → player_id küçük. `perf_score` NULL satır aday
-  değildir; kazanan takımda hiç perf yoksa o maçta MVP yoktur.
+  değildir; kazanan takımda hiç perf yoksa o maçta MVP yoktur. Kırılımda NULL
+  kills/assists en düşük, NULL deaths en yüksek sayılır (son anahtar player_id
+  olduğundan sonuç her hâlükârda deterministiktir).
 - **vision / damage / gold**: maçtaki 10 oyuncu içinde ilgili statın (vision_score /
   damage_to_champs / gold) en yükseği; NULL statlılar aday değildir; EŞİTLİKTE eşit
   olan HERKES rozeti alır; hiç non-null yoksa o maçta rozet yoktur. **cs_per_min**:
-  aynı kural, metrik `cs / (duration_s/60)`; `duration_s <= 0` maç dışıdır.
+  aynı kural, metrik `cs / (duration_s/60)`; `duration_s` NULL veya `<= 0` olan maç
+  bu rozet için dışıdır (diğer rekor rozetleri etkilenmez).
 - **deathless**: `deaths == 0` (NULL değil) bitirilen her maç.
 - **comeback**: oyuncu kazanan takımda + İKİ takımın da 5 oyuncusunun gold'u non-null
   + kazanan takımın gold toplamı kaybedenden KÜÇÜK.
