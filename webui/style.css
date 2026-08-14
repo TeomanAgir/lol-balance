@@ -430,6 +430,115 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .syn-link { padding: 0; text-align: left; font-weight: 600; transition: color 0.12s; }
 .syn-link:hover { color: var(--brass); }
 
+/* ── Rating tarihçesi grafiği (GÖREV 10) — "ph-" öneki profil tarihçesine aittir ──
+   Grafik satır içi SVG'dir ve viewBox ile kapsayıcıya oranlı ölçeklenir; eksen
+   yazıları SVG'de değil bu HTML katmanındadır (ölçeklenip küçülmesinler diye).
+   Y ekseni solda sabit genişlikte bir oluk, X ekseni grafiğin altında. */
+.ph-ranges { display: flex; gap: 6px; margin-bottom: 10px; }
+.ph-pill {
+  font-size: 12px;
+  padding: 8px 14px;
+  min-height: 40px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ph-pill:hover { color: var(--brass); border-color: var(--brass-dim); }
+.ph-pill.active {
+  color: var(--brass);
+  border-color: var(--brass);
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.ph-chart { display: flex; align-items: stretch; }
+.ph-yaxis { flex: 0 0 38px; position: relative; }
+.ph-ytick {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ph-plot { position: relative; flex: 1 1 auto; min-width: 0; }
+.ph-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ph-xaxis {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0 0 38px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ph-grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.55; }
+.ph-area { fill: var(--brass); opacity: 0.10; }
+.ph-line {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+/* Renk tek başına taşıyıcı değil: G/M metni popup'ta ve nokta aria-label'ında var. */
+.ph-dot { stroke: var(--bg); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.ph-dot.win { fill: var(--blue); }
+.ph-dot.loss { fill: var(--red); }
+.ph-dot.last { stroke: var(--brass); stroke-width: 2.4; }
+/* Dokunma hedefi: noktadan büyük, saydam daire (≈18px @320px ekran). */
+.ph-hit { fill: transparent; cursor: pointer; outline: none; }
+.ph-hit:hover { fill: rgba(200, 161, 90, 0.10); }
+.ph-hit:focus-visible { fill: rgba(200, 161, 90, 0.16); stroke: var(--brass); stroke-width: 2; }
+
+.ph-pop {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  width: max-content;
+  max-width: min(210px, 100%);
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+.ph-pop.above { transform: translate(-50%, -100%); margin-top: -12px; }
+.ph-pop.below { transform: translate(-50%, 0); margin-top: 12px; }
+.ph-pop-date {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.ph-pop-line { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ph-pop-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+.ph-pop-res { font-weight: 700; }
+.ph-pop-res.win { color: var(--blue); }
+.ph-pop-res.loss { color: var(--red); }
+.ph-pop-score { color: var(--brass); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ph-pop-score small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-left: 3px;
+}
+.ph-pop-hint { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
 /* ── Haftanın enleri (GÖREV 2) ── */
 .hl-window {
   display: flex;

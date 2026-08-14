@@ -15,6 +15,63 @@ from ..services.role_ratings import replay_roles
 router = APIRouter()
 
 
+_MATCH_COLUMNS = (
+    "id, source_game_id, played_at, duration_s, winner_team, status"
+)
+
+
+def _serialize_match(
+    conn: sqlite3.Connection, match: sqlite3.Row, engine_version: str
+) -> dict:
+    """Tek maçın yanıt şekli — liste ve tekil endpoint TEK bu fonksiyonu kullanır
+    (api_contract §3: `GET /matches/{id}` liste elemanıyla BİREBİR aynı şekil).
+    """
+    participants = conn.execute(
+        "SELECT mp.player_id, p.display_name, mp.team, mp.position, mp.champion,"
+        " mp.kills, mp.deaths, mp.assists, mp.gold, mp.cs,"
+        " mp.damage_to_champs, mp.vision_score,"
+        " rh.mu_before, rh.sigma_before, rh.mu_after, rh.sigma_after "
+        "FROM match_participants mp "
+        "JOIN players p ON p.id = mp.player_id "
+        "LEFT JOIN rating_history rh ON rh.match_id = mp.match_id"
+        " AND rh.player_id = mp.player_id AND rh.engine_version = ? "
+        "WHERE mp.match_id = ? ORDER BY mp.team, mp.id",
+        (engine_version, match["id"]),
+    ).fetchall()
+    return {
+        **dict(match),
+        "participants": [
+            {
+                "player_id": row["player_id"],
+                "display_name": row["display_name"],
+                "team": row["team"],
+                "position": row["position"],
+                "champion": row["champion"],
+                "stats": {
+                    "kills": row["kills"],
+                    "deaths": row["deaths"],
+                    "assists": row["assists"],
+                    "gold": row["gold"],
+                    "cs": row["cs"],
+                    "damage_to_champs": row["damage_to_champs"],
+                    "vision_score": row["vision_score"],
+                },
+                "rating_change": (
+                    {
+                        "mu_before": row["mu_before"],
+                        "sigma_before": row["sigma_before"],
+                        "mu_after": row["mu_after"],
+                        "sigma_after": row["sigma_after"],
+                    }
+                    if row["mu_after"] is not None
+                    else None
+                ),
+            }
+            for row in participants
+        ],
+    }
+
+
 @router.get("/matches")
 def list_matches(
     limit: int = Query(default=20, ge=1, le=200),
@@ -22,59 +79,31 @@ def list_matches(
     settings: Settings = Depends(get_settings),
 ) -> list[dict]:
     matches = conn.execute(
-        "SELECT id, source_game_id, played_at, duration_s, winner_team, status "
+        f"SELECT {_MATCH_COLUMNS} "
         "FROM matches ORDER BY played_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    out = []
-    for m in matches:
-        participants = conn.execute(
-            "SELECT mp.player_id, p.display_name, mp.team, mp.position, mp.champion,"
-            " mp.kills, mp.deaths, mp.assists, mp.gold, mp.cs,"
-            " mp.damage_to_champs, mp.vision_score,"
-            " rh.mu_before, rh.sigma_before, rh.mu_after, rh.sigma_after "
-            "FROM match_participants mp "
-            "JOIN players p ON p.id = mp.player_id "
-            "LEFT JOIN rating_history rh ON rh.match_id = mp.match_id"
-            " AND rh.player_id = mp.player_id AND rh.engine_version = ? "
-            "WHERE mp.match_id = ? ORDER BY mp.team, mp.id",
-            (settings.engine_version, m["id"]),
-        ).fetchall()
-        out.append(
-            {
-                **dict(m),
-                "participants": [
-                    {
-                        "player_id": row["player_id"],
-                        "display_name": row["display_name"],
-                        "team": row["team"],
-                        "position": row["position"],
-                        "champion": row["champion"],
-                        "stats": {
-                            "kills": row["kills"],
-                            "deaths": row["deaths"],
-                            "assists": row["assists"],
-                            "gold": row["gold"],
-                            "cs": row["cs"],
-                            "damage_to_champs": row["damage_to_champs"],
-                            "vision_score": row["vision_score"],
-                        },
-                        "rating_change": (
-                            {
-                                "mu_before": row["mu_before"],
-                                "sigma_before": row["sigma_before"],
-                                "mu_after": row["mu_after"],
-                                "sigma_after": row["sigma_after"],
-                            }
-                            if row["mu_after"] is not None
-                            else None
-                        ),
-                    }
-                    for row in participants
-                ],
-            }
-        )
-    return out
+    return [
+        _serialize_match(conn, m, settings.engine_version) for m in matches
+    ]
+
+
+@router.get("/matches/{match_id}")
+def get_match(
+    match_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Tek maç (api_contract §3, GÖREV 10: profil grafiğinden maç detayına atlama).
+
+    Şekil liste elemanıyla birebir aynıdır — serializasyon paylaşılır.
+    """
+    match = conn.execute(
+        f"SELECT {_MATCH_COLUMNS} FROM matches WHERE id = ?", (match_id,)
+    ).fetchone()
+    if match is None:
+        raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+    return _serialize_match(conn, match, settings.engine_version)
 
 
 @router.post("/matches/{match_id}/void")

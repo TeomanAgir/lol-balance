@@ -12,7 +12,7 @@ import sqlite3
 
 from rating import ROLES, Engine, ParticipantStats, Rating
 
-from .ratings import STAT_FIELDS
+from .ratings import STAT_FIELDS, replay_order_by
 
 # (player_id, role) → ...
 RoleKey = tuple[int, str]
@@ -228,7 +228,7 @@ def replay_roles(conn: sqlite3.Connection, engine_version: str) -> int:
         )
         matches = conn.execute(
             "SELECT id, winner_team FROM matches "
-            "WHERE status = 'valid' ORDER BY played_at, id"
+            f"WHERE status = 'valid' {replay_order_by()}"
         ).fetchall()
         ratings: dict[RoleKey, Rating] = {}
         for match in matches:

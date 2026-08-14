@@ -143,6 +143,33 @@ class PlayerStatsOut(BaseModel):
     synergy: list[SynergyOut]
 
 
+class RatingHistoryStatsOut(BaseModel):
+    # api_contract §2 "Rating tarihçesi": k/d/a nullable; ÜÇÜ DE null ise
+    # RatingHistoryPointOut.stats tamamen None olur.
+    kills: Optional[int]
+    deaths: Optional[int]
+    assists: Optional[int]
+
+
+class RatingHistoryPointOut(BaseModel):
+    # score_after = o maç SONRASI efektif score (leaderboard `score` tanımı),
+    # o ana kadarki kümülatif P_avg ile; 2 ondalığa yuvarlanmış.
+    match_id: int
+    played_at: str
+    win: bool
+    champion: Optional[str]
+    position: Optional[Position]
+    score_after: float
+    stats: Optional[RatingHistoryStatsOut]
+
+
+class RatingHistoryOut(BaseModel):
+    # Tam tarihçe döner: zaman aralığı filtresi SUNUCUDA YOKTUR (api_contract §2).
+    player_id: int
+    engine_version: str
+    points: list[RatingHistoryPointOut]
+
+
 class HighlightsWindowOut(BaseModel):
     # api_contract §2 "Haftanın enleri": UTC ISO8601, `start < played_at <= end`.
     # fallback=True → pencere boştu, end en son valid maça çapalandı.
