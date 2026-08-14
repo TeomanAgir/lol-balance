@@ -1,0 +1,23 @@
+{
+  "patch": "16.16",
+  "updated": "2026-08-15",
+  "source": "manual-seed",
+  "note": "Baslangic tohumu (konsept verisi). Gercek veri deploy/fetch_meta.py ile cekilir, Teoman onayiyla bu dosyaya yazilir ve commit'lenir. Sampiyon adlari Data Dragon gorunen adlaridir (webui/assets/ddragon/champions.json anahtarlari).",
+  "tiers": {
+    "top":     { "S": ["Darius", "Irelia", "Shen", "Mordekaiser"],
+                 "A": ["Fiora", "Ornn", "Riven", "Jayce"],
+                 "B": ["Poppy", "Kennen", "Gwen", "Gnar"] },
+    "jungle":  { "S": ["Vi", "Warwick", "Nocturne"],
+                 "A": ["Lee Sin", "Ekko", "Amumu"],
+                 "B": ["Rengar", "Kha'Zix", "Shaco"] },
+    "middle":  { "S": ["Ahri", "Yone", "Viktor"],
+                 "A": ["Zed", "Orianna", "Syndra"],
+                 "B": ["Yasuo", "Lux", "Galio"] },
+    "bottom":  { "S": ["Jinx", "Kai'Sa", "Ezreal"],
+                 "A": ["Caitlyn", "Ashe", "Jhin"],
+                 "B": ["Vayne", "Sivir", "Xayah"] },
+    "utility": { "S": ["Thresh", "Lulu", "Leona"],
+                 "A": ["Nami", "Braum", "Rakan"],
+                 "B": ["Blitzcrank", "Morgana", "Pyke"] }
+  }
+}
