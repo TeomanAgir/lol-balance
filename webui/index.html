@@ -77,6 +77,12 @@
   <!-- ═══ Haftanın enleri (GÖREV 2) ═══ -->
   <section id="view-highlights" class="view" hidden>
     <p class="view-hint" data-i18n="highlights.hint"></p>
+    <!-- META (GÖREV 16) girişi: alt çubuk 320px'de 6. sekmeyi kaldırmıyor (ölçüm
+         README'de) → harita/sağlık deseniyle "detay" görünümü olarak açılır.
+         Giriş bilerek STATİK düğümdür: Enler gövdesi hata durumunda tamamen
+         yeniden yazılıyor, giriş orada olsaydı /highlights düşünce kaybolurdu. -->
+    <div class="mt-entry"><button id="btn-meta-open" class="mt-link" type="button"
+        data-i18n="highlights.meta_link"></button></div>
     <div id="highlights-body" aria-live="polite"></div>
   </section>
 
@@ -172,6 +178,21 @@
     </div>
 
     <p class="rift-note" data-i18n="map.note"></p>
+  </section>
+
+  <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — sekme değil, Enler'den açılan detay görünümü ═══ -->
+  <!-- Veri backend'den DEĞİL, statik dosyadan gelir: assets/meta/tiers.json
+       (api_contract §8 "Meta tier verisi"). Süzgeç düğmeleri ve sütunlar app.js'te
+       kurulur; dosya yoksa/bozuksa yalnız bu görünüm hata metni gösterir. -->
+  <section id="view-meta" class="view" hidden>
+    <!-- Geri düğmesi metnini loadMeta() yazar (geldiği görünüme göre) -->
+    <button id="btn-meta-back" class="back-btn" type="button"></button>
+    <!-- İçerik JS'te kurulur: renderMeta() → "Patch 16.16 · 15 Ağu" -->
+    <div class="mt-head"><span id="meta-patch" class="mt-patch"></span></div>
+    <p class="view-hint" data-i18n="meta.hint"></p>
+    <div id="meta-filters" class="mt-filters" role="group"
+         data-i18n-aria-label="meta.filter_aria" hidden></div>
+    <div id="meta-body" aria-live="polite"></div>
   </section>
 
   <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralama/enler'den açılan detay görünümü ═══ -->

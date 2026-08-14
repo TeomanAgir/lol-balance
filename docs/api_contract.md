@@ -390,6 +390,14 @@ tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui
   (Data Dragon'da yoktur; CommunityDragon `rcp-fe-lol-static-assets`'ten,
   DDRAGON_VERSION'ın major.minor'una sabitlenir — Teoman kararı: rol
   etiketleri resmî oyun simgeleriyle gösterilir)
-İndirme betiği `deploy/fetch_ddragon.py`'dir; Dockerfile imaj kurulumunda koşturur. Yerel
+İndirme betiği `deploy/fetch_ddragon.py`'dir; Dockerfile imaj kurulumunda koşturur.
+
+**Meta tier verisi (META sayfası — Teoman kararı, yarı otomatik):** Onaylı veri repo'da
+`webui/assets/meta/tiers.json` dosyasıdır (gitignore'lu DEĞİL, commit'lenir; statik servis
+otomatik). Şema: `{patch, updated, source, tiers: {top|jungle|middle|bottom|utility:
+{S|A|B: [DD görünen adları]}}}`. Güncelleme akışı: `deploy/fetch_meta.py` topluluk
+kaynağından çeker → bizim şemaya çevirir + adları champions.json'a karşı doğrular →
+mevcut dosyayla FARKI gösterir → yalnız açık onayla (`--write`) dosyaya yazar → Teoman
+commit/PR'lar. Otomatik cron YOK; patch başına elle koşulur. Backend bu veriyi bilmez. Yerel
 geliştirmede varlıklar yoksa web UI YER TUTUCU gösterir (kırık görsel değil) — betik elle de
 koşulabilir. Kaldırılmış/bilinmeyen eşya id'si de yer tutucuya düşer. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).

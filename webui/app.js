@@ -22,6 +22,9 @@
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
     profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita | maç detayı)
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
+    meta: null,                 // assets/meta/tiers.json içeriği (GÖREV 16; null = henüz çekilmedi)
+    metaFilter: "ALL",          // META süzgeci: "ALL" | ROLES elemanı
+    metaFrom: "highlights",     // meta hangi görünümden açıldı (şimdilik tek giriş: enler)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
     matches: [],                // son GET /matches yanıtı (GÖREV 10: grafikten detaya atlarken önbellek)
@@ -302,7 +305,7 @@
   const loaders = {
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
-    matchdetail: loadMatchDetail, health: loadHealth,
+    matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -311,6 +314,8 @@
   // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
   // profile → profileFrom olarak çözülür.
   // Collector sağlığı (GÖREV 13) TEK yerden açılır (Manuel) → sabit eşleme.
+  // META (GÖREV 16) da tek yerden açılır (Enler) ama alan üzerinden çözülür:
+  // ileride ikinci bir giriş eklenirse eşleme değişmesin.
   //
   // Zincir artık ÇİFT YÖNLÜ olabilir (GÖREV 15: maç detayı satırındaki addan
   // profile) → profile→matchdetail→profile sonsuz özyinelemeye girerdi. Bu yüzden
@@ -322,6 +327,7 @@
     map: () => state.mapFrom,
     matchdetail: () => state.matchFrom,
     health: () => "manual",
+    meta: () => state.metaFrom,
   };
   function tabOf(name, seen) {
     seen = seen || new Set();
@@ -1397,6 +1403,215 @@
     closeBadgeTip();    // GÖREV 11+12: rozet tooltip'i (klavye erişimi)
     closeBuildTip();    // GÖREV 14: build ikonu tooltip'i (klavye erişimi)
   });
+
+  // ── 2f) META: şampiyon kademeleri (GÖREV 16) ──────────────────
+  // Veri API'den DEĞİL statik dosyadan gelir: assets/meta/tiers.json
+  // (api_contract §8 "Meta tier verisi"; yarı otomatik akış — deploy/fetch_meta.py
+  // üretir, Teoman onaylayıp commit'ler). Bu yüzden istek dd- varlık katmanıyla
+  // aynı desendedir: X-API-Key TAŞIMAZ, USE_MOCK yolundan geçmez, bir kez çekilip
+  // önbelleğe alınır ve ASLA reject etmez — dosyanın yokluğu bu görünümün hata
+  // durumudur, uygulamanın değil.
+  const META_URL = "assets/meta/tiers.json";
+  const META_TIERS = ["S", "A", "B"];
+  // Dosyadaki rol anahtarları küçük harftir; kanonik ROLES sırasına eşlenir.
+  const META_ROLE_KEY = {
+    TOP: "top", JUNGLE: "jungle", MIDDLE: "middle", BOTTOM: "bottom", UTILITY: "utility",
+  };
+  let metaPromise = null;
+
+  // Hata METNİ değil, hata TÜRÜ önbelleğe alınır: dil değişince mesaj yeniden
+  // üretilebilsin (metin saklansaydı eski dilde donardı).
+  function fetchMeta() {
+    if (metaPromise) return metaPromise;
+    metaPromise = window.fetch(META_URL)
+      .then(r => {
+        if (!r.ok) return { err: { kind: "http", status: r.status } };
+        return r.json().then(
+          d => (d && typeof d === "object" && d.tiers && typeof d.tiers === "object"
+            ? { data: d } : { err: { kind: "shape" } }),
+          () => ({ err: { kind: "shape" } }));
+      })
+      .catch(() => ({ err: { kind: "network" } }));
+    return metaPromise;
+  }
+
+  // Çoğul kuralı sözlüktedir (sağlık ekranındaki desen): <base>_one / _other.
+  const metaPlural = (n) => t("meta.n_champs" + (n === 1 ? "_one" : "_other"), { n });
+
+  const metaErrText = (e) =>
+    e.kind === "http" ? t("meta.err_http", { status: e.status })
+      : e.kind === "shape" ? t("meta.err_shape")
+      : t("meta.err_network");
+
+  // Bir (rol, kademe) hücresinin adları. Şema dışı değerler (sayı, boş dize,
+  // eksik anahtar) sessizce elenir: bozuk tek hücre ekranı düşürmez.
+  function metaList(tiers, role, tier) {
+    const cell = tiers[META_ROLE_KEY[role]];
+    const arr = cell && Array.isArray(cell[tier]) ? cell[tier] : [];
+    return arr.filter(x => typeof x === "string" && x.trim() !== "");
+  }
+
+  // TÜMÜ görünümü: şampiyon EN İYİ kademesinde BİR KEZ görünür, adının altındaki
+  // rol rozetleri O KADEMEYİ tuttuğu koridorlardır (daha düşük kademedeki rolleri
+  // burada göstermek sütunun anlamıyla çelişirdi — o bilgi rol süzgecinde durur).
+  function metaBestIndex(tiers) {
+    const best = new Map();
+    ROLES.forEach(role => META_TIERS.forEach((tier, ti) => {
+      metaList(tiers, role, tier).forEach(name => {
+        const cur = best.get(name);
+        if (!cur || ti < cur.ti) best.set(name, { ti, roles: [role] });
+        else if (ti === cur.ti && cur.roles.indexOf(role) === -1) cur.roles.push(role);
+      });
+    }));
+    return best;
+  }
+
+  // Sütun içeriği kademe-öncelikli gezilir (rol kanonik sırada, rol içinde dosya
+  // sırası korunur) → aynı dosya her zaman aynı sırayı üretir.
+  function metaColumnItems(tiers, tier) {
+    if (state.metaFilter !== "ALL") {
+      return metaList(tiers, state.metaFilter, tier).map(name => ({ name, roles: [] }));
+    }
+    const best = metaBestIndex(tiers);
+    const ti = META_TIERS.indexOf(tier);
+    const seen = new Set();
+    const out = [];
+    ROLES.forEach(role => metaList(tiers, role, tier).forEach(name => {
+      const b = best.get(name);
+      if (!b || b.ti !== ti || seen.has(name)) return;
+      seen.add(name);
+      out.push({ name, roles: b.roles });
+    }));
+    return out;
+  }
+
+  // Portre yuvarlaktır (dd- sözleşmesi: ölçüyü kapsayıcı verir). champions.json'da
+  // olmayan ad da LİSTELENİR, yalnız portre yer tutucuya düşer (veri onay akışı
+  // adları zaten deploy/fetch_meta.py'de doğruluyor).
+  function metaChampHtml(item) {
+    const badges = item.roles.length
+      ? `<span class="mt-roles">` +
+        item.roles.map(r => posIconHtml(r, roleAbbr(r), "mt-role")).join("") + `</span>`
+      : "";
+    return `<li class="mt-champ">
+        <span class="mt-portrait">${ddIconHtml(champIconSrc(item.name), champPh(item.name), "champ")}</span>
+        <span class="mt-name">${esc(item.name)}</span>
+        ${badges}
+      </li>`;
+  }
+
+  function metaColumnHtml(tier, items) {
+    return `<section class="mt-col mt-${tier.toLowerCase()}"
+              aria-label="${esc(t("meta.tier_aria", { tier }))}">
+        <h3 class="mt-col-head">
+          <span class="mt-tier">${tier}</span>
+          <span class="mt-count">${metaPlural(items.length)}</span>
+        </h3>
+        ${items.length
+          ? `<ul class="mt-list">${items.map(metaChampHtml).join("")}</ul>`
+          : `<p class="mt-empty">${t("meta.tier_empty")}</p>`}
+      </section>`;
+  }
+
+  // Süzgeç düğmeleri gerçek <button>'dır (Tab + Enter/Space); seçili olan
+  // aria-pressed taşır. Rol düğmesinin içeriği ortak posIconHtml'dir: ikonlar
+  // indirilmemişse kendiliğinden kısaltma metnine düşer.
+  function metaFiltersHtml() {
+    const btn = (val, cls, inner, label) =>
+      `<button type="button" class="mt-filter ${cls}${state.metaFilter === val ? " on" : ""}"
+         data-filter="${val}" aria-pressed="${state.metaFilter === val}"
+         aria-label="${esc(label)}">${inner}</button>`;
+    return btn("ALL", "mt-all",
+        `<span class="mt-star" aria-hidden="true">★</span>` +
+        `<span class="mt-all-txt">${t("meta.filter_all")}</span>`, t("meta.filter_all")) +
+      ROLES.map(r => btn(r, "mt-frole",
+        posIconHtml(r, roleAbbr(r), "mt-fico"), roleName(r))).join("");
+  }
+
+  // patch / updated eksik ya da bozuksa o parça hiç yazılmaz (başlık boş kalır).
+  function metaHeadText(d) {
+    const parts = [];
+    if (typeof d.patch === "string" && d.patch.trim()) parts.push(t("meta.patch", { patch: d.patch }));
+    // Tarih YEREL saatle kurulur: new Date("2026-08-15") UTC gece yarısıdır ve
+    // negatif ofsetli cihazda bir gün geriye kayardı.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d.updated || ""));
+    if (m) {
+      const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      if (!isNaN(dt.getTime())) parts.push(dt.toLocaleDateString(uiLocale(), { day: "numeric", month: "short" }));
+    }
+    return parts.join(" · ");
+  }
+
+  // Süzgeç değişiminde ÇUBUK YENİDEN KURULMAZ, yalnız durumu güncellenir: innerHTML
+  // ile kurulsaydı basılan düğme DOM'dan silinir ve klavye odağı body'ye düşerdi
+  // (Tab yeniden sayfanın başından başlardı).
+  function syncMetaFilters() {
+    $("#meta-filters").querySelectorAll(".mt-filter").forEach(b => {
+      const on = b.dataset.filter === state.metaFilter;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+  }
+
+  function renderMetaBody() {
+    const box = $("#meta-body");
+    const lists = META_TIERS.map(tier => metaColumnItems(state.meta.tiers, tier));
+    const cols = META_TIERS.map((tier, i) => metaColumnHtml(tier, lists[i])).join("");
+    // Hiçbir kademede ad yoksa (boş ya da tanınmayan rol anahtarlı dosya) sütun
+    // iskeleti yerine tek satır boş durum yazılır.
+    const total = lists.reduce((n, l) => n + l.length, 0);
+    box.innerHTML = total
+      ? `<div class="mt-cols">${cols}</div>` +
+        (state.metaFilter === "ALL" ? `<p class="mt-note">${t("meta.all_note")}</p>` : "")
+      : `<p class='empty'>${t("meta.empty")}</p>`;
+    ddBindImages(box);
+  }
+
+  function renderMeta() {
+    const filters = $("#meta-filters");
+    $("#meta-patch").textContent = metaHeadText(state.meta);
+    filters.hidden = false;
+    filters.innerHTML = metaFiltersHtml();
+    filters.querySelectorAll(".mt-filter").forEach(b =>
+      b.addEventListener("click", () => {
+        if (state.metaFilter === b.dataset.filter) return;
+        state.metaFilter = b.dataset.filter;
+        syncMetaFilters();
+        renderMetaBody();
+      }));
+    renderMetaBody();
+  }
+
+  // Yükleyici hiç THROW ETMEZ: veri bir uç değil statik dosyadır, hata bu
+  // görünümün içinde yazılı durur (toast'a gerek yok, sağlık ekranı deseni).
+  async function loadMeta() {
+    $("#btn-meta-back").textContent = backLabel(state.metaFrom);
+    const box = $("#meta-body");
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    $("#meta-filters").hidden = true;
+    $("#meta-patch").textContent = "";
+    const [res] = await Promise.all([fetchMeta(), loadAssets()]);
+    if (res.err) {
+      state.meta = null;
+      box.innerHTML = `<div class="mt-error">
+          <p class="mt-err-title">${t("meta.error_title")}</p>
+          <p class="mt-err-detail">${esc(metaErrText(res.err))}</p>
+          <p class="mt-err-hint">${t("meta.error_hint")}</p>
+        </div>`;
+      return;
+    }
+    state.meta = res.data;
+    renderMeta();
+  }
+
+  function openMeta() {
+    if (currentView !== "meta") {
+      state.metaFrom = BACK_VIEWS.indexOf(currentView) === -1 ? "highlights" : currentView;
+    }
+    showView("meta");
+  }
+  $("#btn-meta-open").addEventListener("click", openMeta);
+  $("#btn-meta-back").addEventListener("click", () => showView(state.metaFrom));
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   // Kart satırındaki şampiyon portresi (GÖREV 14 uzantısı): kartlar arasında
