@@ -967,15 +967,19 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   font-weight: 600;
 }
 
-/* Karşılıklı bar graph: sol mavi (team 100), sağ kırmızı (team 200) */
+/* Karşılıklı bar graph (KS1): sol mavi (team 100), sağ kırmızı (team 200).
+   Bar ölçeği GLOBAL'dir — seçili statın maçtaki en büyük oyuncu değeri %100.
+   --md-val-w: yandaki değer sütununun genişliği; ibre bu sütunların arasına
+   hizalanır (dar ekranda tek yerden küçültülür). */
 .md-graph {
+  --md-val-w: 68px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px 12px 10px;
+  padding: 8px 12px;
 }
-.md-row { margin-bottom: 12px; }
-.md-row:last-child { margin-bottom: 0; }
+.md-row { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.md-row:last-child { border-bottom: 0; }
 .md-row-names {
   display: flex;
   justify-content: space-between;
@@ -1005,31 +1009,121 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .md-val {
   font-size: 12px;
   color: var(--muted);
-  min-width: 52px;
+  min-width: var(--md-val-w);
   flex-shrink: 0;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .md-val.left { text-align: right; }
 .md-val.right { text-align: left; }
 .md-val.lead { color: var(--text); font-weight: 600; }
-.md-track { flex: 1; display: flex; height: 18px; }
+.md-star { color: var(--brass); font-size: 11px; }
+.md-star.off { visibility: hidden; }
+.md-track { flex: 1; display: flex; height: 20px; }
 .md-half { flex: 1; position: relative; overflow: hidden; }
-.md-half.left { border-radius: 4px 0 0 4px; background: color-mix(in srgb, var(--blue) 10%, transparent); }
-.md-half.right { border-radius: 0 4px 4px 0; background: color-mix(in srgb, var(--red) 10%, transparent); }
-.md-fill { position: absolute; top: 0; bottom: 0; transition: width 0.35s ease; }
-.md-half.left .md-fill { right: 0; background: var(--blue); border-radius: 4px 0 0 4px; }
-.md-half.right .md-fill { left: 0; background: var(--red); border-radius: 0 4px 4px 0; }
+.md-half.left { border-radius: 6px 0 0 6px; background: color-mix(in srgb, var(--line) 50%, transparent); }
+.md-half.right { border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--line) 50%, transparent); }
+.md-fill { position: absolute; top: 0; bottom: 0; transition: width 0.5s cubic-bezier(0.3, 0, 0.2, 1); }
+.md-half.left .md-fill {
+  right: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--blue) 55%, #000), var(--blue));
+  border-radius: 6px 0 0 6px;
+}
+.md-half.right .md-fill {
+  left: 0;
+  background: linear-gradient(90deg, var(--red), color-mix(in srgb, var(--red) 55%, #000));
+  border-radius: 0 6px 6px 0;
+}
+/* Statın en iyisi: pirinç çerçeve + parıltı (değerinin yanında da ⭐ var) */
+.md-fill.best { outline: 1px solid var(--brass); box-shadow: 0 0 12px color-mix(in srgb, var(--brass) 50%, transparent); }
 .md-center-line { width: 2px; background: var(--line); flex-shrink: 0; }
 
-/* Takım toplamı: pirinç vurgulu, ayrı çizgiyle */
-.md-total { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+/* İbre: kılçık ray + %50'de pirinç çentik + payın düştüğü noktada üçgen iğne */
+.md-gauge { position: relative; height: 12px; margin: 4px calc(var(--md-val-w) + 6px) 0; }
+.md-rail { position: absolute; left: 0; right: 0; top: 5px; height: 1px; background: var(--line); }
+.md-notch { position: absolute; left: 50%; top: 2px; bottom: 2px; width: 1.5px; background: var(--brass); opacity: 0.85; }
+.md-needle {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  transition: left 0.5s cubic-bezier(0.3, 0, 0.2, 1);
+}
+.md-needle.blue { border-top: 8px solid var(--blue); }
+.md-needle.red { border-top: 8px solid var(--red); }
+.md-needle.neutral { border-top: 8px solid var(--muted); }
+
+/* Takım toplamı: bar YOK — iki büyük sayı + büyütülmüş takım ibresi */
+.md-total { border-top: 2px solid var(--brass); border-bottom: 0; margin-top: 2px; padding-top: 14px; }
 .md-total .md-role { color: var(--brass); }
+.md-team-vals { display: flex; align-items: center; gap: 12px; }
+.md-team-val {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.md-team-val.blue { color: var(--blue); text-align: right; }
+.md-team-val.red { color: var(--red); }
+.md-team-val.lead { text-shadow: 0 0 14px color-mix(in srgb, var(--text) 20%, transparent); }
+.md-team-val small {
+  display: block;
+  font-family: var(--display);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+.md-team-gauge { flex: 1; min-width: 36px; position: relative; height: 14px; }
+.md-team-gauge .md-rail { top: 6px; }
+.md-team-gauge .md-needle { border-left-width: 6px; border-right-width: 6px; }
+.md-team-gauge .md-needle.blue,
+.md-team-gauge .md-needle.red,
+.md-team-gauge .md-needle.neutral { border-top-width: 10px; }
 
-.md-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 10px; }
+/* Gösterge anahtarı (renkler · ⭐ · ibre) */
+.md-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.md-keys .md-sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.md-keys .md-sw.blue { background: var(--blue); }
+.md-keys .md-sw.red { background: var(--red); }
+.md-key-needle { color: var(--brass); }
 
-@media (max-width: 480px) {
-  .md-val { min-width: 42px; font-size: 11px; }
+.md-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px; }
+
+@media (max-width: 520px) {
+  .md-graph { --md-val-w: 58px; }
+  .md-val { font-size: 11px; }
   .md-name { max-width: 34%; font-size: 12px; }
+  .md-team-val { font-size: 19px; }
+}
+/* 320px: TOPLAM sayıları ve etiketleri küçülür → yatay taşma olmaz */
+@media (max-width: 380px) {
+  .md-graph { --md-val-w: 50px; padding: 6px 10px; }
+  .md-team-vals { gap: 8px; }
+  .md-team-val { font-size: 16px; }
+  .md-team-val small { font-size: 8.5px; letter-spacing: 0.08em; }
 }
 
 /* ── Manuel giriş ── */

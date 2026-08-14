@@ -12,14 +12,15 @@ Son güncelleme: 2026-08-13 (orkestratör)
   metinleri tarandı (temiz). Teoman tarafı: ayarlar + visibility flip.
 - Collector: tek exe (PyInstaller), ilk açılış sihirbazı, oto-yetişme
   (CATCHUP_DAYS=14), tiresiz `backfill` alias. SR-only filtre (yalnız Sihirdar
-  Vadisi custom'ları; PR #24) eklendi — arkadaşlardaki exe'ler ESKİ, yeniden
-  derleme + dağıtım gerekiyor.
+  Vadisi custom'ları; PR #24) canlıda; exe 2026-08-14'te yeniden derlendi,
+  arkadaşlara dağıtım Teoman'da.
 - Backend: sıra-dışı ingest'te iki evren otomatik replay (2026-08-13'te canlıya çıktı).
 
 ## Tamamlanan görevler (new_modules.md)
 0 rol rating evreni · 1 oyuncu profili · 2 haftanın enleri · 3 nemesis ·
 4 harita rol enleri · 5 collector exe · 6 i18n (tr/en) · 7 public repo hazırlığı ·
-8 maç detay ekranı (rol-eşleşmeli karşılıklı stat barları; PR #23).
+8 maç detay ekranı (PR #23) · 9 maç detayı KS1 modernizasyonu (global ölçek +
+ibre + sade TOPLAM; 11 konsept + 5 varyant artifact'ından Teoman seçimi).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler
