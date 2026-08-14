@@ -25,6 +25,15 @@ from pathlib import Path
 DDRAGON_VERSION = "16.16.1"
 
 CDN = f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VERSION}"
+
+# Pozisyon ikonları Data Dragon'da YOK; resmî client ikonları CommunityDragon'dan
+# gelir (aynı sabitleme ilkesi: sürüm = DDRAGON_VERSION'ın major.minor'u).
+CDRAGON = (
+    "https://raw.communitydragon.org/"
+    + ".".join(DDRAGON_VERSION.split(".")[:2])
+    + "/plugins/rcp-fe-lol-static-assets/global/default/svg"
+)
+POSITIONS = ("top", "jungle", "middle", "bottom", "utility")
 # Çıktı kökü: önce CWD/webui (Docker imajında WORKDIR /app, webui ./webui'dedir),
 # yoksa betiğe göre repo kökü (yerelde herhangi bir dizinden koşulabilsin).
 _cwd_webui = Path.cwd() / "webui"
@@ -34,14 +43,22 @@ OUT = (_cwd_webui if _cwd_webui.is_dir() else _repo_webui) / "assets" / "ddragon
 TAG_RE = re.compile(r"<[^>]+>")
 
 
+# CommunityDragon varsayılan Python UA'sını 403'ler; kimliğimizi açıkça veriyoruz.
+_UA = {"User-Agent": f"lol-balance-fetch/{DDRAGON_VERSION}"}
+
+
+def _open(url: str):
+    return urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=60)
+
+
 def fetch_json(url: str) -> dict:
-    with urllib.request.urlopen(url, timeout=60) as r:
+    with _open(url) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
 def fetch_binary(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url, timeout=60) as r:
+    with _open(url) as r:
         dest.write_bytes(r.read())
 
 
@@ -114,7 +131,12 @@ def main() -> int:
         if i % 50 == 0:
             print(f"  champion {i}/{len(champions)}")
 
-    print(f"OK: {len(items)} esya, {len(champions)} sampiyon.")
+    for pos in POSITIONS:
+        dest = OUT / "position" / f"{pos}.svg"
+        if not dest.exists():
+            fetch_binary(f"{CDRAGON}/position-{pos}.svg", dest)
+
+    print(f"OK: {len(items)} esya, {len(champions)} sampiyon, {len(POSITIONS)} pozisyon ikonu.")
     return 0
 
 
