@@ -31,6 +31,8 @@ sırası hiç değişmedi.
 - `mh_list_page_real.json`: gerçek match-history liste sayfası (21 maç).
   Custom'larda queueId 0 DEĞİL (3110/3100/3130 geliyor) — custom tespiti
   gameType=="CUSTOM_GAME" yoluyla yapılmalı, queueId==0 fallback'ine güvenilemez.
+  Ayrıca SR dışı 2 Arena maçı taşır (`gameMode: "CHERRY"`, `mapId: 30`) — SR
+  filtresinin gerçek veri kanıtı; MH kayıtlarında hem gameMode hem mapId gelir.
 - `champion_summary_real.json`: gerçek champion-summary (id=-1 "Yok" girdisi dahil).
 """
 
@@ -43,6 +45,7 @@ import pytest
 from collector.normalizer import (
     champion_map_from_summary,
     is_custom,
+    is_summoners_rift,
     normalize_eog,
     normalize_match_history_game,
     to_utc_z,
@@ -475,6 +478,43 @@ class TestIsCustomOnRealListPage:
         # Tuzağın gerçekten fixture'da var olduğunu kanıtla: en az bir custom
         # maç sıfırdan farklı queueId taşıyor.
         assert seen_nonzero_custom_queue
+
+
+class TestSummonersRiftOnRealFixtures:
+    """SR filtresi (Teoman, 2026-08-13) gerçek şemaya karşı: canlı EOG'de `mapId`
+    YOK — karar `gameMode` ile verilmeli; MH kayıtlarında ikisi de var."""
+
+    def test_real_eog_has_game_mode_but_no_map_id(self, eog_custom_real):
+        assert eog_custom_real["gameMode"] == "CLASSIC"
+        assert "mapId" not in eog_custom_real
+        assert is_summoners_rift(eog_custom_real) is True
+
+    def test_real_detected_eog_is_summoners_rift(self, eog_custom_detected):
+        assert "mapId" not in eog_custom_detected
+        assert is_summoners_rift(eog_custom_detected) is True
+
+    def test_real_match_history_game_carries_both_signals(self, mh_game_custom_real):
+        assert mh_game_custom_real["gameMode"] == "CLASSIC"
+        assert mh_game_custom_real["mapId"] == 11
+        assert is_summoners_rift(mh_game_custom_real) is True
+
+    def test_real_list_page_arena_games_are_filtered_out(self, mh_list_page_real):
+        """Gerçek liste sayfasında 2 adet Arena (CHERRY, mapId 30) maç var:
+        SR filtresi bunları eler, 19 SR maçını (12 custom + 7 matched) bırakır."""
+        games = mh_list_page_real["games"]["games"]
+        rift = [g for g in games if is_summoners_rift(g)]
+        assert len(games) == 21 and len(rift) == 19  # fixture bütünlüğü
+        for game in games:
+            expected = game["gameMode"] == "CLASSIC" and game["mapId"] == 11
+            assert is_summoners_rift(game) is expected, (
+                f"gameId={game.get('gameId')} gameMode={game.get('gameMode')} "
+                f"mapId={game.get('mapId')}"
+            )
+        # SR olmayanların hepsi zaten custom değil; filtre custom'lara dokunmadı
+        assert all(is_custom(g) for g in rift if g["gameType"] == "CUSTOM_GAME")
+        assert [g["gameId"] for g in games if not is_summoners_rift(g)] == [
+            g["gameId"] for g in games if g.get("gameMode") == "CHERRY"
+        ]
 
 
 class TestFixtureAnonymity:

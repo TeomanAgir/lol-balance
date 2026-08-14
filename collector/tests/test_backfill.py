@@ -77,6 +77,33 @@ def remake_summary(game_id=6874233333):
     }
 
 
+def custom_summary(game_id, **overrides):
+    """Liste sayfasındaki bir custom maç özeti (varsayılan: SR/CLASSIC)."""
+    summary = {
+        "gameId": game_id,
+        "gameCreationDate": "2026-08-05T20:00:00.000Z",
+        "gameDuration": 1500,
+        "queueId": 0,
+        "gameType": "CUSTOM_GAME",
+        "gameMode": "CLASSIC",
+        "mapId": 11,
+    }
+    summary.update(overrides)
+    return summary
+
+
+class DetailTrackingLcu(FakeLcu):
+    """Hangi maçların DETAYININ çekildiğini kaydeder (filtre detaydan önce mi?)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.game_calls: list = []
+
+    def get_game(self, game_id):
+        self.game_calls.append(game_id)
+        return super().get_game(game_id)
+
+
 def test_backfill_sends_roster_matching_customs(
     config, mh_list_page, mh_game_custom, champion_summary
 ):
@@ -231,6 +258,77 @@ def test_backfill_no_winner_long_game_is_still_error(
     assert len(stats.errors) == 1
     assert "Could not determine the winning team" in stats.errors[0]
     assert sent == []
+
+
+def test_backfill_skips_non_summoners_rift_custom(
+    config, mh_list_page, mh_game_custom, champion_summary
+):
+    """Custom ARAM (SR değil) sessizce atlanır: detayı bile çekilmez, hata sayılmaz
+    (Teoman, 2026-08-13)."""
+    aram_id = 6874235555
+    games = [custom_summary(aram_id, gameMode="ARAM", mapId=12)] + mh_list_page["games"]["games"]
+    old_custom = copy.deepcopy(mh_game_custom)
+    old_custom["gameId"] = 6874230000
+    old_custom["gameCreationDate"] = "2026-07-01T18:00:00.000Z"
+    lcu = DetailTrackingLcu(
+        summoner={"puuid": "puuid-t1"},
+        pages=[games, []],
+        games={6874231001: mh_game_custom, 6874230000: old_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+    roster = KnownRoster(riot_ids=set(KNOWN_SIX))
+
+    stats = run_backfill(config, lcu, sender, roster=roster)
+
+    assert stats.scanned == 4
+    assert stats.customs == 3  # ARAM da bir custom'dır, ama SR olmadığı için elenir
+    assert stats.skipped_non_sr == 1
+    assert stats.errors == []
+    assert aram_id not in lcu.game_calls  # filtre detay çekiminden ÖNCE
+    assert [p["source_game_id"] for p in sent] == ["6874230000", "6874231001"]
+
+
+def test_backfill_skips_non_sr_map_id_with_classic_mode(
+    config, mh_game_custom, champion_summary
+):
+    """Kemer-askı: gameMode CLASSIC ama mapId 11 değilse yine elenir."""
+    tt_id = 6874236666
+    lcu = DetailTrackingLcu(
+        summoner={"puuid": "puuid-t1"},
+        pages=[[custom_summary(tt_id, mapId=10)], []],
+        games={tt_id: mh_game_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+
+    stats = run_backfill(config, lcu, sender, roster=KnownRoster(riot_ids=set(KNOWN_SIX)))
+
+    assert stats.skipped_non_sr == 1
+    assert stats.sent == 0 and sent == []
+    assert lcu.game_calls == []
+
+
+def test_backfill_processes_custom_without_game_mode(
+    config, mh_game_custom, champion_summary
+):
+    """Eski şema toleransı: özet `gameMode` taşımıyorsa maç ATLANMAZ."""
+    game_id = 6874231001
+    summary = custom_summary(game_id)
+    del summary["gameMode"], summary["mapId"]
+    lcu = DetailTrackingLcu(
+        summoner={"puuid": "puuid-t1"},
+        pages=[[summary], []],
+        games={game_id: mh_game_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+
+    stats = run_backfill(config, lcu, sender, roster=KnownRoster(riot_ids=set(KNOWN_SIX)))
+
+    assert stats.skipped_non_sr == 0
+    assert stats.sent == 1
+    assert [p["source_game_id"] for p in sent] == [str(game_id)]
 
 
 def test_backfill_sends_chronologically(

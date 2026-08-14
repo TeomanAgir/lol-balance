@@ -92,6 +92,43 @@ def test_disabled_catchup_never_touches_backfill_or_sender(
     assert capsys.readouterr().out == ""  # kullanıcıya mesaj da yok
 
 
+def test_catchup_applies_the_summoners_rift_filter(
+    config, mh_game_custom, champion_summary, monkeypatch
+):
+    """Yetişme yolu gerçek `run_backfill`i çağırır: SR olmayan custom burada da
+    elenir (Teoman, 2026-08-13). Sahte backfill kullanılmaz — zincir test edilir."""
+    from collector import backfill as backfill_module
+    from collector.roster import KnownRoster
+
+    from .test_backfill import KNOWN_SIX, capturing_sender, custom_summary
+
+    monkeypatch.setattr(
+        backfill_module, "build_known_roster", lambda cfg: KnownRoster(riot_ids=set(KNOWN_SIX))
+    )
+    aram_id, sr_id = 6874235555, 6874231001
+    lcu = FakeLcu(
+        summoner={"puuid": "puuid-t1"},
+        pages=[
+            [
+                custom_summary(aram_id, gameMode="ARAM", mapId=12),
+                custom_summary(sr_id, gameCreationDate="2026-08-06T20:00:00.000Z"),
+            ],
+            [],
+        ],
+        games={sr_id: mh_game_custom},  # ARAM detayı hiç istenmemeli
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+    config.catchup_days = 14
+
+    stats = run_catchup(config, lcu, sender, today=date(2026, 8, 13))
+
+    assert stats is not None
+    assert stats.skipped_non_sr == 1
+    assert stats.errors == []
+    assert [p["source_game_id"] for p in sent] == [str(sr_id)]
+
+
 # --------------------------------------------------------------------------- #
 # 2. Sağlamlık: yetişme canlı modu ASLA engellemez
 # --------------------------------------------------------------------------- #
