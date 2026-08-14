@@ -1083,36 +1083,39 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .mc-champ { flex: 0 0 auto; align-self: center; width: 19px; height: 19px; }
 .mc-champ.mc-none { visibility: hidden; }
 
-/* ── Maç kartı rol simgesi (GÖREV 15) — "mc-pos" öneki ──
-   Rol sütunu metin yerine resmî oyun içi pozisyon SVG'sini gösterir. Simge
-   <img> DEĞİL CSS mask'idir: tek renkli SVG böylece tema rengiyle boyanır
-   (--muted, satırın üstüne gelince --brass); img olsaydı dosyanın sabit altın
-   rengi kartın paletinden bağımsız yanardı.
+/* ── Resmî rol simgesi (GÖREV 15) — ORTAK "pos-ico" öneki ──
+   Rol göstergesi metin yerine resmî oyun içi pozisyon SVG'sini gösterir. İki
+   yerde kullanılır: Geçmiş kartı satırı (.pos-tag) ve maç detayı satır başlığı
+   (.md-role) — işaretlemeyi app.js'teki ortak posIconHtml() basar.
+   Simge <img> DEĞİL CSS mask'idir: tek renkli SVG böylece currentColor ile,
+   yani KAPSAYICININ metin rengiyle boyanır (kartta --muted, maç detayında
+   --brass-dim); img olsaydı dosyanın sabit altın rengi paletten bağımsız yanardı.
    İki katmanlı emniyet — kırık/boş kutu imkânsız:
-     1) İkon dosyaları indirilmemişse app.js mc-pos sınıfını HİÇ basmaz
+     1) İkon dosyaları indirilmemişse app.js pos-ico sınıfını HİÇ basmaz
         (DD.positions), etiket düz metin kalır.
      2) Tarayıcı mask desteklemiyorsa @supports bloğu hiç uygulanmaz; içerideki
         metin görünür durumda olduğu için yine eski etiket okunur.
    Bu yüzden metin DOM'da her zaman durur, yalnız simge çizilebilirken gizlenir.
+   Boyut --pos-ico ile kullanıldığı yerden verilir (varsayılan 18px).
    url()'ler style.css'e görelidir (ikisi de webui/ kökünde) → app.js'teki
    DD_BASE ile aynı yola çıkar. */
-.mc-pos-top { --mc-pos-src: url("assets/ddragon/position/top.svg"); }
-.mc-pos-jungle { --mc-pos-src: url("assets/ddragon/position/jungle.svg"); }
-.mc-pos-middle { --mc-pos-src: url("assets/ddragon/position/middle.svg"); }
-.mc-pos-bottom { --mc-pos-src: url("assets/ddragon/position/bottom.svg"); }
-.mc-pos-utility { --mc-pos-src: url("assets/ddragon/position/utility.svg"); }
+.pos-ico-top { --pos-ico-src: url("assets/ddragon/position/top.svg"); }
+.pos-ico-jungle { --pos-ico-src: url("assets/ddragon/position/jungle.svg"); }
+.pos-ico-middle { --pos-ico-src: url("assets/ddragon/position/middle.svg"); }
+.pos-ico-bottom { --pos-ico-src: url("assets/ddragon/position/bottom.svg"); }
+.pos-ico-utility { --pos-ico-src: url("assets/ddragon/position/utility.svg"); }
 
 @supports (mask-image: url("assets/ddragon/position/top.svg")) or
           (-webkit-mask-image: url("assets/ddragon/position/top.svg")) {
-  .match-teams .mc-pos {
-    /* Metin etiketinin 44px'lik sütunu yerine 18px kare: dar ekranda satır
-       DARALIR, taşma büyümez. */
+  .pos-ico {
+    /* Metin etiketinin sütunu yerine kare kutu: dar ekranda satır DARALIR,
+       taşma büyümez. */
     min-width: 0;
-    width: 18px;
-    height: 18px;
-    background-color: var(--muted);
-    -webkit-mask-image: var(--mc-pos-src);
-    mask-image: var(--mc-pos-src);
+    width: var(--pos-ico, 18px);
+    height: var(--pos-ico, 18px);
+    background-color: currentColor;
+    -webkit-mask-image: var(--pos-ico-src);
+    mask-image: var(--pos-ico-src);
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
@@ -1121,10 +1124,10 @@ button.hl-role:hover { border-color: var(--brass-dim); }
     mask-size: contain;
   }
   /* Metin YALNIZ simgeli kutunun içinde gizlenir: kural sınıfa bağlıdır, böylece
-     mc-pos düşerse etiket kendiliğinden geri gelir. */
-  .match-teams .mc-pos .mc-pos-txt { display: none; }
+     pos-ico düşerse etiket kendiliğinden geri gelir. */
+  .pos-ico .pos-ico-txt { display: none; }
   /* Satırın üstündeyken pirinç: kart zaten tıklanabilir, simge de canlanır. */
-  .match-teams .team li:hover .mc-pos { background-color: var(--brass); }
+  .match-teams .team li:hover .pos-ico { background-color: var(--brass); }
 }
 /* Dar ekranda satır ÜÇ sabit parça taşır (rol · portre · delta) ve ada pay
    kalmaz. Portrenin maliyeti burada geri kazanılır: rol etiketi min-width'siz
@@ -1136,12 +1139,10 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   .match-teams .pos-tag { min-width: 0; font-size: 10px; letter-spacing: 0; }
   .match-teams .delta { font-size: 12px; }
   .match-teams .mc-champ { width: 16px; height: 16px; }
-  /* Simge de portreyle aynı ölçüye iner — ama YALNIZ mask çizilebiliyorken:
-     desteklemeyen tarayıcıda burada metin var, 16px'e kısılmamalı. */
-  @supports (mask-image: url("assets/ddragon/position/top.svg")) or
-            (-webkit-mask-image: url("assets/ddragon/position/top.svg")) {
-    .match-teams .mc-pos { width: 16px; height: 16px; }
-  }
+  /* Simge de portreyle aynı ölçüye iner. Değişken YALNIZ simge modunda okunur
+     (metin kutusu --pos-ico'yu kullanmaz), bu yüzden @supports sargısı gerekmez:
+     desteklemeyen tarayıcıda buradaki metin 16px'e kısılmaz. */
+  .match-teams .pos-ico { --pos-ico: 16px; }
 }
 .match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .btn-void, .btn-roles {
@@ -1263,10 +1264,16 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .md-row { padding: 11px 0; border-bottom: 1px solid var(--line); }
 .md-row:last-child { border-bottom: 0; }
+/* Satır başlığı ÜÇ SÜTUNLU IZGARADIR, space-between DEĞİL: iki yan sütun eşit
+   (minmax(0, 1fr)) olduğu için ortadaki rol göstergesi isim uzunluğundan
+   BAĞIMSIZ olarak satırın tam ortasında durur (space-between'de uzun isim
+   göstergeyi karşı tarafa itiyordu). minmax'ın 0 tabanı şart: çıplak 1fr'in
+   min-width'i auto'dur, uzun isim sütunu şişirip merkezi yine kaydırırdı —
+   sıfır tabanla isim ellipsis'e düşer, 320px'te taşma olmaz. */
 .md-row-names {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   font-size: 13px;
   margin-bottom: 3px;
   gap: 8px;
@@ -1275,17 +1282,22 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 38%;
 }
 .md-name.red { text-align: right; }
 .md-champ { color: var(--muted); font-size: 11px; }
+/* Rol göstergesi: metin etiket ya da (varlıklar varsa) ortak .pos-ico simgesi.
+   --pos-ico = 17.5px: metnin ölçülen render yüksekliği 15.95px (11px x 1.45
+   satır yüksekliği), simge onun ~%10 üstünde. Satır yüksekliğini isim sütunu
+   (19.95px) belirlediği için bu büyütme satırı BÜYÜTMEZ. */
 .md-role {
+  --pos-ico: 17.5px;
   font-family: var(--display);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--brass-dim);
   text-transform: uppercase;
+  justify-self: center;
   flex-shrink: 0;
 }
 .md-bars { display: flex; align-items: center; gap: 6px; }
@@ -1520,7 +1532,7 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 @media (max-width: 520px) {
   .md-graph { --md-val-w: 58px; }
   .md-val { font-size: 11px; }
-  .md-name { max-width: 34%; font-size: 12px; }
+  .md-name { font-size: 12px; }
   .md-team-val { font-size: 19px; }
   .mb-graph { --mb-slot: 23px; --mb-champ: 28px; }
 }

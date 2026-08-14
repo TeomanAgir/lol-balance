@@ -254,6 +254,34 @@
     });
   }
 
+  // ── Resmî rol simgesi (GÖREV 15) — ORTAK yardımcı ─────────────
+  // Simge <img> DEĞİL, CSS mask'idir: tek renkli SVG kapsayıcının metin rengiyle
+  // (currentColor) boyanır, yani kullanıldığı yerin paletine uyar; img olsaydı
+  // dosyanın sabit altın rengi temadan bağımsız yanardı.
+  // Varlık katmanının "yoksa yer tutucu" ilkesi burada da geçerli — iki katmanlı
+  // emniyet, kırık/boş kutu imkânsız:
+  //   1) İkonlar indirilmemişse (DD.positions false) ya da rol bilinmiyorsa
+  //      pos-ico sınıfı HİÇ basılmaz, ETİKET DÜZ METİN kalır.
+  //   2) Tarayıcı mask desteklemiyorsa style.css'teki @supports bloğu hiç
+  //      uygulanmaz; içerideki metin görünür kaldığı için yine etiket okunur.
+  // Bu yüzden metin DOM'da HER ZAMAN durur, yalnız simge çizilebilirken gizlenir.
+  // text  = simge çizilemezse görünecek etiket (çağıranın kendi biçimi: maç
+  //         kartında tam ad, maç detayında kısaltma, eşleşmeyen satırda "?").
+  // cls   = çağıranın kendi sınıfı (maç kartı "pos-tag", maç detayı "md-role");
+  //         boyut/renk oradan gelir, yardımcı yerleşime karışmaz.
+  const POS_FILE = { TOP: "top", JUNGLE: "jungle", MIDDLE: "middle", BOTTOM: "bottom", UTILITY: "utility" };
+  function posIconHtml(pos, text, cls) {
+    const file = pos == null ? null : POS_FILE[pos];
+    if (!file || !DD.positions) return `<span class="${cls}">${esc(text)}</span>`;
+    // role="img" + aria-label: simge görsel olarak metnin yerine geçtiğinde ekran
+    // okuyucu rolü yine TAM ADIYLA duyar (sözlükteki common.role_*), title de
+    // aynı adı fare ucunda gösterir — kısaltmayla yetinilmez.
+    const name = roleName(pos);
+    return `<span class="${cls} pos-ico pos-ico-${file}" role="img"` +
+      ` aria-label="${esc(name)}" title="${esc(name)}">` +
+      `<span class="pos-ico-txt">${esc(text)}</span></span>`;
+  }
+
   // ── API key modalı ────────────────────────────────────────────
   function openKeyModal() {
     $("#key-input").value = state.apiKey;
@@ -1294,30 +1322,12 @@
     : `<span class="mc-champ mc-none" aria-hidden="true"></span>`;
 
   // Kart satırındaki ROL sütunu (GÖREV 15 — Teoman kararı): metin etiket
-  // ("UST/ORMAN/...") yerine resmi oyun ici pozisyon simgesi. Simge <img> DEĞİL,
-  // CSS mask'idir: tek renkli SVG tema rengiyle boyanır (--muted, satırın üstüne
-  // gelince --brass) ve kartın kendi paletiyle uyumlu kalır; img olsaydı SVG'nin
-  // sabit altın rengi temadan bağımsız yanardı.
-  // Varlık katmanının "yoksa yer tutucu" ilkesi burada da geçerli: ikonlar
-  // indirilmemişse (DD.positions false) ya da tarayıcı mask desteklemiyorsa
-  // (style.css'teki @supports) ESKİ METİN etiket görünür — kırık\boş kutu
-  // imkânsızdır. Metin bu yüzden DOM'da HER ZAMAN durur; yalnız simge gerçekten
-  // çizilebiliyorken CSS ile gizlenir.
+  // ("UST/ORMAN/...") yerine resmi oyun ici pozisyon simgesi. Simgeyi ortak
+  // posIconHtml() basar (aynı desen maç detayı satır başlıklarında da kullanılır).
   // Rol bilinmiyorsa (position null) eski "—" aynen kalır: simgesi yoktur.
-  // Kapsam yalnız bu sütundur — maç detayı, rol düzenleyici <select>, dengeleme
-  // kartları ve profil metin etiketi kullanmaya devam eder.
-  const POS_FILE = { TOP: "top", JUNGLE: "jungle", MIDDLE: "middle", BOTTOM: "bottom", UTILITY: "utility" };
-  function mcRoleHtml(pos) {
-    const label = roleLabel(pos);   // null → "—", bilinmeyen değer → değerin kendisi
-    const file = pos == null ? null : POS_FILE[pos];
-    if (!file || !DD.positions) return `<span class="pos-tag">${esc(label)}</span>`;
-    // role="img" + aria-label: simge görsel olarak metnin yerine geçtiğinde ekran
-    // okuyucu rolü yine ADIYLA duyar (sözlükteki common.role_*), title de aynı adı
-    // fare ucunda gösterir.
-    return `<span class="pos-tag mc-pos mc-pos-${file}" role="img"` +
-      ` aria-label="${esc(label)}" title="${esc(label)}">` +
-      `<span class="mc-pos-txt">${esc(label)}</span></span>`;
-  }
+  // Kapsam yalnız bu sütun ve maç detayı satır başlıklarıdır — rol düzenleyici
+  // <select>, dengeleme kartları ve profil metin etiketi kullanmaya devam eder.
+  const mcRoleHtml = (pos) => posIconHtml(pos, roleLabel(pos), "pos-tag");
 
   async function loadMatches() {
     await fetchRoster();
@@ -1533,7 +1543,12 @@
         </div>`;
   }
 
-  function mdRowHtml(label, left, right, stat, gmax) {
+  // Satır ortasındaki rol göstergesi: Geçmiş kartlarıyla AYNI resmî simge
+  // (ortak posIconHtml). Simge çizilemezse ya da satır eşleşmemişse (role null,
+  // etiket "?") eski metin kısaltma aynen kalır. Beş sekme de bunu kullanır.
+  const mdRoleHtml = (role) => posIconHtml(role, role ? roleAbbr(role) : "?", "md-role");
+
+  function mdRowHtml(roleHtml, left, right, stat, gmax) {
     const lv = left.value, rv = right.value;
     const width = (v) => (gmax > 0 && v != null ? (v / gmax) * 100 : 0).toFixed(1);
     const isMax = (v) => gmax > 0 && v === gmax;
@@ -1545,7 +1560,7 @@
     return `<div class="md-row">
         <div class="md-row-names">
           <span class="md-name blue">${esc(left.name)}${left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""}</span>
-          <span class="md-role">${esc(label)}</span>
+          ${roleHtml}
           <span class="md-name red">${right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : ""}${esc(right.name)}</span>
         </div>
         <div class="md-bars">
@@ -1650,12 +1665,12 @@
 
   // Satır başlığı diğer sekmelerle aynı (ad · rol · ad) — şampiyon adı portrede
   // zaten var, bu yüzden burada tekrarlanmaz.
-  function mbRowHtml(label, blue, red) {
+  function mbRowHtml(roleHtml, blue, red) {
     const nm = (p) => esc(p ? p.display_name : "—");
     return `<div class="md-row mb-row">
         <div class="md-row-names">
           <span class="md-name blue">${nm(blue)}</span>
-          <span class="md-role">${esc(label)}</span>
+          ${roleHtml}
           <span class="md-name red">${nm(red)}</span>
         </div>
         <div class="mb-sides">${mbSideHtml(blue, "blue")}${mbSideHtml(red, "red")}</div>
@@ -1715,13 +1730,13 @@
     // BUILD: bar/ibre/TOPLAM yok, gösterge yerine ikon satırları (GÖREV 14).
     if (stat.build) {
       const buildRows = mdRows(m)
-        .map(r => mbRowHtml(r.role ? roleAbbr(r.role) : "?", r.blue, r.red)).join("");
+        .map(r => mbRowHtml(mdRoleHtml(r.role), r.blue, r.red)).join("");
       return head + statbar + `<div class="md-graph mb-graph">${buildRows}</div>` +
         `<p class="md-hint">${t("matchdetail.build_hint")}</p>`;
     }
     const gmax = mdGlobalMax(m, stat.key);
     const rows = mdRows(m).map(r =>
-      mdRowHtml(r.role ? roleAbbr(r.role) : "?", mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, gmax)
+      mdRowHtml(mdRoleHtml(r.role), mdSide(r.blue, stat.key), mdSide(r.red, stat.key), stat, gmax)
     ).join("");
     const keys =
       `<div class="md-keys">
