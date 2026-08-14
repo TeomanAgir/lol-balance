@@ -1599,7 +1599,10 @@
       ddIconHtml(itemIconSrc(id), itemPh(id), "item"));
   }
 
-  const mbEmptySlot = () => `<span class="mb-slot empty" aria-hidden="true"></span>`;
+  // Sınıf adı "mb-empty"dir, "empty" DEĞİL: global `.empty` (ortalı boş-durum
+  // paragrafı, padding: 40px 0) slotu 26x26 yerine 26x82 çiziyor, satırı
+  // şişiriyordu. Bu tuzağa dördüncü düşüş (.hl-none / .rb-none / .mc-none).
+  const mbEmptySlot = () => `<span class="mb-slot mb-empty" aria-hidden="true"></span>`;
 
   function mbChampHtml(champ) {
     const name = champ || t("matchdetail.champ_unknown");

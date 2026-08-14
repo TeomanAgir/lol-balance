@@ -1449,16 +1449,30 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .mb-side.red { flex-direction: row-reverse; }
 .mb-items { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; }
 .mb-side.red .mb-items { flex-direction: row-reverse; }
+/* Slot HER KOŞULDA --mb-slot kenarlı bir karedir; kutu ölçüsü burada kilitlenir:
+   padding/border sıfırlanır ve box-sizing: border-box ile kenarlık ölçünün İÇİNE
+   alınır (boş slotun 1px kesik çizgisi kareyi büyütmez), align-self: flex-start
+   ile de saran flex satırında dikey esneme (stretch) kapatılır. Bu üç satır
+   savunmadır: dışarıdan eşleşen bir kural (bkz. aşağıdaki .empty dersi) slotu
+   artık şişiremez, satır yüksekliği içerikten bağımsız kalır. */
 .mb-slot {
   position: relative;
   flex: 0 0 auto;
+  align-self: flex-start;
   display: block;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
   width: var(--mb-slot);
   height: var(--mb-slot);
 }
 .mb-champ { width: var(--mb-champ); height: var(--mb-champ); }
-/* Boş slot: envanterde o yer boş (items = [] ya da 7'den az eşya). */
-.mb-slot.empty {
+/* Boş slot: envanterde o yer boş (items = [] ya da 7'den az eşya).
+   Sınıf ".mb-empty"dir, ".empty" DEĞİL: global `.empty` (ortalı boş-durum
+   paragrafı) `padding: 40px 0` ile slotu 26x26 yerine 26x82 çiziyor, eksik
+   eşyalı satırları 78px'ten 127px'e şişiriyordu. Bu tuzağa dördüncü düşüş
+   (önceki kurbanlar: .hl-none, .rb-none, .mc-none). */
+.mb-slot.mb-empty {
   border: 1px dashed var(--line);
   border-radius: 5px;
   opacity: 0.5;
