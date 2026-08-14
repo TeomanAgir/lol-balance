@@ -365,7 +365,7 @@
       card.classList.toggle("nem-pick", nemIds.has(p.id));
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
-        `<span class="p-name">${p.display_name}</span>` +
+        `<span class="p-name">${esc(p.display_name)}</span>` +
         `<span class="p-meta">${fmtRating(p.rating.score)} · ${t("common.n_matches", { n: p.matches_played })}</span>` +
         roleCells(p.role_ratings);
       card.addEventListener("click", () => {
@@ -462,8 +462,8 @@
     [...members].map(teamEntry)
       .sort((a, b) => roleOrder(a.position) - roleOrder(b.position))
       .map(m => `<li${nemIds && nemIds.has(m.player_id) ? ' class="nem-row"' : ""}>` +
-                `<span class="pos-tag">${roleLabel(m.position)}</span>` +
-                `<span class="p-who">${playerName(m.player_id)}</span></li>`)
+                `<span class="pos-tag">${esc(roleLabel(m.position))}</span>` +
+                `<span class="p-who">${esc(playerName(m.player_id))}</span></li>`)
       .join("") + "</ul>";
 
   // nemesis: yalnız POST /balance/nemesis yanıtında gelir ({source, role, player_ids}) —
@@ -475,7 +475,7 @@
       (nemesis && suggestions.length
         ? `<p class="sug-note">` + t("balance.nem_match_note", {
             pair: esc(nemesis.player_ids.map(playerName).join(" vs ")),
-            role: roleLabel(nemesis.role),
+            role: esc(roleLabel(nemesis.role)),
             source: t(nemesis.source === "weekly" ? "balance.pair_weekly" : "balance.pair_alltime"),
           }) + `</p>`
         : "");
@@ -683,7 +683,7 @@
         fc ? esc(fc.champion) : "—",
         fc ? t("profile.champ_line", { n: fc.matches, pct: pctText(fc.winrate) }) : t("profile.no_champion_data")) +
       statCard(t("profile.card_role"),
-        fr ? roleLabel(fr.role) : "—",
+        fr ? esc(roleLabel(fr.role)) : "—",
         fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data")) +
       // Favori eşya kartı yalnız uygun kayıt varsa şeride girer (GÖREV 14).
       (fi ? favItemCard(fi) : "");
@@ -1183,7 +1183,7 @@
     return `<div class="nem-card">
         ${nemLink(a, "nem-who")}
         <div class="nem-mid">
-          <span class="nem-role">${roleLabel(pair.role)}</span>
+          <span class="nem-role">${esc(roleLabel(pair.role))}</span>
           <span class="nem-score">${a.wins}–${b.wins}</span>
           <span class="nem-sub">${t("highlights.encounters", { n: pair.encounters })}</span>
         </div>
@@ -1207,7 +1207,7 @@
         body += `<p class="nem-weekly">` + t("highlights.weekly_pair", {
             a: nemLink(wa, "nem-link"),
             b: nemLink(wb, "nem-link"),
-            role: roleLabel(wk.role),
+            role: esc(roleLabel(wk.role)),
             enc: t("highlights.encounters", { n: wk.encounters }),
             close: t("highlights.close", { pct: nemPct(wk.closeness) }),
           }) +
@@ -1441,7 +1441,7 @@
               : `<span class="delta none">—</span>`;
             return `<li>${mcRoleHtml(p.position)}` +
                    mcChampHtml(p.champion) +
-                   `<span class="p-who">${p.display_name}</span>${deltaHtml}</li>`;
+                   `<span class="p-who">${esc(p.display_name)}</span>${deltaHtml}</li>`;
           }).join("") + "</ul>";
       };
       // Rol düzeltme paneli: yalnız DEĞİŞEN roller PUT edilir (kısmi güncelleme serbest).
@@ -1453,9 +1453,9 @@
             const opts = `<option value=""${cur === "" ? " selected" : ""}>—</option>` +
               ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${roleName(r)}</option>`).join("");
             return `<li class="re-row ${p.team === 100 ? "blue" : "red"}">
-                <span class="p-who">${p.display_name}</span>
-                <select data-player="${p.player_id}" data-original="${cur}"
-                        aria-label="${t("matches.role_select_aria", { name: p.display_name })}">${opts}</select>
+                <span class="p-who">${esc(p.display_name)}</span>
+                <select data-player="${p.player_id}" data-original="${esc(cur)}"
+                        aria-label="${esc(t("matches.role_select_aria", { name: p.display_name }))}">${opts}</select>
               </li>`;
           }).join("");
         return `<div class="role-editor" hidden>
@@ -1922,7 +1922,7 @@
       const row = document.createElement("div");
       row.className = "manual-row";
       row.innerHTML =
-        `<span class="p-name">${p.display_name}</span>
+        `<span class="p-name">${esc(p.display_name)}</span>
          <div class="team-toggle">
            <button type="button" class="tt-blue" aria-pressed="false">${t("common.blue")}</button>
            <button type="button" class="tt-red" aria-pressed="false">${t("common.red")}</button>
