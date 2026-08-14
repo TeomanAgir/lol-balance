@@ -8,6 +8,7 @@ contract §1: sihirbazın İLK sorusu İngilizce dil seçimidir; config'de
 2. API_KEY — zorunlu, boş geçilemez.
 3. LOL_DIR — önce otomatik aranır (kayıt defteri → Riot metadata → bilinen yollar),
    bulunursa onaylatılır (Enter = evet), bulunamazsa sorulur.
+4. CLIENT_ID (GÖREV 13) — cihaz adı; varsayılan öneri hostname, Enter = kabul.
 
 Sonuç `.env`'e yazılır ve backend'e hızlı bir doğrulama isteği atılır; anahtar/adres
 hatası ilk dakikada seçilen dilde raporlanır.
@@ -26,7 +27,7 @@ from typing import Callable, Iterable, Optional
 
 import httpx
 
-from .config import app_dir
+from .config import app_dir, hostname_client_id, normalize_client_id
 from .i18n import (
     LANGUAGE_KEY,
     get_language,
@@ -39,6 +40,9 @@ from .i18n import (
 DEFAULT_BACKEND_URL = "https://lol.teomanagir.com"
 
 PLAYERS_PATH = "/api/v1/players"
+
+#: Cihaz kimliğinin `.env` anahtarı (GÖREV 13).
+CLIENT_ID_KEY = "CLIENT_ID"
 
 #: LoL kurulum dizinini işaret eden dosya/dizinler (biri yeterli).
 LOL_DIR_MARKERS = (
@@ -319,6 +323,18 @@ def _ask_lol_dir(input_fn: Reader, print_fn: Printer, max_tries: int = 5) -> str
     raise SystemExit(msg("wizard.lol_dir_aborted"))
 
 
+def _ask_client_id(input_fn: Reader, print_fn: Printer) -> str:
+    """Cihaz kimliği (GÖREV 13): varsayılan öneri hostname, Enter = kabul.
+
+    Boş/yalnız-boşluk yanıt hostname'e düşer; değer trim'lenip 64'e kırpılır.
+    """
+    default = hostname_client_id()
+    answer = normalize_client_id(_ask(msg("wizard.ask_client_id", default=default), input_fn))
+    if not answer:
+        return default
+    return answer
+
+
 def render_env(values: dict[str, str]) -> str:
     """`.env` içeriği. `LANGUAGE` yalnızca values'ta varsa yazılır — böylece
     dil alanı mevcut alanların YANINA eklenir, dosya yapısı değişmez."""
@@ -333,6 +349,12 @@ def render_env(values: dict[str, str]) -> str:
         f"BACKEND_URL={values['BACKEND_URL']}",
         f"API_KEY={values['API_KEY']}",
         "",
+    ]
+    # Kimlik alanı da dile bağlı değil ve yalnız verildiyse yazılır (LANGUAGE gibi):
+    # eski çağrılar (ör. testlerdeki roundtrip) dosya yapısını değiştirmeden çalışır.
+    if CLIENT_ID_KEY in values:
+        lines += [msg("env.comment_client_id"), f"{CLIENT_ID_KEY}={values[CLIENT_ID_KEY]}", ""]
+    lines += [
         msg("env.comment_optional"),
         "#MIN_KNOWN=6",
         "#POLL_INTERVAL_S=2.5",
@@ -374,11 +396,13 @@ def run_wizard(
     backend_url = _ask_backend_url(input_fn, print_fn)
     api_key = _ask_api_key(input_fn, print_fn)
     lol_dir = _ask_lol_dir(input_fn, print_fn)
+    client_id = _ask_client_id(input_fn, print_fn)
 
     values = {
         "BACKEND_URL": backend_url,
         "API_KEY": api_key,
         "LOL_DIR": lol_dir,
+        CLIENT_ID_KEY: client_id,
         LANGUAGE_KEY: get_language(),
     }
     write_env(target, values)
@@ -391,6 +415,7 @@ def run_wizard(
     print_fn(msg("wizard.saved_backend", url=backend_url))
     print_fn(msg("wizard.saved_api_key", masked=masked))
     print_fn(msg("wizard.saved_lol_dir", path=lol_dir))
+    print_fn(msg("wizard.saved_client_id", client_id=client_id))
     print_fn("")
 
     result = check(backend_url, api_key)

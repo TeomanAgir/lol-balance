@@ -19,8 +19,10 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
     başına 5 farklı rol), `apply_match_incremental_roles`, `replay_roles`,
     `current_role_ratings`.
   - `player_stats.py` (profil) · `weekly.py` (`weekly_window` paylaşımlı) · `nemesis.py`.
-- `backend/migrations/` — 0001 temel, 0002 perf_score, 0003 role_rating_history.
-- `backend/tests/` — 169 test. Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
+- `backend/migrations/` — 0001 temel, 0002 perf_score, 0003 role_rating_history,
+  0004 collector_health + matches.client_id.
+  - `health.py` (services+routers) — GÖREV 13: heartbeat upsert + collectors listesi.
+- `backend/tests/` — 198 test. Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
   "incremental yolu korunur" kanıtları, bit-bit replay eşitlikleri.
 
 ## Değişmezler (worker bunları BOZAMAZ)

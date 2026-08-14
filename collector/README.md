@@ -30,6 +30,8 @@ notepad collector\.env   # LOL_DIR, BACKEND_URL, API_KEY doldurun
 | `MIN_KNOWN` | hayır (6) | Backfill roster filtresi eşiği: 10 katılımcıdan en az kaçı bilinen oyuncu olmalı |
 | `POLL_INTERVAL_S` | hayır (2.5) | Gameflow polling aralığı (saniye) |
 | `CATCHUP_DAYS` | hayır (14) | Canlı modda açılışta koşan oto-yetişme penceresi (gün); `0` = kapalı |
+| `CLIENT_ID` | hayır (hostname) | Cihaz adı; ingest gövdesine ve heartbeat'e girer. Trim'lenir, 64 karaktere kırpılır. Sihirbaz sorar; eski kurulumlarda alan yoksa çalışma zamanında hostname kullanılır (sihirbaz yeniden koşmaz) |
+| `HEARTBEAT_MINUTES` | hayır (5) | Canlı modda backend'e sağlık bildirimi aralığı (dakika); `0` = kapalı |
 
 Ortam değişkenleri `.env` dosyasındaki değerleri ezer.
 
@@ -41,8 +43,9 @@ kaynaktan çalışırken `collector/`, paketlenmiş exe'de exe'nin bulunduğu kl
 
 `.env` hiç yoksa (ve gerekli alanlar ortam değişkenlerinde de yoksa) program ilk
 açılışta interaktif olarak sorar: backend adresi (varsayılan canlı URL), API anahtarı
-(zorunlu) ve LoL klasörü — sonuncusu önce kayıt defteri → Riot metadata → bilinen
-yollar sırasıyla otomatik aranır, bulunursa yalnızca onaylatılır. Sihirbazı sonradan
+(zorunlu), LoL klasörü — sonuncusu önce kayıt defteri → Riot metadata → bilinen
+yollar sırasıyla otomatik aranır, bulunursa yalnızca onaylatılır — ve cihaz adı
+(`CLIENT_ID`; varsayılan öneri bilgisayar adı, Enter = kabul). Sihirbazı sonradan
 tekrar çalıştırmak için `--setup`.
 
 Her başlangıçta backend'e hızlı bir `GET /api/v1/players` doğrulaması atılır; yanlış
@@ -77,6 +80,14 @@ py -m collector
   gönderim idempotency sayesinde zararsızdır. Yetişme herhangi bir nedenle
   başarısız olursa (backend erişilemez, roster boş, LCU hatası) **canlı mod
   engellenmez**: hata loglanır, döngü başlar.
+- **Cihaz kimliği ve heartbeat (GÖREV 13):** gönderilen her maç gövdesinde üst
+  seviye `client_id` alanı bulunur (`.env` `CLIENT_ID`, yoksa hostname). Ayrıca
+  `POST /health/heartbeat` ile `{client_id, version, outbox_pending}` bildirilir:
+  LCU'ya bağlanınca, canlı modda her `HEARTBEAT_MINUTES` dakikada (varsayılan 5,
+  `0` = kapalı) ve backfill/yetişme bitiminde. Heartbeat **hiçbir koşulda** maç
+  toplamayı engellemez: her hata loglanıp yutulur ve başarısız heartbeat
+  `outbox/`'a yazılmaz (orası yalnız maç payload'ları içindir). GÖREV 13
+  öncesinden kalmış `client_id`'siz outbox dosyaları olduğu gibi gönderilir.
 
 ### Backfill modu
 

@@ -145,8 +145,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         lcu = HttpLcuClient(info)
         try:
+            sender.send_heartbeat("lcu-connected")
             sender.flush_outbox()
             stats = run_backfill(config, lcu, sender, since=args.since)
+            sender.send_heartbeat("backfill-done")
         finally:
             lcu.close()
             sender.close()
@@ -172,6 +174,9 @@ def main(argv: list[str] | None = None) -> int:
             lcu = HttpLcuClient(info)
             runner = LiveRunner(config, lcu, sender)
             try:
+                # GÖREV 13: bağlantı kurulur kurulmaz haber ver (yetişme uzun
+                # sürebilir; panelde cihaz "ayakta" görünsün). Hata yutulur.
+                sender.send_heartbeat("lcu-connected")
                 # Her bağlantıda (ilk + yeniden) canlı döngüden ÖNCE sınırlı
                 # yetişme; hata yutulur, canlı mod engellenmez (catchup.py).
                 run_catchup(config, lcu, sender)

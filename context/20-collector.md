@@ -37,6 +37,13 @@ Yeni gerçek fixture eklerken: ÖNCE anonimleştir (Player numaraları çakışm
 onefile → `dist/LoLBalanceCollector.exe` (~15MB). Exe repo'ya GİRMEZ; .env asla
 exe'yle dağıtılmaz. Yeni collector özelliği merge edilince exe yeniden derlenip dağıtılır.
 
+## Sağlık (GÖREV 13)
+`CLIENT_ID` (.env; sihirbaz sorar, yoksa hostname) her ingest payload'ına eklenir
+(`sender.with_client_id`); heartbeat `sender.send_heartbeat` — anlar: LCU bağlantısı,
+canlı modda HEARTBEAT_MINUTES (varsayılan 5, 0=kapalı), backfill/catchup bitimi.
+Heartbeat hatası HER ZAMAN yutulur, outbox'a yazılmaz. Sürüm: `__init__.__version__`
+(dağıtım öncesi yükselt).
+
 ## Test
-285 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
+336 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
 dokunmadan, fake/fixture tabanlı.

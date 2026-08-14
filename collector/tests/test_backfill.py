@@ -15,9 +15,12 @@ KNOWN_SIX = {"teoman#tr1", "kaan#tr1", "mert#euw", "ece#tr1", "deniz#tr1", "bara
 
 
 def capturing_sender(config):
+    """Yalnız ingest gövdelerini toplar; heartbeat (GÖREV 13) ayrı uçtur, karışmaz."""
     sent = []
 
     def handler(request):
+        if request.url.path == "/api/v1/health/heartbeat":
+            return httpx.Response(200, json={"ok": True})
         sent.append(json.loads(request.content))
         return httpx.Response(201, json={"match_id": 1, "duplicate": False})
 

@@ -70,6 +70,7 @@ def config(tmp_path: Path) -> Config:
         api_key="test-key",
         min_known=6,
         poll_interval_s=0.0,
+        client_id="test-client",
         raw_archive_dir=tmp_path / "raw_archive",
         outbox_dir=tmp_path / "outbox",
         seed_roster_path=tmp_path / "seed_roster.json",

@@ -40,6 +40,7 @@ def test_fresh_db_applies_all_migrations_in_name_order(tmp_path):
         "0001_init.sql",
         "0002_perf_score.sql",
         "0003_role_ratings.sql",
+        "0004_collector_health.sql",
     ]  # sıra garantisi
     assert "perf_score" in _columns(db_path, "rating_history")
     # Tekrar koşmak güvenli ve no-op.
@@ -55,6 +56,17 @@ def test_0003_creates_role_rating_objects(tmp_path):
         "id", "player_id", "match_id", "role", "engine_version",
         "mu_before", "sigma_before", "mu_after", "sigma_after", "perf_score",
     }
+
+
+def test_0004_creates_collector_health_and_matches_client_id(tmp_path):
+    """GÖREV 13: sağlık tablosu + matches.client_id (db_schema migration 0004)."""
+    db_path = tmp_path / "health.db"
+    run_migrations(str(db_path))
+    assert "collector_health" in _objects(db_path)
+    assert _columns(db_path, "collector_health") == {
+        "client_id", "last_seen", "version", "outbox_pending",
+    }
+    assert "client_id" in _columns(db_path, "matches")
 
 
 def test_existing_db_gets_0002_and_0003(tmp_path):
@@ -82,16 +94,28 @@ def test_existing_db_gets_0002_and_0003(tmp_path):
     assert run_migrations(str(db_path)) == [
         "0002_perf_score.sql",
         "0003_role_ratings.sql",
+        "0004_collector_health.sql",
     ]
     assert "perf_score" in _columns(db_path, "rating_history")
     assert "role_rating_history" in _objects(db_path)
+    assert "client_id" in _columns(db_path, "matches")
+
+    # Mevcut (veri dolu) DB üstünde tekrar koşmak no-op: 0004 iki kez
+    # uygulanırsa "duplicate column" ile patlardı.
+    assert run_migrations(str(db_path)) == []
+
+
+def _code_lines(filename: str) -> list[str]:
+    ddl = (MIGRATIONS_DIR / filename).read_text(encoding="utf-8")
+    # Yorum satırları hariç gerçek tanım aranır.
+    return [line for line in ddl.splitlines() if not line.lstrip().startswith("--")]
 
 
 def test_0001_does_not_define_perf_score():
     """Koruma: kolon 0001'e geri eklenirse taze kurulum 0002'de patlar."""
-    ddl = (MIGRATIONS_DIR / "0001_init.sql").read_text(encoding="utf-8")
-    # Yorum satırları hariç gerçek tanım aranır.
-    code_lines = [
-        line for line in ddl.splitlines() if not line.lstrip().startswith("--")
-    ]
-    assert not any("perf_score" in line for line in code_lines)
+    assert not any("perf_score" in line for line in _code_lines("0001_init.sql"))
+
+
+def test_0001_does_not_define_matches_client_id():
+    """Aynı koruma client_id için: tek kaynak 0004'tür (bkz. 0002 notu)."""
+    assert not any("client_id" in line for line in _code_lines("0001_init.sql"))

@@ -199,6 +199,10 @@
   <!-- ═══ Manuel giriş ═══ -->
   <section id="view-manual" class="view" hidden>
     <p class="view-hint" data-i18n="manual.hint"></p>
+    <!-- Collector sağlığı (GÖREV 13) girişi: yeni sekme değil, Manuel'den açılan
+         detay görünümü (harita/profil deseni; alt çubukta Manuel yanık kalır). -->
+    <div class="ch-entry"><button id="btn-health-open" class="ch-link" type="button"
+        data-i18n="manual.health_link"></button></div>
     <div id="manual-roster" class="manual-list"></div>
 
     <fieldset class="winner-pick">
@@ -214,6 +218,22 @@
       <button id="btn-manual-submit" class="btn-primary" type="button"
               data-i18n="manual.submit_btn" disabled></button>
     </div>
+  </section>
+
+  <!-- ═══ Collector sağlığı (GÖREV 13) — sekme değil, Manuel'den açılan detay görünümü ═══ -->
+  <!-- Veri: GET /health/collectors (api_contract §6). Otomatik polling YOK:
+       görünüm açılınca bir kez çekilir, "Yenile" düğmesi elle tazeler. -->
+  <section id="view-health" class="view" hidden>
+    <!-- Geri düğmesi metnini loadHealth() yazar (her zaman Manuel'e döner) -->
+    <button id="btn-health-back" class="back-btn" type="button"></button>
+    <p class="view-hint" data-i18n="health.hint"></p>
+    <div class="ch-bar">
+      <!-- İçerik JS'te kurulur: loadHealth() → "3 cihaz" -->
+      <span id="health-count" class="ch-count"></span>
+      <button id="btn-health-refresh" class="ch-refresh" type="button"
+              data-i18n="health.refresh"></button>
+    </div>
+    <div id="health-body" aria-live="polite"></div>
   </section>
 
 </main>

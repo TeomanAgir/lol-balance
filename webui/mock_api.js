@@ -705,6 +705,31 @@
     })).sort((x, y) => y.quality - x.quality);
   }
 
+  // ── Collector sağlığı (GÖREV 13) ──
+  // api_contract §6: liste last_seen AZALAN sıralıdır; version / outbox_pending /
+  // last_ingest_at / last_ingest_game_id nullable'dır. Zaman damgaları İSTEK
+  // ANINA göre üretilir: UI göreli metin gösterdiği için ("3 dk önce") sabit
+  // tarihler senaryoyu birkaç gün sonra anlamsız kılardı.
+  //
+  // Senaryo (3 cihaz): (1) çevrimiçi ve outbox temiz, (2) bugün görülmüş ama
+  // outbox birikmiş, (3) 3 gündür sinyal yok + sürüm bilinmiyor + hiç maç izi yok.
+  const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+  const agoIso = (ms) => new Date(Date.now() - ms).toISOString().replace(/\.\d+Z$/, "Z");
+  const collectorHealth = () => [
+    {
+      client_id: "Teoman-PC", last_seen: agoIso(3 * MIN), version: "1.5.0",
+      outbox_pending: 0, last_ingest_at: agoIso(14 * HOUR), last_ingest_game_id: "6874240007",
+    },
+    {
+      client_id: "Baran-Laptop", last_seen: agoIso(2 * HOUR), version: "1.4.2",
+      outbox_pending: 3, last_ingest_at: agoIso(2 * HOUR + 5 * MIN), last_ingest_game_id: "6874240012",
+    },
+    {
+      client_id: "Kaan-PC", last_seen: agoIso(3 * DAY + 2 * HOUR), version: null,
+      outbox_pending: null, last_ingest_at: null, last_ingest_game_id: null,
+    },
+  ];
+
   // ── fetch stub ──
   window.mockFetch = async function (url, opts = {}) {
     await delay(250); // ağ hissi
@@ -742,6 +767,18 @@
     if (method === "GET" && path === "/highlights/weekly") return json(weeklyHighlights());
 
     if (method === "GET" && path === "/nemesis") return json(nemesisPayload());
+
+    // Collector sağlığı (GÖREV 13). Heartbeat'i UI atmaz (collector atar), yine de
+    // contract §6 ile senkron kalsın diye stub'ta duruyor.
+    if (method === "GET" && path === "/health/collectors") return json(collectorHealth());
+
+    if (method === "POST" && path === "/health/heartbeat") {
+      let body = {};
+      try { body = JSON.parse(opts.body); } catch { /* gövde JSON değil */ }
+      const cid = typeof body.client_id === "string" ? body.client_id.trim() : "";
+      if (!cid || cid.length > 64) return err(422, "client_id zorunlu (en fazla 64 karakter).");
+      return json({ ok: true });
+    }
 
     // Tek maç (GÖREV 10): liste elemanıyla BİREBİR aynı şekil. Bu dal listeden
     // ÖNCE gelmeli — aşağıdaki startsWith("/matches") /matches/{id}'yi de yakalar.

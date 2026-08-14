@@ -12,11 +12,18 @@ Kalıcı dosyaların (`.env`, `raw_archive/`, `outbox/`, `seed_roster.json`) kö
 from __future__ import annotations
 
 import os
+import socket
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
+
+#: Cihaz kimliği üst sınırı (docs/api_contract.md §6, docs/ingest_contract.md "client_id").
+CLIENT_ID_MAX_LEN = 64
+
+#: Hostname hiç okunamazsa kullanılan son çare (kimliksiz kalmaktansa sabit bir ad).
+FALLBACK_CLIENT_ID = "unknown-host"
 
 
 def is_frozen() -> bool:
@@ -61,6 +68,30 @@ def _load_env_file(path: Path) -> dict[str, str]:
     return data
 
 
+# --------------------------------------------------------------------------- #
+# Cihaz kimliği (GÖREV 13)
+# --------------------------------------------------------------------------- #
+
+
+def normalize_client_id(value: str | None) -> str:
+    """Contract sınırı: trim + en fazla `CLIENT_ID_MAX_LEN` karakter."""
+    return (value or "").strip()[:CLIENT_ID_MAX_LEN].strip()
+
+
+def hostname_client_id() -> str:
+    """`.env`'de CLIENT_ID yoksa (eski kurulum) kullanılan varsayılan: hostname."""
+    try:
+        name = socket.gethostname()
+    except Exception:  # noqa: BLE001 — kimlik yüzünden collector durmaz
+        name = ""
+    return normalize_client_id(name) or FALLBACK_CLIENT_ID
+
+
+def resolve_client_id(value: str | None) -> str:
+    """Öncelik: verilen değer (CLIENT_ID) > hostname. Sihirbaz YENİDEN koşmaz."""
+    return normalize_client_id(value) or hostname_client_id()
+
+
 @dataclass
 class Config:
     lol_dir: Path
@@ -70,6 +101,10 @@ class Config:
     poll_interval_s: float = 2.5
     #: Canlı modda açılışta koşan oto-yetişme penceresi (gün); 0 = kapalı.
     catchup_days: int = 14
+    #: Cihaz kimliği (GÖREV 13): ingest gövdesine ve heartbeat'e girer.
+    client_id: str = field(default_factory=hostname_client_id)
+    #: Canlı modda heartbeat aralığı (dakika); 0 = kapalı.
+    heartbeat_minutes: float = 5.0
     raw_archive_dir: Path = field(default_factory=lambda: app_dir() / "raw_archive")
     outbox_dir: Path = field(default_factory=lambda: app_dir() / "outbox")
     seed_roster_path: Path = field(default_factory=lambda: app_dir() / "seed_roster.json")
@@ -101,4 +136,8 @@ def load_config(env_file: Path | None = None) -> Config:
         min_known=int(merged.get("MIN_KNOWN", "6")),
         poll_interval_s=float(merged.get("POLL_INTERVAL_S", "2.5")),
         catchup_days=int(merged.get("CATCHUP_DAYS", "14")),
+        # CLIENT_ID yoksa (i18n/GÖREV 13 öncesi kurulum) sessizce hostname'e düşülür;
+        # sihirbaz bu yüzden yeniden koşmaz.
+        client_id=resolve_client_id(merged.get("CLIENT_ID")),
+        heartbeat_minutes=float(merged.get("HEARTBEAT_MINUTES", "5")),
     )
