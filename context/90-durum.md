@@ -20,7 +20,14 @@ Son güncelleme: 2026-08-13 (orkestratör)
 0 rol rating evreni · 1 oyuncu profili · 2 haftanın enleri · 3 nemesis ·
 4 harita rol enleri · 5 collector exe · 6 i18n (tr/en) · 7 public repo hazırlığı ·
 8 maç detay ekranı (PR #23) · 9 maç detayı KS1 modernizasyonu (global ölçek +
-ibre + sade TOPLAM; 11 konsept + 5 varyant artifact'ından Teoman seçimi).
+ibre + sade TOPLAM; 11 konsept + 5 varyant artifact'ından Teoman seçimi) ·
+10 profilde rating tarihçesi grafiği (GET rating-history + GET /matches/{id}).
+
+## Sıradaki (new_modules.md, kararlar CHANGE_REQUESTS 2026-08-14'te)
+- GÖREV 11+12 birlikte: rozetler + MVP (MVP = kazanan takımın en yüksek
+  perf_score'u; rozet seti önerisini orkestratör sunacak, Teoman onaylayacak).
+- GÖREV 13: collector sağlık paneli TAM sürüm (heartbeat + kimlik; exe yeniden
+  derleme/dağıtım gerektirir).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler

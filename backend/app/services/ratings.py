@@ -22,6 +22,21 @@ STAT_FIELDS = (
 )
 
 
+def replay_order_by(alias: str = "") -> str:
+    """Replay'in maç sıralama anahtarı — TEK doğruluk noktası.
+
+    Değişmez 3 ("incremental sonuç == tam replay sonucu") bu anahtara bağlıdır;
+    ana evren (`replay`), rol evreni (`replay_roles`) ve rating tarihçesi
+    (`rating_history`) aynı ifadeyi paylaşır ki hiçbiri diğerinden kayamasın.
+    `alias`, maç tablosuna JOIN'de takma ad verildiğinde (`m`) geçilir.
+
+    `is_out_of_order` bu ifadeyi SQL WHERE'e çevirir; oradaki karşılaştırma
+    burasıyla birlikte düşünülür (bkz. o fonksiyonun docstring'i).
+    """
+    prefix = f"{alias}." if alias else ""
+    return f"ORDER BY {prefix}played_at, {prefix}id"
+
+
 def current_ratings(
     conn: sqlite3.Connection, engine_version: str
 ) -> dict[int, Rating]:
@@ -241,7 +256,7 @@ def replay(conn: sqlite3.Connection, engine_version: str) -> int:
         )
         matches = conn.execute(
             "SELECT id, winner_team FROM matches "
-            "WHERE status = 'valid' ORDER BY played_at, id"
+            f"WHERE status = 'valid' {replay_order_by()}"
         ).fetchall()
         ratings: dict[int, Rating] = {}
         for match in matches:

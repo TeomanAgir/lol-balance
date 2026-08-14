@@ -13,10 +13,12 @@ from ..schemas import (
     PlayerOut,
     PlayerPatch,
     PlayerStatsOut,
+    RatingHistoryOut,
     RatingOut,
     RoleRatingOut,
 )
 from ..services.player_stats import player_stats
+from ..services.rating_history import rating_history
 from ..services.ratings import (
     current_ratings,
     effective_score,
@@ -147,6 +149,23 @@ def player_profile_stats(
     if stats is None:
         raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
     return stats
+
+
+@router.get("/players/{player_id}/rating-history")
+def player_rating_history(
+    player_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RatingHistoryOut:
+    """Oyuncunun rating eğrisi (api_contract §2 "Rating tarihçesi", GÖREV 10).
+
+    Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz. Hiç valid maçı
+    olmayan oyuncuda `points: []`.
+    """
+    history = rating_history(conn, player_id, settings.engine_version)
+    if history is None:
+        raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
+    return history
 
 
 @router.post("/players", status_code=201)

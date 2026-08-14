@@ -30,6 +30,35 @@ def test_list_matches_limit_and_order(client):
     assert matches[0]["played_at"] > matches[1]["played_at"]
 
 
+def test_get_match_identical_to_list_element(client):
+    """api_contract §3 (GÖREV 10): tekil maç liste elemanıyla BİREBİR aynı şekil."""
+    r = client.post("/api/v1/ingest/match", json=make_payload())
+    match_id = r.json()["match_id"]
+
+    detail = client.get(f"/api/v1/matches/{match_id}")
+    assert detail.status_code == 200
+    listed = client.get("/api/v1/matches").json()[0]
+    assert detail.json() == listed
+    assert detail.json()["id"] == match_id
+
+
+def test_get_match_unknown_404(client):
+    r = client.get("/api/v1/matches/999")
+    assert r.status_code == 404
+
+
+def test_get_void_match_still_returned(client):
+    match_id = client.post(
+        "/api/v1/ingest/match", json=make_payload()
+    ).json()["match_id"]
+    assert client.post(f"/api/v1/matches/{match_id}/void").status_code == 200
+
+    body = client.get(f"/api/v1/matches/{match_id}").json()
+    assert body["status"] == "void"
+    # Void sonrası rating satırları silinir → rating_change null döner.
+    assert all(p["rating_change"] is None for p in body["participants"])
+
+
 def test_void_triggers_replay(client, db):
     client.post("/api/v1/ingest/match", json=make_payload(source_game_id="g1"))
     client.post(

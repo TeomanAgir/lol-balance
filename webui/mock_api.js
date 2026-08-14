@@ -335,6 +335,63 @@
     };
   }
 
+  // ── Rating tarihçesi (GÖREV 10) ──
+  // api_contract §2 "Rating tarihçesi": yalnız valid maçlar, KRONOLOJİK ARTAN sıra,
+  // sunucuda zaman aralığı filtresi YOK (tam tarihçe döner, aralık seçimi UI'da).
+  // Gerçek değerler backend'de rating paketiyle hesaplanır; burada yalnız ŞEKİL
+  // doğru olsun diye deterministik bir yürüyüş üretilir (Date.now/random yok).
+  //
+  // SENARYO BAYRAKLARI (test için elle değiştir):
+  //   HIST_SINGLE_PLAYER = <id> → o oyuncunun tarihçesi İLK maçıyla sınırlanır.
+  //     Selin (13) en son 2026-08-05'te oynadı → aynı anda İKİ kenar durumu verir:
+  //     "tek nokta, çizgi yok" ve "7 gün" aralığında "bu aralıkta maç yok".
+  //     (null yaparsan kapanır.)
+  //   HIST_NULL_STATS_PLAYER = <id> → o oyuncunun 2. maçında stats null döner
+  //     (contract: k/d/a'nın üçü de null ise stats null) → popup'ta K/D/A "—".
+  // Ece (14) hiç maç oynamadı → points: [] (grafik yerine boş durum metni).
+  // Teoman (1) 12 maçlık seri → aralık filtresi anlamlı biçimde denenebilir.
+  const HIST_SINGLE_PLAYER = 13;
+  const HIST_NULL_STATS_PLAYER = 3;
+
+  function ratingHistory(id) {
+    const p = players.find(x => x.id === id);
+    if (!p) return null;
+    const mine = matches
+      .filter(m => m.status === "valid" && m.participants.some(x => x.player_id === id))
+      .sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at));
+
+    // mu W/L ile yürür, sigma yavaşça daralır, P_avg kümülatif ortalamadır —
+    // score = 0.5*mu + 0.5*(25 + 20*(P_avg-1)) - 3*sigma (rating_contract harman).
+    let mu = 25, sigma = 8.333, perfSum = 0;
+    const points = [];
+    mine.forEach((m, i) => {
+      const part = m.participants.find(x => x.player_id === id);
+      const win = m.winner_team === part.team;
+      mu += win ? 1.7 - ((id + i) % 3) * 0.25 : -1.4 + ((id + i) % 4) * 0.2;
+      sigma = Math.max(p.rating.sigma, sigma - 0.42);
+      perfSum += 1 + (((id * 7 + i * 13) % 25) - 12) / 100;   // 0.88 .. 1.13
+      const pAvg = perfSum / (i + 1);
+      const noStats = id === HIST_NULL_STATS_PLAYER && i === 1;
+      points.push({
+        match_id: m.id,
+        played_at: m.played_at,
+        win,
+        champion: part.champion,
+        position: part.position,
+        score_after: +(0.5 * mu + 0.5 * (25 + 20 * (pAvg - 1)) - 3 * sigma).toFixed(2),
+        stats: noStats ? null : {
+          kills: part.stats.kills, deaths: part.stats.deaths, assists: part.stats.assists,
+        },
+      });
+    });
+
+    return {
+      player_id: id,
+      engine_version: "openskill-pl-blend50-v1",
+      points: id === HIST_SINGLE_PLAYER ? points.slice(0, 1) : points,
+    };
+  }
+
   // ── Haftanın enleri (GÖREV 2) ──
   // api_contract §2 "Haftanın enleri": pencere = son 7 gün; o pencerede hiç valid maç
   // yoksa end = en son valid maçın zamanı olur ve fallback: true döner.
@@ -547,12 +604,27 @@
       return s ? json(s) : err(404, "Oyuncu bulunamadı.");
     }
 
+    // Rating tarihçesi (GÖREV 10) — profil grafiğinin verisi.
+    const histPath = path.match(/^\/players\/(\d+)\/rating-history$/);
+    if (method === "GET" && histPath) {
+      const h = ratingHistory(Number(histPath[1]));
+      return h ? json(h) : err(404, "Oyuncu bulunamadı.");
+    }
+
     if (method === "GET" && path === "/leaderboard")
       return json([...players].sort((a, b) => b.rating.score - a.rating.score));
 
     if (method === "GET" && path === "/highlights/weekly") return json(weeklyHighlights());
 
     if (method === "GET" && path === "/nemesis") return json(nemesisPayload());
+
+    // Tek maç (GÖREV 10): liste elemanıyla BİREBİR aynı şekil. Bu dal listeden
+    // ÖNCE gelmeli — aşağıdaki startsWith("/matches") /matches/{id}'yi de yakalar.
+    const oneMatch = path.match(/^\/matches\/(\d+)$/);
+    if (method === "GET" && oneMatch) {
+      const m = matches.find(x => x.id === Number(oneMatch[1]));
+      return m ? json(m) : err(404, "Maç bulunamadı.");
+    }
 
     if (method === "GET" && path.startsWith("/matches")) return json(matches);
 

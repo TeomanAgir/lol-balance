@@ -24,8 +24,13 @@
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
+    matches: [],                // son GET /matches yanıtı (GÖREV 10: grafikten detaya atlarken önbellek)
     matchDetail: null,          // açık maç detayı: GET /matches listesinden gelen maç nesnesi (GÖREV 8)
     matchStat: "gold",          // maç detayında seçili stat (MD_STATS anahtarı)
+    matchFrom: "matches",       // maç detayı hangi görünümden açıldı (geçmiş | profil, GÖREV 10)
+    ratingHistory: null,        // GET /players/{id}/rating-history yanıtı (GÖREV 10; null = çekilemedi)
+    historyRange: "all",        // grafikteki zaman aralığı: PH_RANGES anahtarı (istemci tarafı)
+    histOpen: null,             // grafikte popup'ı açık olan noktanın match_id'si
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -144,11 +149,13 @@
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
   // zincir (harita → profil) özyinelemeyle gerçek sekmeye çözülür.
-  // Maç detayı (GÖREV 8) tek yerden açılır: her zaman Geçmiş sekmesi yanar.
+  // Maç detayı (GÖREV 8) iki yerden açılır: Geçmiş kartı ve (GÖREV 10) profil
+  // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
+  // profile → profileFrom olarak çözülür.
   const tabOf = (name) =>
     name === "profile" ? tabOf(state.profileFrom) :
     name === "map" ? tabOf(state.mapFrom) :
-    name === "matchdetail" ? "matches" : name;
+    name === "matchdetail" ? tabOf(state.matchFrom) : name;
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
@@ -349,6 +356,8 @@
     t("common.back_" + (BACK_VIEWS.includes(from) ? from : "leaderboard"));
 
   function openProfile(id) {
+    // Yeni oyuncu → tarihçe grafiği baştan başlar (aralık seçimi taşınmaz).
+    if (id !== state.profileId) { state.historyRange = "all"; state.ratingHistory = null; }
     state.profileId = id;
     // Profilden profile geçilebilir (sinerji linkleri) — çıkış noktası ilk giriş yeridir.
     if (currentView !== "profile") state.profileFrom = currentView;
@@ -426,7 +435,11 @@
         : `<p class="ps-empty">${t("profile.synergy_empty")}</p>`) +
       `</section>`;
 
-    return head + `<div class="stat-grid">${cards}</div>` + roleSec + synSec;
+    // Tarihçe bölümü (GÖREV 10) burada yalnız YER AÇAR: içeriğini renderHistory()
+    // doldurur — aralık düğmeleri profil yeniden çekilmeden yeniden çizebilsin diye.
+    const histSec = `<section class="prof-section" id="prof-history" hidden></section>`;
+
+    return head + `<div class="stat-grid">${cards}</div>` + histSec + roleSec + synSec;
   }
 
   async function loadProfile() {
@@ -438,8 +451,15 @@
     box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     try {
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
-      const s = await api(`/players/${state.profileId}/stats`);
+      // rating-history ayrı bir uçtur (GÖREV 10): düşerse profilin kalanı çalışsın —
+      // /nemesis'teki desenin aynısı, bölüm o durumda hiç çizilmez.
+      const [s, h] = await Promise.all([
+        api(`/players/${state.profileId}/stats`),
+        api(`/players/${state.profileId}/rating-history`).catch(() => null),
+      ]);
+      state.ratingHistory = h;
       box.innerHTML = profileHtml(s);
+      renderHistory();
       // Sinerji listesindeki isimler o oyuncunun profiline geçer.
       box.querySelectorAll(".syn-link").forEach(btn =>
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
@@ -448,6 +468,239 @@
       throw e; // toast'ı showView gösterir
     }
   }
+
+  // ── 2b2) Rating tarihçesi grafiği (GÖREV 10) ──────────────────
+  // Veri: GET /players/{id}/rating-history — contract §2: yanıt TAM tarihçedir,
+  // sunucuda zaman aralığı filtresi YOKTUR; "Tümü / 30 gün / 7 gün" seçimi burada,
+  // istemci tarafında uygulanır (maç hacmi küçük).
+  //
+  // Çizim framework'süz satır içi SVG'dir. viewBox sabit, genişlik %100 → grafik
+  // kapsayıcıya oranlı ölçeklenir, 320px'de yatay taşma olmaz. Eksen etiketleri
+  // SVG'de DEĞİL HTML katmanındadır: SVG ölçeklenince yazı boyu da ölçeklenirdi
+  // (harita ekranındaki baloncuk deseninin aynısı).
+  //
+  // Renk TEK BAŞINA taşıyıcı değildir: nokta mavi/kırmızı ama G/M bilgisi popup'ta
+  // metin olarak ve noktanın aria-label'ında da vardır.
+  // W/H oranı grafiğin en-boyudur: 320px ekranda ~125px, geniş ekranda ~300px yüksek.
+  const PH = { W: 320, H: 160, PADX: 10, TOP: 10, BOT: 13 };
+  const PH_RANGES = [
+    { key: "all", label: "profile.range_all", days: null },
+    { key: "30", label: "profile.range_30d", days: 30 },
+    { key: "7", label: "profile.range_7d", days: 7 },
+  ];
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const fmtDay = (iso) =>
+    new Date(iso).toLocaleDateString(uiLocale(), { day: "numeric", month: "short" });
+
+  let histLayout = null;  // son çizimin geometrisi ({xy}) — popup konumu buradan okunur
+  let histReturn = null;  // popup kapanınca odağın döneceği nokta (klavye erişimi)
+
+  const histAll = () => (state.ratingHistory && state.ratingHistory.points) || [];
+
+  function histPoints() {
+    const all = histAll();
+    const r = PH_RANGES.find(x => x.key === state.historyRange) || PH_RANGES[0];
+    if (!r.days) return all;
+    const from = Date.now() - r.days * DAY_MS;
+    return all.filter(p => Date.parse(p.played_at) >= from);
+  }
+
+  const histNum = (v) => (typeof v === "number" ? String(v) : "—");
+  // stats null olabilir (contract: k/d/a'nın üçü de null ise stats null); tek tek
+  // alanlar da nullable → her biri ayrı ayrı "—" düşer.
+  const histKda = (s) =>
+    s ? `${histNum(s.kills)} / ${histNum(s.deaths)} / ${histNum(s.assists)}` : "—";
+  const histResult = (p) => t(p.win ? "profile.hist_win" : "profile.hist_loss");
+
+  // Tek nokta → çizgi ve alan dolgusu yoktur, yalnız nokta çizilir.
+  function histChart(pts) {
+    const x0 = PH.PADX, x1 = PH.W - PH.PADX;
+    const y0 = PH.TOP, y1 = PH.H - PH.BOT;
+    const vals = pts.map(p => Number(p.score_after));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (!(hi > lo)) { lo -= 1; hi += 1; }          // tek nokta ya da düz seri
+    const pad = (hi - lo) * 0.12;
+    lo -= pad; hi += pad;
+    const ts = pts.map(p => Date.parse(p.played_at));
+    // Bozuk/eksik zaman damgası gelirse eşit aralıklı yerleşime düşülür.
+    const okTs = ts.every(v => !isNaN(v));
+    const t0 = Math.min(...ts), t1 = Math.max(...ts);
+    const span = x1 - x0;
+    const xAt = (i) =>
+      pts.length < 2 ? (x0 + x1) / 2
+        : !okTs || t1 <= t0 ? x0 + (i / (pts.length - 1)) * span
+        : x0 + ((ts[i] - t0) / (t1 - t0)) * span;
+    const xy = pts.map((p, i) => ({
+      x: xAt(i),
+      y: y1 - ((Number(p.score_after) - lo) / (hi - lo)) * (y1 - y0),
+      p,
+    }));
+
+    const gridY = [0, 0.5, 1].map(f => y0 + f * (y1 - y0));
+    const grid = gridY.map(y =>
+      `<line class="ph-grid" x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}"/>`
+    ).join("");
+    const chain = xy.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ");
+    const area = xy.length > 1
+      ? `<polygon class="ph-area" points="${xy[0].x.toFixed(1)},${y1} ${chain} ${xy[xy.length - 1].x.toFixed(1)},${y1}"/>`
+      : "";
+    const line = xy.length > 1 ? `<polyline class="ph-line" points="${chain}"/>` : "";
+    const dots = xy.map((q, i) => {
+      const last = i === xy.length - 1;
+      return `<circle class="ph-dot ${q.p.win ? "win" : "loss"}${last ? " last" : ""}"
+          cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${last ? 4.6 : 3.4}"/>`;
+    }).join("");
+    // Dokunma hedefi noktadan büyüktür (r=10 viewBox birimi ≈ 18px @320px ekran)
+    // ve saydamdır; en sona çizilir ki tıklama hep hedefe gitsin.
+    const hits = xy.map((q, i) =>
+      `<circle class="ph-hit" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="10"
+         tabindex="0" role="button" data-i="${i}"
+         aria-label="${esc(t("profile.hist_point_aria", {
+           date: fmtDate(q.p.played_at),
+           result: histResult(q.p),
+           score: fmtRating(Number(q.p.score_after)),
+         }))}"/>`).join("");
+
+    const yaxis = gridY.map(y => {
+      const v = lo + ((y1 - y) / (y1 - y0)) * (hi - lo);
+      return `<span class="ph-ytick" style="top:${(y / PH.H * 100).toFixed(2)}%">${fmtRating(v)}</span>`;
+    }).join("");
+    const xaxis = `<div class="ph-xaxis"><span>${esc(fmtDay(pts[0].played_at))}</span>` +
+      (pts.length > 1 ? `<span>${esc(fmtDay(pts[pts.length - 1].played_at))}</span>` : "") +
+      `</div>`;
+
+    const html =
+      `<div class="ph-chart">
+         <div class="ph-yaxis">${yaxis}</div>
+         <div class="ph-plot">
+           <svg class="ph-svg" viewBox="0 0 ${PH.W} ${PH.H}" role="group"
+                aria-label="${esc(t("profile.hist_chart_aria", { n: pts.length }))}">
+             ${grid}${area}${line}${dots}${hits}
+           </svg>
+         </div>
+       </div>${xaxis}`;
+    return { xy, html };
+  }
+
+  function renderHistory() {
+    const sec = $("#prof-history");
+    if (!sec) return;
+    histLayout = null;
+    histReturn = null;
+    state.histOpen = null;
+    // Uç yoksa/düştüyse bölüm hiç görünmez (profilin kalanı etkilenmez).
+    if (!state.ratingHistory) { sec.hidden = true; sec.innerHTML = ""; return; }
+    sec.hidden = false;
+
+    const title = `<h3 class="ps-title">${t("profile.history_title")}</h3>`;
+    // Hiç maç yok → aralık düğmeleri de anlamsız, tek satır boş durum.
+    if (!histAll().length) {
+      sec.innerHTML = title + `<p class="ps-empty">${t("profile.history_empty")}</p>`;
+      return;
+    }
+    const pills = `<div class="ph-ranges" role="group" aria-label="${esc(t("profile.range_aria"))}">` +
+      PH_RANGES.map(r =>
+        `<button type="button" class="ph-pill${r.key === state.historyRange ? " active" : ""}"
+           data-range="${r.key}" aria-pressed="${r.key === state.historyRange}">${t(r.label)}</button>`
+      ).join("") + `</div>`;
+
+    const pts = histPoints();
+    let body;
+    if (!pts.length) {
+      body = `<p class="ps-empty ph-empty">${t("profile.history_range_empty")}</p>`;
+    } else {
+      histLayout = histChart(pts);
+      body = histLayout.html;
+    }
+    sec.innerHTML = title + pills + body;
+
+    sec.querySelectorAll(".ph-pill").forEach(btn =>
+      btn.addEventListener("click", () => {
+        state.historyRange = btn.dataset.range;
+        renderHistory();
+      }));
+    sec.querySelectorAll(".ph-hit").forEach(node => {
+      const i = Number(node.dataset.i);
+      node.addEventListener("click", () => histActivate(i, node));
+      // SVG öğesi <button> değildir: Enter/Space'i kendimiz bağlarız.
+      node.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); histActivate(i, node); }
+      });
+    });
+  }
+
+  // Teoman'ın tarifi: noktaya İLK tık popup'ı açar, AYNI noktaya (ya da popup'a)
+  // İKİNCİ tık o maçın detayına gider.
+  function histActivate(i, node) {
+    const q = histLayout && histLayout.xy[i];
+    if (!q) return;
+    if (state.histOpen === q.p.match_id) { openMatchFromHistory(q.p.match_id); return; }
+    openHistPopup(q, node);
+  }
+
+  function histPopHtml(q) {
+    const p = q.p;
+    const above = q.y > PH.H * 0.45;   // grafiğin alt yarısındaki nokta → popup üstte
+    return `<button type="button" class="ph-pop ${above ? "above" : "below"}"
+        style="left:${(q.x / PH.W * 100).toFixed(2)}%;top:${(q.y / PH.H * 100).toFixed(2)}%">
+        <span class="ph-pop-date">${esc(fmtDate(p.played_at))}</span>
+        <span class="ph-pop-line">${esc(p.champion || "—")} · ${esc(roleLabel(p.position))}</span>
+        <span class="ph-pop-line">${esc(histKda(p.stats))}</span>
+        <span class="ph-pop-foot">
+          <span class="ph-pop-res ${p.win ? "win" : "loss"}">${histResult(p)}</span>
+          <span class="ph-pop-score">${fmtRating(Number(p.score_after))}<small>${t("common.points_word")}</small></span>
+        </span>
+        <span class="ph-pop-hint">${t("profile.hist_pop_hint")}</span>
+      </button>`;
+  }
+
+  function openHistPopup(q, node) {
+    closeHistPopup(false);
+    const plot = $("#prof-history .ph-plot");
+    if (!plot) return;
+    plot.insertAdjacentHTML("beforeend", histPopHtml(q));
+    const pop = plot.querySelector(".ph-pop");
+    state.histOpen = q.p.match_id;
+    histReturn = node || null;
+    pop.addEventListener("click", () => openMatchFromHistory(q.p.match_id));
+    // Kenardaki noktalarda popup kutusu grafiğin dışına taşabilir: ölçüp içeri çekilir
+    // (320px'de yatay taşma yok kuralı). marginLeft translateX(-50%)'den önce uygulanır.
+    const pr = pop.getBoundingClientRect();
+    const wr = plot.getBoundingClientRect();
+    const shift = pr.left < wr.left ? wr.left - pr.left
+      : pr.right > wr.right ? wr.right - pr.right : 0;
+    if (shift) pop.style.marginLeft = Math.round(shift) + "px";
+    pop.focus();
+  }
+
+  function closeHistPopup(restoreFocus = true) {
+    const pop = document.querySelector("#prof-history .ph-pop");
+    if (pop) pop.remove();
+    state.histOpen = null;
+    if (restoreFocus && histReturn && document.contains(histReturn)) histReturn.focus();
+    histReturn = null;
+  }
+
+  // Maça atlama: maç Geçmiş ekranından zaten yüklüyse önbellekten, değilse
+  // GET /matches/{id} ile çekilir (contract §3, GÖREV 10 notu).
+  async function openMatchFromHistory(matchId) {
+    closeHistPopup(false);
+    const cached = state.matches.find(m => m.id === matchId);
+    if (cached) { openMatchDetail(cached, "profile"); return; }
+    try {
+      openMatchDetail(await api(`/matches/${matchId}`), "profile");
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+
+  // Popup dışına tıklama kapatır (rol pop-up'ıyla aynı desen; Esc aşağıdaki
+  // ortak keydown dinleyicisinde).
+  document.addEventListener("click", (e) => {
+    if (state.histOpen == null) return;
+    if (e.target.closest && e.target.closest(".ph-pop, .ph-hit")) return;
+    closeHistPopup(false);
+  });
 
   // ── 2c) Haftanın enleri (GÖREV 2) ─────────────────────────────
   // Salt-okur ekran: GET /highlights/weekly. Contract'taki her alan null olabilir;
@@ -721,13 +974,16 @@
     if (e.target === $("#role-modal")) closeRoleModal();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeRoleModal();
+    if (e.key !== "Escape") return;
+    closeRoleModal();
+    closeHistPopup();   // GÖREV 10: tarihçe popup'ı da Esc ile kapanır
   });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   async function loadMatches() {
     await fetchRoster();
     const list = await api("/matches?limit=20");
+    state.matches = list;   // GÖREV 10: profil grafiğinden detaya atlarken önbellek
     const box = $("#match-list");
     box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
 
@@ -1010,15 +1266,20 @@
       keys + `<p class="md-hint">${t("matchdetail.hint")}</p>`;
   }
 
-  function openMatchDetail(m) {
+  // from: detayın hangi görünümden açıldığı — "matches" (Geçmiş kartı) ya da
+  // "profile" (GÖREV 10: rating tarihçesi grafiğindeki nokta). Geri düğmesi ve
+  // yanan sekme (tabOf) buna bakar.
+  function openMatchDetail(m, from) {
     state.matchDetail = m;
+    state.matchFrom = from === "profile" ? "profile" : "matches";
     showView("matchdetail");
   }
-  $("#btn-matchdetail-back").addEventListener("click", () => showView("matches"));
+  $("#btn-matchdetail-back").addEventListener("click", () => showView(state.matchFrom));
 
   // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir.
   async function loadMatchDetail() {
-    $("#btn-matchdetail-back").textContent = t("common.back_matches");
+    $("#btn-matchdetail-back").textContent =
+      t(state.matchFrom === "profile" ? "common.back_profile" : "common.back_matches");
     const box = $("#matchdetail-body");
     const m = state.matchDetail;
     if (!m) {
