@@ -119,6 +119,13 @@ CREATE TABLE collector_health (
 ALTER TABLE matches ADD COLUMN client_id TEXT;
 ```
 
+-- ── GÖREV 14 (migration 0005) ──────────────────────────────────────────────
+-- Maç sonu envanteri. JSON int dizisi (ham sıra korunur), NULL = bilinmiyor.
+-- Rating'e GİRMEZ; gösterim/istatistik verisidir.
+```sql
+ALTER TABLE match_participants ADD COLUMN items_json TEXT;  -- ör. '[6697,6676,3036]'
+```
+
 ## Kenar durumlar
 - **Remake / erken bitiş:** backend, `duration_s < 300` olan maçları otomatik `void` işaretler; `void` maçlar veri olarak saklanır ama rating replay'ine girmez.
 - **Yeni oyuncu:** Misafir/üye ayrımı YOKTUR. Payload'daki puuid `players`'ta yoksa backend önce riot_id ile (case-insensitive) puuid'i NULL olan bir kayıt arar — bulursa puuid'i o kayda bağlar (manuel eklenen oyuncunun ilk maçı senaryosu). Bulamazsa yeni oyuncu oluşturur (display_name = riot_id'nin GameName kısmı). Aynı kişi için asla iki player satırı oluşmaz. Oyuncu havuzu ~13-14 kişi; maç günü hazır bulunanlar web UI'daki roster listesinden seçilir.
