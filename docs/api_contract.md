@@ -386,6 +386,10 @@ tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui
 - `champions.json` — `{"<championName>": {"icon": "champion/<Name>.png"}}` (ad eşleşmesi
   participants.champion string'iyle)
 - `item/<id>.png`, `champion/<Name>.png` — ikonlar
+- `position/{top,jungle,middle,bottom,utility}.svg` — resmî pozisyon ikonları
+  (Data Dragon'da yoktur; CommunityDragon `rcp-fe-lol-static-assets`'ten,
+  DDRAGON_VERSION'ın major.minor'una sabitlenir — Teoman kararı: rol
+  etiketleri resmî oyun simgeleriyle gösterilir)
 İndirme betiği `deploy/fetch_ddragon.py`'dir; Dockerfile imaj kurulumunda koşturur. Yerel
 geliştirmede varlıklar yoksa web UI YER TUTUCU gösterir (kırık görsel değil) — betik elle de
 koşulabilir. Kaldırılmış/bilinmeyen eşya id'si de yer tutucuya düşer. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).
