@@ -199,7 +199,7 @@ window.I18N_DICTS.tr = {
   "matchdetail.legend_gauge": "ibre = pay (orta çizgi %50)",
   "matchdetail.no_items": "Eşya bilgisi yok",
   "matchdetail.champ_unknown": "Şampiyon bilinmiyor",
-  "matchdetail.build_hint": "Eşyalar maç sonundaki envanter sırasıyla dizilir, son slot totemdir. Bir ikona dokun ya da klavyeyle odaklan: adı ve kısa açıklaması görünür (Esc kapatır).",
+  "matchdetail.build_hint": "Eşyalar maç sonundaki envanter sırasıyla dizilir; ziynet eşyası (totem) her zaman son slotta gösterilir. Bir ikona dokun ya da klavyeyle odaklan: adı ve kısa açıklaması görünür (Esc kapatır).",
   "matchdetail.hint": "Barlar global ölçekli: seçili statta maçın en iyisi %100'dür (⭐), herkes ona oranlıdır. TOPLAM satırında bar yoktur. Rolü bilinmeyen oyuncular \"?\" satırlarında eşlenir.",
   "manual.hint": "Collector çalışmadıysa maçı buradan gir. Her oyuncuya takım ata: 5 mavi, 5 kırmızı.",
   "manual.health_link": "Collector sağlığı →",
