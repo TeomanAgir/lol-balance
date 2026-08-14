@@ -43,6 +43,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.workdir": "Working folder: {path}",
         "cli.mode.setup": "setup wizard",
         "cli.mode.backfill_positions": "role backfill",
+        "cli.mode.backfill_items": "item backfill",
         "cli.mode.backfill": "match history backfill",
         "cli.mode.live": "live mode",
         "cli.mode.dry_run_suffix": " (dry-run)",
@@ -50,10 +51,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.description": "LoL custom match collector",
         "cli.help.command": "backfill: same as --backfill; backfill-positions: infers "
                             "roles for the matches in raw_archive and writes them to "
-                            "the backend",
+                            "the backend; backfill-items: writes the end-of-game "
+                            "inventories of those matches to the backend",
         "cli.help.backfill": "Scan match history backwards (with the roster filter)",
         "cli.help.since": "During backfill, ignore matches older than this date",
-        "cli.help.dry_run": "backfill-positions: print what would be sent, do not send",
+        "cli.help.dry_run": "backfill-positions / backfill-items: print what would be "
+                            "sent, do not send",
         "cli.help.setup": "Re-run the setup wizard (rewrites .env)",
         "cli.since_format": "--since must be in YYYY-MM-DD format: {value}",
         # -- CLI runtime --
@@ -145,6 +148,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.workdir": "Çalışma klasörü: {path}",
         "cli.mode.setup": "kurulum sihirbazı",
         "cli.mode.backfill_positions": "rol backfill",
+        "cli.mode.backfill_items": "eşya backfill",
         "cli.mode.backfill": "geçmiş maç backfill",
         "cli.mode.live": "canlı mod",
         "cli.mode.dry_run_suffix": " (dry-run)",
@@ -152,10 +156,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.description": "LoL custom maç toplayıcı",
         "cli.help.command": "backfill: --backfill ile aynı; backfill-positions: "
                             "raw_archive'daki maçların rollerini tahmin edip "
-                            "backend'e yazar",
+                            "backend'e yazar; backfill-items: aynı maçların maç sonu "
+                            "eşya envanterlerini backend'e yazar",
         "cli.help.backfill": "Match history'yi geriye tara (roster filtresiyle)",
         "cli.help.since": "Backfill'de bu tarihten eski maçlara bakma",
-        "cli.help.dry_run": "backfill-positions: ne gönderileceğini yazdır, gönderme",
+        "cli.help.dry_run": "backfill-positions / backfill-items: ne gönderileceğini "
+                            "yazdır, gönderme",
         "cli.help.setup": "Kurulum sihirbazını yeniden çalıştır (.env'i yeniden yazar)",
         "cli.since_format": "--since YYYY-MM-DD formatında olmalı: {value}",
         # -- CLI çalışma zamanı --

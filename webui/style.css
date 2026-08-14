@@ -392,6 +392,12 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .sc-main { font-size: 18px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .sc-sub { font-size: 13px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
+/* Favori eşya kartı (GÖREV 14) — şeritteki diğer kartlarla aynı gövde, tek fark
+   adın yanındaki eşya ikonu (varlık yoksa yer tutucu kutu). */
+.fi-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.fi-card .dd-ico { flex: 0 0 auto; width: 28px; height: 28px; }
+.fi-name { margin-top: 0; min-width: 0; font-size: 16px; overflow-wrap: anywhere; }
+
 .prof-section { margin-top: 18px; }
 .ps-title {
   font-family: var(--display);
@@ -1151,9 +1157,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .md-meta { font-size: 13px; color: var(--muted); }
 
 /* Stat seçimi: graph'ın hemen üstünde, dokunma hedefi 40px */
-.md-statbar { display: flex; gap: 8px; margin-bottom: 10px; }
+/* BUILD ile birlikte 5 düğme var: flex-basis dar ekranda küçülür (aşağıdaki
+   medya sorguları), sarma yalnız emniyet payıdır. */
+.md-statbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .md-statbtn {
-  flex: 1;
+  flex: 1 1 52px;
   text-align: center;
   font-size: 13px;
   padding: 8px 4px;
@@ -1317,18 +1325,131 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 
 .md-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px; }
 
+/* ── Data Dragon ikon kutusu (GÖREV 14) — "dd-" öneki PAYLAŞILAN varlık kutusudur
+   (maç build satırları + profildeki favori eşya kartı). Yer tutucu HER ZAMAN
+   çizilir, görsel onun üstüne biner; dosya 404 verirse app.js img'i kaldırır ve
+   kutu görünür → kırık görsel imkânsızdır. Kutunun boyutunu KAPSAYICI verir. ── */
+.dd-ico {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.dd-ph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--display);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--brass-dim);
+}
+.dd-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+/* Şampiyon portresi yuvarlaktır (eşya kareleriyle karışmasın). */
+.dd-ico.champ, .dd-ico.champ .dd-ph, .dd-ico.champ .dd-img { border-radius: 50%; }
+
+/* ── Maç detayı BUILD sekmesi (GÖREV 14) — "mb-" öneki ──
+   Rol-eşleşmeli satır: solda mavi (portre + eşyalar), sağda kırmızı AYNALI
+   (row-reverse → portre dış kenarda, eşyalar içeri doğru dizilir).
+   Eşya sırası HAM sıradır (son slot totem), yeniden sıralanmaz.
+   Slotlar sarar ve --mb-slot ile küçülür → 320px'de yatay taşma yok. */
+.mb-graph { --mb-slot: 26px; --mb-champ: 32px; }
+.mb-sides { display: flex; align-items: flex-start; gap: 10px; }
+.mb-side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.mb-side.red { flex-direction: row-reverse; }
+.mb-items { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; }
+.mb-side.red .mb-items { flex-direction: row-reverse; }
+.mb-slot {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: var(--mb-slot);
+  height: var(--mb-slot);
+}
+.mb-champ { width: var(--mb-champ); height: var(--mb-champ); }
+/* Boş slot: envanterde o yer boş (items = [] ya da 7'den az eşya). */
+.mb-slot.empty {
+  border: 1px dashed var(--line);
+  border-radius: 5px;
+  opacity: 0.5;
+}
+/* Slot <button> değildir (tıklanabilir değil) → odak halkası ayrıca yazılır. */
+.mb-slot:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+/* items = NULL (bilinmiyor): slot yerine kısa metin. */
+.mb-none {
+  align-self: center;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* Tooltip: rozet vitrinindeki (.pb-tip) kutunun aynısı; kendisi tıklama hedefi
+   değildir, taşarsa app.js margin-left ile içeri çeker. */
+.mb-tip {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 200px;
+  padding: 7px 9px;
+  text-align: left;
+  font-family: var(--body);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.mb-tip-name { font-weight: 600; color: var(--brass); }
+.mb-tip-desc { color: var(--muted); font-size: 11px; line-height: 1.35; }
+
 @media (max-width: 520px) {
   .md-graph { --md-val-w: 58px; }
   .md-val { font-size: 11px; }
   .md-name { max-width: 34%; font-size: 12px; }
   .md-team-val { font-size: 19px; }
+  .mb-graph { --mb-slot: 23px; --mb-champ: 28px; }
 }
 /* 320px: TOPLAM sayıları ve etiketleri küçülür → yatay taşma olmaz */
 @media (max-width: 380px) {
   .md-graph { --md-val-w: 50px; padding: 6px 10px; }
+  .md-statbar { gap: 5px; }
+  .md-statbtn { flex: 1 1 44px; font-size: 11px; padding: 8px 2px; }
   .md-team-vals { gap: 8px; }
   .md-team-val { font-size: 16px; }
   .md-team-val small { font-size: 8.5px; letter-spacing: 0.08em; }
+  .mb-graph { --mb-slot: 20px; --mb-champ: 26px; }
+  .mb-sides { gap: 6px; }
+  .mb-side { gap: 4px; }
+  .mb-tip { max-width: 160px; }
 }
 
 /* ── Manuel giriş ── */

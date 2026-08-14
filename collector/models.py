@@ -7,11 +7,21 @@ Bu modeller contract'ın collector tarafındaki garantisidir: 10 katılımcı,
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 VALID_POSITIONS = {"TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"}
+
+#: Envanterde en fazla 7 eşya taşınır: 6 slot + trinket (ingest_contract "items").
+MAX_ITEMS = 7
 
 
 class Stats(BaseModel):
@@ -31,6 +41,9 @@ class Participant(BaseModel):
     position: Optional[str] = None
     champion: Optional[str] = None
     stats: Stats = Field(default_factory=Stats)
+    #: Maç sonu envanteri (GÖREV 14). `None` = "bilgi yok" → alan gövdeye hiç
+    #: konmaz; `[]` = "bilgi var, envanter boş".
+    items: Optional[list[int]] = None
 
     @field_validator("position")
     @classmethod
@@ -38,6 +51,28 @@ class Participant(BaseModel):
         if v is not None and v not in VALID_POSITIONS:
             raise ValueError(f"Invalid position: {v!r} (allowed: {sorted(VALID_POSITIONS)} or null)")
         return v
+
+    @field_validator("items")
+    @classmethod
+    def _items_valid(cls, v: Optional[list[int]]) -> Optional[list[int]]:
+        if v is None:
+            return None
+        if len(v) > MAX_ITEMS:
+            raise ValueError(f"items can hold at most {MAX_ITEMS} entries, got {len(v)}")
+        if any(item_id <= 0 for item_id in v):
+            raise ValueError(f"items must contain positive item ids: {v}")
+        return v
+
+    @model_serializer(mode="wrap")
+    def _omit_unknown_items(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """`items` bilinmiyorsa (None) alan gövdeye HİÇ konmaz — ingest_contract
+        "items" maddesi: alanı göndermeyen eski exe'lerle aynı davranış, backend
+        `NULL` saklar. Diğer nullable alanlar (position, stats...) eskisi gibi
+        `null` olarak gider; davranış yalnız `items` için özeldir."""
+        data = handler(self)
+        if data.get("items") is None:
+            data.pop("items", None)
+        return data
 
 
 class MatchPayload(BaseModel):

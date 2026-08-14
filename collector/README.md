@@ -69,6 +69,12 @@ py -m collector
   Normal/ranked maçlar sessizce atlanır. Canlı modda roster filtresi **yoktur**;
   yanlışlıkla yakalanan bir custom, web UI'dan void edilebilir.
 - Ham EOG payload'ı her durumda `collector/raw_archive/{gameId}.json` olarak saklanır.
+- **Eşya envanteri (GÖREV 14):** her katılımcıya maç sonu envanteri (`items`) eklenir —
+  canlı EOG'de oyuncunun `items` dizisinden, backfill'de `item0..item6` slotlarından.
+  Ham sıra korunur (son eleman genelde trinket), boş slotlar (`0`) atılır, en fazla 7
+  eşya gider. Kaynakta hiç eşya bilgisi yoksa alan gövdeye **hiç konmaz** (eski
+  exe'lerle aynı davranış; backend `NULL` saklar). Envanteri gerçekten boş olan
+  katılımcı `[]` ile gider — "bilgi yok" ile "boş envanter" farklı şeylerdir.
 - `played_at` maçın **gerçek bitiş anıdır**: payload'daki `endOfGameTimestamp`'ten okunur
   (gerçek LCU şeması bu alanı taşır). Böylece proses gecikmesi, outbox retry ya da geç
   işleme maç zamanını kaydırmaz. Alan gelmeyen eski sürümlerde yakalama anına düşülür.
@@ -147,6 +153,28 @@ Backend'de bulunmayan maç / eşleşmeyen oyuncu uyarı yazdırır, tarama devam
 Komut idempotenttir, tekrar tekrar koşturulabilir.
 
 > `GET /matches` limiti 200'dür: 200'den eski maçlar bu komutla güncellenemez.
+
+### Eşya (items) backfill
+
+```powershell
+py -m collector backfill-items --dry-run   # ne gönderileceğini göster
+py -m collector backfill-items             # backend'e yaz
+```
+
+Rol backfill'inin birebir aynı deseni, tek fark taşınan veri: `raw_archive/` altındaki
+maçların **maç sonu envanterlerini** canlı backend'e yazar (GÖREV 14; LCU client'a
+ihtiyaç duymaz). Her iki arşiv formatı da desteklenir — canlı EOG bloğunda oyuncunun
+`items` dizisi, match-history kaydında `item0..item6` slotları. Akış: her ham maç için
+envanter çözümü → `GET /matches` ile `source_game_id → match.id` → `GET /players` ile
+`puuid → player_id` → `PUT /matches/{id}/items`.
+
+- Arşivde eşya **bilgisi olmayan** katılımcı gönderilmez (kısmi güncelleme); envanteri
+  boş olan `[]` ile gönderilir.
+- Ham arşiv otoritedir: gönderilen değer backend'deki mevcut değerin üzerine yazar,
+  komut idempotenttir, istendiği kadar tekrarlanabilir.
+- **Rating'e etkisi yoktur**, replay tetiklemez (rol backfill'inden farkı budur).
+- Backend'de bulunmayan maç / eşleşmeyen oyuncu uyarı yazdırır, tarama devam eder.
+  `GET /matches` limiti burada da 200'dür.
 
 ## Rol tahmini (position)
 
@@ -248,9 +276,9 @@ Fixture'lar iki sınıftır:
 | Dosya | Ne belgeler |
 |---|---|
 | `eog_custom.json`, `mh_game_custom.json`, ... | **sentetik** — yapıyı ve uç durumları (eksik stat, ms süre, dengesiz takım) belgeler |
-| `eog_custom_real.json` (gameId 1734664864) | **gerçek şema** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu |
+| `eog_custom_real.json` (gameId 1734664864) | **gerçek şema** canlı EOG bloğu: UPPER_SNAKE statlar, dolu `selectedPosition`, `championName`, `queueId` yokluğu, oyuncu başına `items` dizisi (boş slotlar `0`) |
 | `eog_custom_detected.json` (gameId 1734940206) | **gerçek şema** EOG bloğu (yeni patch şekli): `selectedPosition` 10/10 BOŞ string, `detectedTeamPosition` 10/10 dolu — tespit katmanının kanıt maçı |
-| `mh_game_custom_real.json` (gameId 1734450310) | **gerçek şema** match-history kaydı: camelCase statlar, açık position yok |
+| `mh_game_custom_real.json` (gameId 1734450310) | **gerçek şema** match-history kaydı: camelCase statlar, açık position yok, `stats.item0..item6` slotları |
 | `mh_list_page_real.json`, `champion_summary_real.json` | **gerçek** liste sayfası / champion özeti |
 
 **Anonimlik (GÖREV 7, repo public):** fixture'ların hiçbirinde gerçek PII yoktur.
@@ -271,7 +299,7 @@ gerçek doğrulama `tests/test_real_fixtures.py` üzerinden yapılır.
 
 ```
 collector/
-  __main__.py      # CLI: python -m collector [--backfill|backfill [--since ...] | backfill-positions]
+  __main__.py      # CLI: python -m collector [--backfill|backfill [--since ...] | backfill-positions | backfill-items]
   config.py        # .env + ortam değişkenleri
   lockfile.py      # LCU lockfile parse
   lcu.py           # LcuClient interface + HttpLcuClient (tek LCU bağımlılığı)
@@ -284,6 +312,8 @@ collector/
   backfill.py      # geçmiş tarama
   catchup.py       # canlı moddan önce koşan sınırlı backfill (oto-yetişme)
   backfill_positions.py  # arşivdeki maçların rollerini backend'e yazma
+  backfill_items.py      # arşivdeki maçların eşya envanterlerini backend'e yazma
+  backfill_common.py     # iki arşiv backfill'inin ortak parçaları (maç/oyuncu indeksi)
   archive.py       # raw_archive yazımı
   fixtures/        # örnek LCU payload'ları (test verisi)
   tests/           # pytest

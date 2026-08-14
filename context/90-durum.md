@@ -24,12 +24,18 @@ ibre + sade TOPLAM; 11 konsept + 5 varyant artifact'ından Teoman seçimi) ·
 10 profilde rating tarihçesi grafiği (GET rating-history + GET /matches/{id}) ·
 11+12 rozetler + MVP (13 rozetlik katalog + Sonsuz Bench; GET /players/{id}/badges,
 salt-okur türetilmiş; profilde pb- vitrini) · 13 collector sağlık paneli
-(heartbeat + CLIENT_ID + migration 0004; webui ch- görünümü Manuel'den girişli).
+(heartbeat + CLIENT_ID + migration 0004; webui ch- görünümü Manuel'den girişli) ·
+14 eşya build'leri (BUILD sekmesi + Data Dragon build-time vendoring
+`deploy/fetch_ddragon.py` sürüm 16.16.1 + migration 0005 + backfill-items +
+profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları).
 
 ## Açık not
-- GÖREV 13 canlıda TAM etkinleşmek için exe yeniden derleme + dağıtım bekliyor
-  (heartbeat/kimlik yeni exe'de; sürüm sabiti `collector/__init__.py::__version__`
-  dağıtımdan önce bilinçli yükseltilmeli — şu an 0.1.0).
+- GÖREV 13+14 canlıda TAM etkinleşmek için exe yeniden derleme + dağıtım bekliyor
+  (heartbeat/kimlik/items yeni exe'de; sürüm 0.2.0'a yükseltildi). Dağıtım sonrası
+  Teoman kendi PC'sinde `backfill-items` (önce --dry-run) koşarsa eski maçların
+  build'leri dolar; arkadaşlar da arşivlerinden koşturabilir.
+- Data Dragon patch güncellemesi: `deploy/fetch_ddragon.py` içindeki
+  DDRAGON_VERSION değiştir + redeploy (api_contract §8).
 - new_modules.md'de kodlanacak açık görev kalmadı (IMPOSSIBLE uzak vizyon).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 

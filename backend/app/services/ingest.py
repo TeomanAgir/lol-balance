@@ -10,6 +10,7 @@ from ..schemas import IngestMatch, IngestParticipant
 from . import ratings as rating_service
 from . import role_ratings as role_rating_service
 from .health import normalize_optional_client_id
+from .items import normalize_optional_items
 
 VOID_THRESHOLD_S = 300
 
@@ -101,6 +102,13 @@ def ingest_match(
     # GÖREV 13: kaynak cihaz izi. Duplicate maçta MEVCUT kayda dokunulmaz —
     # ilk gönderen cihaz izi kalır (idempotency "işlem yok" demektir).
     client_id = normalize_optional_client_id(body.client_id)
+    # GÖREV 14: envanterler DB'ye dokunmadan ÖNCE doğrulanır — geçersiz bir
+    # items dizisi hiçbir satır yazılmadan 422 döner (client_id deseni).
+    # Duplicate maçta da mevcut kayda dokunulmaz (idempotency = "işlem yok").
+    items_json = [
+        normalize_optional_items(p.items, f"participants[{i}]")
+        for i, p in enumerate(body.participants)
+    ]
 
     existing = conn.execute(
         "SELECT id FROM matches WHERE source_game_id = ?", (body.source_game_id,)
@@ -144,13 +152,15 @@ def ingest_match(
             )
             match_id = cur.lastrowid
 
-            for p, player_id in zip(body.participants, player_ids):
+            for p, player_id, p_items in zip(
+                body.participants, player_ids, items_json
+            ):
                 stats = p.stats
                 conn.execute(
                     "INSERT INTO match_participants (match_id, player_id, team,"
                     " position, champion, kills, deaths, assists, gold, cs,"
-                    " damage_to_champs, vision_score)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " damage_to_champs, vision_score, items_json)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         match_id,
                         player_id,
@@ -164,6 +174,7 @@ def ingest_match(
                         stats.cs if stats else None,
                         stats.damage_to_champs if stats else None,
                         stats.vision_score if stats else None,
+                        p_items,
                     ),
                 )
 

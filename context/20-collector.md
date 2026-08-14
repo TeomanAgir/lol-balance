@@ -17,7 +17,9 @@ Yazma izni: yalnız `collector/` (`packaging/.build_venv`, `raw_archive/`, `.env
   custom'ları toplanır (gameMode CLASSIC ana sinyal, mapId!=11 ek eleme, alan
   yoksa tolerans); `is_custom` ile aynı üç çağrı noktasında (canlı EOG, MH
   fallback, backfill) uygulanır [Teoman, 2026-08-14].
-- `backfill_positions.py` — raw_archive'dan mevcut maçlara PUT /positions (aynı öncelik).
+- `backfill_positions.py` / `backfill_items.py` — raw_archive'dan mevcut maçlara
+  PUT /positions (aynı öncelik) / PUT /items (GÖREV 14); ortak parçalar `backfill_common.py`.
+  Normalizer artık `items` da üretir (EOG `items` / MH `item0..6`; 0=boş slot atılır).
 - `sender.py` — gönderim + `outbox/` retry. `config.py` — `.env`; frozen'da
   (`is_frozen`/`app_dir`) tüm kalıcı yollar exe-bitişiği (PyInstaller `_MEIPASS` tuzağı!).
 - `wizard.py` — ilk açılış sihirbazı (dil → API key → backend URL → LOL_DIR
@@ -45,5 +47,5 @@ Heartbeat hatası HER ZAMAN yutulur, outbox'a yazılmaz. Sürüm: `__init__.__ve
 (dağıtım öncesi yükselt).
 
 ## Test
-336 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
+403 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
 dokunmadan, fake/fixture tabanlı.

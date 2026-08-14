@@ -42,8 +42,9 @@ Content-Type: application/json
 - Tüm zamanlar UTC ISO8601.
 - **`items` (GÖREV 14, opsiyonel):** Her katılımcıya `"items": [6697, 6676, 3036, 3031, 1055, 2523, 3340]`
   eklenebilir — maç SONU envanteri, 0-7 eleman, ham SIRA korunur (son eleman genelde
-  trinket). Kaynak: canlı EOG'de oyuncunun `items` dizisi; MH kayıtlarında `item0..item6`
-  (0 değerli boş slotlar ATILIR, sıra korunur). Alan yoksa/null ise backend `NULL`
+  trinket). Kaynak: canlı EOG'de oyuncunun `items` dizisi; MH kayıtlarında `item0..item6`.
+  HER İKİ kaynakta da `0` değeri "boş slot" demektir ve ATILIR (gerçek EOG dizisi de
+  boş slotu 0 taşır); int'e çevrilemeyen/negatif değerler de atılır, kalanların sırası korunur. Alan yoksa/null ise backend `NULL`
   saklar (eski exe'ler göndermez — geriye uyumlu). Manuel girişte alan yoktur.
 - **`client_id` (GÖREV 13, opsiyonel):** Gövdeye üst seviyede `"client_id": "Ali-PC"`
   eklenebilir (string, ≤64, boş-olmayan; trim'lenir). Gönderen collector'ın cihaz

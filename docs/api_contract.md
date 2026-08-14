@@ -380,7 +380,7 @@ Backend, `webui/` dizinindeki dosyaları `/` altından servis eder (FastAPI Stat
 **Data Dragon varlıkları (GÖREV 14, build-time vendoring — Teoman kararı):** Eşya/şampiyon
 görselleri ve adları Riot Data Dragon'dan DEPLOY imajı kurulurken indirilir; canlı sitede
 tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui/assets/ddragon/`):
-- `manifest.json` — `{"version": "15.16.1"}` (sabitlenmiş patch; güncelleme = sürümü değiştir + redeploy)
+- `manifest.json` — `{"version": "16.16.1"}` (sabitlenmiş patch; güncelleme = sürümü değiştir + redeploy)
 - `items.json` — `{"<item_id>": {"name_tr", "name_en", "desc_tr", "desc_en", "tags": ["Trinket", ...]}}`
   (Data Dragon `item.json` tr_TR + en_US'ten üretilir; `desc_*` düz metin, HTML etiketleri temizlenir)
 - `champions.json` — `{"<championName>": {"icon": "champion/<Name>.png"}}` (ad eşleşmesi

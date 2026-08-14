@@ -15,9 +15,14 @@ from fractions import Fraction
 
 from rating import ROLES
 
+from .items import load_items
+
 # api_contract §2: sinerji için en az 2 ortak maç, en fazla 3 kayıt döner.
 SYNERGY_MIN_MATCHES = 2
 SYNERGY_LIMIT = 3
+
+# api_contract §2 `top_items` (GÖREV 14): en fazla 10 kayıt.
+TOP_ITEMS_LIMIT = 10
 
 # Yuvarlama: contract örneğindeki değerler (kills_avg 5.2, ratio 4.06,
 # winrate 0.6) 2 basamağa yuvarlanmış hâldedir; float gürültüsünü UI'a
@@ -117,6 +122,28 @@ def _favorite_role(rows: list[sqlite3.Row]) -> dict | None:
     return {"role": role, "matches": matches}
 
 
+def _top_items(rows: list[sqlite3.Row]) -> list[dict]:
+    """items bilgisi DOLU valid maçlardaki eşya sayımları (api_contract §2).
+
+    `items_json` NULL olan maç ("bilinmiyor") hiç sayılmaz; `[]` sayılır ama
+    katkısı yoktur. AYNI maçta aynı eşya (ör. iki iksir slotu) BİR kez sayılır.
+    Sıralama: sayım azalan → item_id artan; en fazla 10 kayıt. Eşya adı/tags
+    burada BİLİNMEZ — trinket/tüketilebilir ayıklaması web UI'dadır.
+    """
+    counts: dict[int, int] = {}
+    for r in rows:
+        items = load_items(r["items_json"])
+        if items is None:
+            continue
+        for item_id in set(items):
+            counts[item_id] = counts.get(item_id, 0) + 1
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [
+        {"item_id": item_id, "matches": matches}
+        for item_id, matches in ordered[:TOP_ITEMS_LIMIT]
+    ]
+
+
 def _synergy(conn: sqlite3.Connection, player_id: int) -> list[dict]:
     """AYNI TAKIMDA ≥2 valid maç oynanmış takım arkadaşları (api_contract §2).
 
@@ -169,7 +196,7 @@ def player_stats(conn: sqlite3.Connection, player_id: int) -> dict | None:
 
     rows = conn.execute(
         "SELECT mp.team, mp.position, mp.champion,"
-        " mp.kills, mp.deaths, mp.assists, m.winner_team "
+        " mp.kills, mp.deaths, mp.assists, mp.items_json, m.winner_team "
         "FROM match_participants mp "
         "JOIN matches m ON m.id = mp.match_id "
         "WHERE mp.player_id = ? AND m.status = 'valid' "
@@ -188,4 +215,5 @@ def player_stats(conn: sqlite3.Connection, player_id: int) -> dict | None:
         "favorite_champion": _favorite_champion(rows),
         "favorite_role": _favorite_role(rows),
         "synergy": _synergy(conn, player_id),
+        "top_items": _top_items(rows),
     }

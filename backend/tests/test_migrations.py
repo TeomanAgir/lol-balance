@@ -41,6 +41,7 @@ def test_fresh_db_applies_all_migrations_in_name_order(tmp_path):
         "0002_perf_score.sql",
         "0003_role_ratings.sql",
         "0004_collector_health.sql",
+        "0005_participant_items.sql",
     ]  # sıra garantisi
     assert "perf_score" in _columns(db_path, "rating_history")
     # Tekrar koşmak güvenli ve no-op.
@@ -69,6 +70,15 @@ def test_0004_creates_collector_health_and_matches_client_id(tmp_path):
     assert "client_id" in _columns(db_path, "matches")
 
 
+def test_0005_adds_participant_items_json(tmp_path):
+    """GÖREV 14: match_participants.items_json (db_schema migration 0005)."""
+    db_path = tmp_path / "items.db"
+    run_migrations(str(db_path))
+    assert "items_json" in _columns(db_path, "match_participants")
+    # Tekrar koşmak no-op: ALTER ikinci kez uygulanırsa "duplicate column".
+    assert run_migrations(str(db_path)) == []
+
+
 def test_existing_db_gets_0002_and_0003(tmp_path):
     """0001'i zaten uygulanmış kurulum eksik migration'ları sırayla alır."""
     db_path = tmp_path / "old.db"
@@ -95,12 +105,14 @@ def test_existing_db_gets_0002_and_0003(tmp_path):
         "0002_perf_score.sql",
         "0003_role_ratings.sql",
         "0004_collector_health.sql",
+        "0005_participant_items.sql",
     ]
     assert "perf_score" in _columns(db_path, "rating_history")
     assert "role_rating_history" in _objects(db_path)
     assert "client_id" in _columns(db_path, "matches")
+    assert "items_json" in _columns(db_path, "match_participants")
 
-    # Mevcut (veri dolu) DB üstünde tekrar koşmak no-op: 0004 iki kez
+    # Mevcut (veri dolu) DB üstünde tekrar koşmak no-op: 0004/0005 iki kez
     # uygulanırsa "duplicate column" ile patlardı.
     assert run_migrations(str(db_path)) == []
 
@@ -119,3 +131,8 @@ def test_0001_does_not_define_perf_score():
 def test_0001_does_not_define_matches_client_id():
     """Aynı koruma client_id için: tek kaynak 0004'tür (bkz. 0002 notu)."""
     assert not any("client_id" in line for line in _code_lines("0001_init.sql"))
+
+
+def test_0001_does_not_define_items_json():
+    """Aynı koruma items_json için: tek kaynak 0005'tir (bkz. 0002 notu)."""
+    assert not any("items_json" in line for line in _code_lines("0001_init.sql"))
