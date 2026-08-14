@@ -73,6 +73,37 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
 - Hassasiyet: tüm oran/ortalama alanları (`*_avg`, `ratio`, `winrate`) 2 ondalığa
   yuvarlanır; sıralama ve eşitlik kırılımları yuvarlanmamış değerle yapılır.
 
+### Rating tarihçesi (GÖREV 10)
+```
+GET /players/{id}/rating-history
+→ 200 {
+  "player_id": 3,
+  "engine_version": "openskill-pl-blend50-v1",
+  "points": [
+    {"match_id": 12, "played_at": "2026-08-11T20:41:03Z", "win": true,
+     "champion": "Ahri", "position": "MIDDLE",
+     "score_after": 3.41,
+     "stats": {"kills": 7, "deaths": 2, "assists": 9}}
+  ]
+}
+```
+Kurallar (salt-okur; rating'e etkisi yok):
+- Yalnız `status='valid'` maçlar; sıra replay sort-key'iyle birebir aynı (kronolojik artan).
+  Determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır.
+- `score_after` = o maç SONRASI efektif score (leaderboard `score` alanıyla aynı tanım):
+  aktif engine harmansa `mu_eff - 3*sigma_after`, `mu_eff` o ana kadarki KÜMÜLATİF
+  `P_avg` ile hesaplanır (o maç dahil, kronolojik önekteki perf_score'ların ortalaması;
+  `perf_score` NULL satırlar ortalamaya katılmaz — rating_contract P_avg tanımıyla
+  tutarlı). Hesap rating paketinin mevcut yardımcılarıyla yapılır, formül backend'e
+  KOPYALANMAZ. Harman olmayan engine'de `score_after = mu_after - 3*sigma_after`.
+- `win` = katılımcının takımı `winner_team` ile aynı mı. `champion`/`position` ve
+  `stats` içindeki k/d/a alanları nullable'dır (ingest ile tutarlı); k/d/a'nın üçü de
+  null ise `stats: null` döner.
+- Hassasiyet: `score_after` 2 ondalığa yuvarlanır (leaderboard ile aynı).
+- Bilinmeyen oyuncu → `404`; hiç valid maçı olmayan oyuncuda `points: []`.
+- Zaman aralığı filtresi SUNUCUDA YOKTUR: yanıt tam tarihçedir, aralık seçimi web UI'da
+  istemci tarafında yapılır (maç hacmi küçük; parametre gerekirse ayrı karar).
+
 ### Haftanın enleri (GÖREV 2)
 ```
 GET /highlights/weekly
@@ -147,6 +178,9 @@ Kurallar (salt-okur; Teoman kararları 2026-08-12, CHANGE_REQUESTS):
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
+GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı şekil,
+                                     bilinmeyen id → 404 (GÖREV 10: profil grafiğinden
+                                     maç detayına atlama)
 POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
