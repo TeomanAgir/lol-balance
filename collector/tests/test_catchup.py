@@ -31,6 +31,10 @@ class FakeSender:
     def send_or_outbox(self, payload):  # pragma: no cover - bu testlerde çağrılmaz
         self._calls.append("send")
 
+    def send_heartbeat(self, reason: str = "") -> bool:
+        self._calls.append(f"heartbeat:{reason}" if reason else "heartbeat")
+        return True
+
     def close(self) -> None:
         self._calls.append("close")
 
@@ -64,7 +68,8 @@ def test_run_catchup_calls_backfill_with_windowed_since_after_flush(
     assert stats is not None and stats.sent == 2
     assert seen["since"] == date(2026, 7, 30)  # 13 Ağustos - 14 gün
     assert seen["config"] is config
-    assert calls == ["flush", "backfill"]  # outbox önce boşaltılır (backfill modundaki gibi)
+    # outbox önce boşaltılır (backfill modundaki gibi), bitiminde heartbeat (GÖREV 13)
+    assert calls == ["flush", "backfill", "heartbeat:catchup"]
 
     out = capsys.readouterr().out
     assert "2026-07-30" in out and "14" in out  # yetişme başlangıcı kullanıcıya bildirilir
@@ -145,7 +150,8 @@ def test_backfill_exception_is_swallowed_and_logged(config, calls, monkeypatch, 
         assert run_catchup(config, FakeLcu(), FakeSender(calls)) is None
 
     assert "backend erişilemiyor" in caplog.text
-    assert calls == ["flush"]
+    # Hatalı bitişte de heartbeat atılır (bekleyen outbox sayısı güncel kalsın).
+    assert calls == ["flush", "heartbeat:catchup"]
 
 
 def test_flush_outbox_exception_is_swallowed_too(config, monkeypatch):
@@ -298,7 +304,8 @@ def test_positional_backfill_is_an_alias_of_the_flag(tmp_path, monkeypatch, caps
 
     assert cli.main(argv) == 0
     assert seen["since"] == date(2026, 8, 1)
-    assert calls[0] == "flush"
+    # Bağlantı heartbeat'i → outbox boşaltma → backfill → bitiş heartbeat'i (GÖREV 13)
+    assert calls == ["heartbeat:lcu-connected", "flush", "heartbeat:backfill-done", "close"]
     assert "backfill" in capsys.readouterr().out  # banner: geçmiş maç backfill modu
 
 

@@ -61,6 +61,10 @@ def run_catchup(
         log.warning("Auto-catchup failed, continuing to live mode: %s", exc, exc_info=True)
         print(msg("catchup.failed", error=exc))
         return None
+    finally:
+        # GÖREV 13: yetişme bitiminde heartbeat — hatalı bitişte de atılır ki
+        # panelde bekleyen outbox sayısı güncel kalsın (kendisi hata yutar).
+        sender.send_heartbeat("catchup")
 
     print(msg("catchup.done", scanned=stats.scanned, sent=stats.sent))
     if stats.errors:

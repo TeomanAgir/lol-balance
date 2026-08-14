@@ -15,6 +15,7 @@ from .deps import require_api_key
 from .routers import (
     admin,
     balance,
+    health,
     highlights,
     ingest,
     matches,
@@ -51,7 +52,7 @@ def create_app() -> FastAPI:
     api_deps = [Depends(require_api_key)]
     for router in (ingest.router, players.router, matches.router,
                    balance.router, admin.router, highlights.router,
-                   nemesis.router):
+                   nemesis.router, health.router):
         app.include_router(router, prefix="/api/v1", dependencies=api_deps)
 
     webui = Path(settings.webui_dir)

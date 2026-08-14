@@ -41,6 +41,10 @@ class IngestMatch(BaseModel):
     duration_s: Optional[int] = None
     winner_team: Literal[100, 200]
     participants: list[IngestParticipant]
+    # GÖREV 13 (ingest_contract "client_id"): gönderen cihazın kimliği.
+    # OPSİYONEL — eski exe'ler alanı hiç göndermez. Trim/uzunluk kuralı
+    # services/health.normalize_optional_client_id'dedir.
+    client_id: Optional[str] = None
 
 
 class IngestResponse(BaseModel):
@@ -295,3 +299,29 @@ class ReplayResponse(BaseModel):
     matches_replayed: int
     role_matches_replayed: int
     engine_version: str
+
+
+class HeartbeatIn(BaseModel):
+    # api_contract §6: client_id zorunlu (trim sonrası boş olamaz, ≤64) — bu
+    # kontrol router'da yapılır ki detail Türkçe ve tek-string olsun.
+    # version/outbox_pending opsiyonel/nullable.
+    model_config = ConfigDict(extra="ignore")
+
+    client_id: Optional[str] = None
+    version: Optional[str] = None
+    outbox_pending: Optional[int] = None
+
+
+class HeartbeatResponse(BaseModel):
+    ok: bool
+
+
+class CollectorHealthOut(BaseModel):
+    # api_contract §6. last_seen SUNUCUDA atanır (UTC Z). last_ingest_* o
+    # cihazın `matches.client_id` izinden son maçı; iz yoksa null (void dahil).
+    client_id: str
+    last_seen: str
+    version: Optional[str]
+    outbox_pending: Optional[int]
+    last_ingest_at: Optional[str]
+    last_ingest_game_id: Optional[str]

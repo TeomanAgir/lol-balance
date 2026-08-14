@@ -145,7 +145,7 @@
   const loaders = {
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
-    matchdetail: loadMatchDetail,
+    matchdetail: loadMatchDetail, health: loadHealth,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -153,10 +153,12 @@
   // Maç detayı (GÖREV 8) iki yerden açılır: Geçmiş kartı ve (GÖREV 10) profil
   // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
   // profile → profileFrom olarak çözülür.
+  // Collector sağlığı (GÖREV 13) TEK yerden açılır (Manuel) → sabit eşleme.
   const tabOf = (name) =>
     name === "profile" ? tabOf(state.profileFrom) :
     name === "map" ? tabOf(state.mapFrom) :
-    name === "matchdetail" ? tabOf(state.matchFrom) : name;
+    name === "matchdetail" ? tabOf(state.matchFrom) :
+    name === "health" ? "manual" : name;
   let currentView = "balance";
 
   function showView(name, forceReload = false) {
@@ -1512,6 +1514,122 @@
       updateManualCounter();
     }
   });
+
+  // ── 5) Collector sağlığı (GÖREV 13) ───────────────────────────
+  // Veri: GET /health/collectors (api_contract §6). Sekme DEĞİL: Manuel ekranından
+  // açılan detay görünümü (harita/profil deseni; tabOf → "manual", geri düğmesi
+  // hep Manuel'e döner). Otomatik polling YOK — görünüm açılınca bir kez çekilir,
+  // "Yenile" elle tazeler (basit kalsın; heartbeat aralığı zaten dakikalar mertebesinde).
+  //
+  // EŞİKLER UI SABİTİDİR: contract'ta yoktur, backend bu ayrımı bilmez. Değişirse
+  // yalnız burası değişir (yanıt şekli aynı kalır).
+  //   < 15 dk → çevrimiçi · < 24 sa → bugün görüldü · ≥ 24 sa → uzun süredir yok
+  // Renk TEK BAŞINA taşıyıcı değildir: üç durumun üçünde de durum METNİ değişir
+  // (nokta rengi yalnız aynı bilgiyi tekrarlar).
+  const CH_ONLINE_MS = 15 * 60 * 1000;      // "çevrimiçi" eşiği (UI sabiti)
+  const CH_TODAY_MS = 24 * 60 * 60 * 1000;  // "bugün görüldü" eşiği (UI sabiti)
+
+  // Çoğul kuralı sözlüktedir: <base>_one / <base>_other. İngilizce'de "1 minute
+  // ago" ≠ "3 minutes ago"; Türkçe'de iki anahtar da aynı metni taşır.
+  const chPlural = (base, n) => t(base + (n === 1 ? "_one" : "_other"), { n });
+
+  // Göreli zaman: "az önce" / "3 dk önce" / "2 sa önce" / "3 gün önce".
+  // Bozuk/eksik zaman damgası → "bilinmiyor" (uydurma bir süre gösterilmez).
+  function chAgo(iso) {
+    const ms = Date.now() - Date.parse(iso);
+    if (isNaN(ms)) return t("health.unknown");
+    if (ms < 60 * 1000) return t("health.ago_now");
+    if (ms < 60 * 60 * 1000) return chPlural("health.ago_min", Math.floor(ms / 60000));
+    if (ms < CH_TODAY_MS) return chPlural("health.ago_hour", Math.floor(ms / 3600000));
+    return chPlural("health.ago_day", Math.floor(ms / CH_TODAY_MS));
+  }
+
+  function chStatus(iso) {
+    const ms = Date.now() - Date.parse(iso);
+    if (isNaN(ms)) return { cls: "unknown", label: t("health.status_unknown") };
+    if (ms < CH_ONLINE_MS) return { cls: "online", label: t("health.status_online") };
+    if (ms < CH_TODAY_MS) return { cls: "today", label: t("health.status_today") };
+    return { cls: "stale", label: t("health.status_stale") };
+  }
+
+  const chRow = (key, valHtml, cls) =>
+    `<div class="ch-row">
+       <span class="ch-key">${key}</span>
+       <span class="ch-val${cls ? " " + cls : ""}">${valHtml}</span>
+     </div>`;
+
+  // d = /health/collectors listesinin bir elemanı. version / outbox_pending /
+  // last_ingest_* contract'ta nullable → her biri ayrı ayrı soluk metne düşer.
+  function chCard(d) {
+    const st = chStatus(d.last_seen);
+    const pending = typeof d.outbox_pending === "number" ? d.outbox_pending : null;
+    const outbox = pending == null ? { cls: "dim", text: t("health.unknown") }
+      : pending > 0 ? { cls: "warn", text: chPlural("health.outbox_pending", pending) }
+      : { cls: "dim", text: t("health.outbox_none") };
+    // game_id küçük mono: sayı dizisi gövde fontunda okunmuyor, ayrıca bu bir
+    // kimliktir (metin değil) — kopyalanıp log'da aranır.
+    const ingest = d.last_ingest_at
+      ? chAgo(d.last_ingest_at) +
+        (d.last_ingest_game_id ? `<span class="ch-gid">#${esc(d.last_ingest_game_id)}</span>` : "")
+      : t("health.no_ingest");
+    return `<article class="ch-card ${st.cls}">
+        <header class="ch-head">
+          <span class="ch-name">${esc(d.client_id)}</span>
+          <span class="ch-status ${st.cls}"><i class="ch-dot" aria-hidden="true"></i>${st.label}</span>
+        </header>
+        ${chRow(t("health.last_seen"), chAgo(d.last_seen))}
+        ${chRow(t("health.version"), d.version ? esc(d.version) : t("health.unknown"),
+                d.version ? "" : "dim")}
+        ${chRow(t("health.outbox"), outbox.text, outbox.cls)}
+        ${chRow(t("health.last_ingest"), ingest, d.last_ingest_at ? "" : "dim")}
+      </article>`;
+  }
+
+  // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir
+  // (maç detayındaki desenin aynısı).
+  async function loadHealth() {
+    $("#btn-health-back").textContent = t("common.back_manual");
+    const box = $("#health-body");
+    const btn = $("#btn-health-refresh");
+    const count = $("#health-count");
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    count.textContent = "";
+    btn.disabled = true;
+    btn.textContent = t("health.refreshing");
+    let list;
+    try {
+      list = await api("/health/collectors");
+    } catch (e) {
+      // Bu görünümün TEK içeriği cihaz listesidir: uç düşerse ekran boş kalmaz,
+      // ne olduğu ve ne yapılacağı yazılı durur (toast'ı showView ayrıca atar).
+      box.innerHTML = `<div class="ch-error">
+          <p class="ch-err-title">${t("health.error_title")}</p>
+          <p class="ch-err-detail">${esc(e.message)}</p>
+          <p class="ch-err-hint">${t("health.error_hint")}</p>
+        </div>`;
+      throw e;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t("health.refresh");
+    }
+    // Sıralamayı backend verir (contract §6: last_seen azalan) — UI yeniden SIRALAMAZ.
+    const devices = Array.isArray(list) ? list : [];
+    if (!devices.length) {
+      box.innerHTML = `<div class="ch-empty">
+          <p class="ch-empty-title">${t("health.empty")}</p>
+          <p class="ch-empty-note">${t("health.empty_note")}</p>
+        </div>`;
+      return;
+    }
+    count.textContent = chPlural("health.devices", devices.length);
+    box.innerHTML = `<div class="ch-list">${devices.map(chCard).join("")}</div>`;
+  }
+
+  $("#btn-health-open").addEventListener("click", () => showView("health"));
+  $("#btn-health-back").addEventListener("click", () => showView("manual"));
+  // Elle yenileme: görünüm zaten açık, sekme değiştirmeden aynı yükleyici koşar.
+  $("#btn-health-refresh").addEventListener("click", () =>
+    loadHealth().catch(e => toast(e.message)));
 
   // ── Dil (GÖREV 6) ─────────────────────────────────────────────
   // Sağ üstteki düğme hedef dili gösterir (sözlük değeri: tr'de "EN", en'de "TR");

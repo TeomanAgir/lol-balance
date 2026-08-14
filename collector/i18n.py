@@ -98,12 +98,15 @@ MESSAGES: dict[str, dict[str, str]] = {
                                     "fix .env if it is wrong.",
         "wizard.lol_dir_missing": "  No such folder: {path}",
         "wizard.lol_dir_aborted": "No valid LoL folder entered, setup aborted.",
+        "wizard.ask_client_id": "Device name (shown on the collector status page) "
+                                "[{default}]: ",
         "wizard.saved": "Saved:",
         "wizard.saved_file": "  file        : {path}",
         "wizard.saved_language": "  LANGUAGE    : {lang}",
         "wizard.saved_backend": "  BACKEND_URL : {url}",
         "wizard.saved_api_key": "  API_KEY     : {masked}",
         "wizard.saved_lol_dir": "  LOL_DIR     : {path}",
+        "wizard.saved_client_id": "  CLIENT_ID   : {client_id}",
         "wizard.fix_hint": "To fix the settings you can edit the .env file by hand "
                            "or run the program again with `--setup`.",
         # -- LOL_DIR detection source labels --
@@ -116,6 +119,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "env.comment_lol_dir": "# LoL install folder (the 'lockfile' appears here "
                                "while the client is running)",
         "env.comment_backend": "# Backend address (without trailing /) and the shared API key",
+        "env.comment_client_id": "# Device name (shown on the collector status page)",
         "env.comment_optional": "# Optional:",
         # -- backend check --
         "check.ok_prefix": "OK  ",
@@ -198,12 +202,15 @@ MESSAGES: dict[str, dict[str, str]] = {
                                     "— yanlışsa .env'i düzelt.",
         "wizard.lol_dir_missing": "  Böyle bir klasör yok: {path}",
         "wizard.lol_dir_aborted": "Geçerli bir LoL klasörü girilmedi, kurulum iptal edildi.",
+        "wizard.ask_client_id": "Cihaz adı (collector durum sayfasında görünür) "
+                                "[{default}]: ",
         "wizard.saved": "Kaydedildi:",
         "wizard.saved_file": "  dosya       : {path}",
         "wizard.saved_language": "  LANGUAGE    : {lang}",
         "wizard.saved_backend": "  BACKEND_URL : {url}",
         "wizard.saved_api_key": "  API_KEY     : {masked}",
         "wizard.saved_lol_dir": "  LOL_DIR     : {path}",
+        "wizard.saved_client_id": "  CLIENT_ID   : {client_id}",
         "wizard.fix_hint": "Ayarları düzeltmek için .env dosyasını elle düzenleyebilir "
                            "ya da programı `--setup` ile yeniden çalıştırabilirsin.",
         # -- LOL_DIR arama kaynağı etiketleri --
@@ -215,6 +222,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "env.comment_language": "# Arayüz dili (tr|en)",
         "env.comment_lol_dir": "# LoL kurulum dizini (içinde client açıkken 'lockfile' oluşur)",
         "env.comment_backend": "# Backend adresi (sondaki / olmadan) ve paylaşılan API anahtarı",
+        "env.comment_client_id": "# Cihaz adı (collector durum sayfasında görünür)",
         "env.comment_optional": "# Opsiyonel:",
         # -- backend doğrulaması --
         "check.ok_prefix": "OK  ",

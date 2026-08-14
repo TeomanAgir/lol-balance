@@ -23,11 +23,14 @@ Son güncelleme: 2026-08-13 (orkestratör)
 ibre + sade TOPLAM; 11 konsept + 5 varyant artifact'ından Teoman seçimi) ·
 10 profilde rating tarihçesi grafiği (GET rating-history + GET /matches/{id}) ·
 11+12 rozetler + MVP (13 rozetlik katalog + Sonsuz Bench; GET /players/{id}/badges,
-salt-okur türetilmiş; profilde pb- vitrini).
+salt-okur türetilmiş; profilde pb- vitrini) · 13 collector sağlık paneli
+(heartbeat + CLIENT_ID + migration 0004; webui ch- görünümü Manuel'den girişli).
 
-## Sıradaki (new_modules.md, kararlar CHANGE_REQUESTS 2026-08-14'te)
-- GÖREV 13: collector sağlık paneli TAM sürüm (heartbeat + kimlik; davranışsal
-  tasarım Teoman onayına sunulacak; exe yeniden derleme/dağıtım gerektirir).
+## Açık not
+- GÖREV 13 canlıda TAM etkinleşmek için exe yeniden derleme + dağıtım bekliyor
+  (heartbeat/kimlik yeni exe'de; sürüm sabiti `collector/__init__.py::__version__`
+  dağıtımdan önce bilinçli yükseltilmeli — şu an 0.1.0).
+- new_modules.md'de kodlanacak açık görev kalmadı (IMPOSSIBLE uzak vizyon).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler

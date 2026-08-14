@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from ..schemas import IngestMatch, IngestParticipant
 from . import ratings as rating_service
 from . import role_ratings as role_rating_service
+from .health import normalize_optional_client_id
 
 VOID_THRESHOLD_S = 300
 
@@ -97,6 +98,9 @@ def ingest_match(
 ) -> tuple[int, bool]:
     """Maçı işler; (match_id, duplicate) döner. Tek transaction'da koşar."""
     validate_rules(body)
+    # GÖREV 13: kaynak cihaz izi. Duplicate maçta MEVCUT kayda dokunulmaz —
+    # ilk gönderen cihaz izi kalır (idempotency "işlem yok" demektir).
+    client_id = normalize_optional_client_id(body.client_id)
 
     existing = conn.execute(
         "SELECT id FROM matches WHERE source_game_id = ?", (body.source_game_id,)
@@ -126,7 +130,8 @@ def ingest_match(
             )
             cur = conn.execute(
                 "INSERT INTO matches (ingest_event_id, source_game_id, played_at,"
-                " duration_s, winner_team, status) VALUES (?, ?, ?, ?, ?, ?)",
+                " duration_s, winner_team, status, client_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     ingest_event_id,
                     body.source_game_id,
@@ -134,6 +139,7 @@ def ingest_match(
                     body.duration_s,
                     body.winner_team,
                     "void" if is_void else "valid",
+                    client_id,
                 ),
             )
             match_id = cur.lastrowid

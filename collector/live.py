@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
 from .archive import archive_path, archive_raw
@@ -52,8 +52,25 @@ class LiveRunner:
         self._now = now
         self._processed: set[str] = set()
         self._champion_map: Optional[dict[int, str]] = None
+        self._last_heartbeat: Optional[datetime] = None
 
     # --- yardımcılar ---
+
+    def _maybe_heartbeat(self) -> None:
+        """Canlı modda periyodik heartbeat (GÖREV 13, api_contract §6).
+
+        Sayaç `poll_forever` başlangıcında kurulur: bağlantı anındaki heartbeat'i
+        CLI atar, ilk periyodik atış ondan `HEARTBEAT_MINUTES` dakika sonradır.
+        Gönderim başarısız olsa da sayaç ilerler — hata canlı döngüyü yavaşlatmaz.
+        """
+        minutes = self._config.heartbeat_minutes
+        if minutes <= 0:
+            return
+        now = self._now()
+        if self._last_heartbeat is not None and now - self._last_heartbeat < timedelta(minutes=minutes):
+            return
+        self._last_heartbeat = now
+        self._sender.send_heartbeat("live")
 
     def _already_processed(self, game_id: str) -> bool:
         return game_id in self._processed or archive_path(self._config, game_id).is_file()
@@ -159,6 +176,7 @@ class LiveRunner:
         self._sender.flush_outbox()
         previous_phase: Optional[str] = None
         failures = 0
+        self._last_heartbeat = self._now()
         while True:
             try:
                 phase = self._lcu.get_gameflow_phase()
@@ -180,4 +198,5 @@ class LiveRunner:
             previous_phase = phase
 
             self._sender.flush_outbox()
+            self._maybe_heartbeat()
             self._sleep(self._config.poll_interval_s)
