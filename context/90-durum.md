@@ -11,7 +11,9 @@ Son güncelleme: 2026-08-13 (orkestratör)
 - Repo PUBLIC sürecinde: fixture'lar anonim, VPS raporları kaldırıldı, PR/issue
   metinleri tarandı (temiz). Teoman tarafı: ayarlar + visibility flip.
 - Collector: tek exe (PyInstaller), ilk açılış sihirbazı, oto-yetişme
-  (CATCHUP_DAYS=14), tiresiz `backfill` alias. Arkadaşlara dağıtılan exe güncel.
+  (CATCHUP_DAYS=14), tiresiz `backfill` alias. SR-only filtre (yalnız Sihirdar
+  Vadisi custom'ları; PR #24) eklendi — arkadaşlardaki exe'ler ESKİ, yeniden
+  derleme + dağıtım gerekiyor.
 - Backend: sıra-dışı ingest'te iki evren otomatik replay (2026-08-13'te canlıya çıktı).
 
 ## Tamamlanan görevler (new_modules.md)

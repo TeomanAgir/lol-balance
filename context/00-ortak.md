@@ -41,7 +41,7 @@ rating (OpenSkill blend50, ana + rol evreni) → web UI (framework'süz).
 - Kod yorumları/log'lar mevcut dosyanın diline uyar (çoğunlukla TR yorum, EN log).
 - Deterministiklik esastır: eşitlik kırılımları contract'ta tanımlanır; testler
   bit-bit eşitlik kanıtlayabilmelidir (replay == incremental gibi).
-- Test tabanları (2026-08-13): rating 145 · backend 122 · collector 254.
+- Test tabanları (2026-08-14): rating 145 · backend 122 · collector 285.
   Worker, taban sayıyı DÜŞÜRMEDEN teslim eder ve önce/sonra sayısını raporlar.
 
 ## E2E deseni (orkestratör koşar; worker'a bilgi)

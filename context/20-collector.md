@@ -13,7 +13,10 @@ Yazma izni: yalnız `collector/` (`packaging/.build_venv`, `raw_archive/`, `.env
 - `normalizer.py` — LCU ham → ingest_contract. ROL ÖNCELİĞİ (3 katman, spec:
   ingest_contract "Kurallar"): açık `selectedPosition` > `detectedTeamPosition` >
   `role_infer.py` kısıt zinciri (Smite→JUNGLE...; belirsizse null, ZORLANMAZ).
-  `played_at`: `endOfGameTimestamp` > captured_at.
+  `played_at`: `endOfGameTimestamp` > captured_at. `is_summoners_rift` — yalnız SR
+  custom'ları toplanır (gameMode CLASSIC ana sinyal, mapId!=11 ek eleme, alan
+  yoksa tolerans); `is_custom` ile aynı üç çağrı noktasında (canlı EOG, MH
+  fallback, backfill) uygulanır [Teoman, 2026-08-14].
 - `backfill_positions.py` — raw_archive'dan mevcut maçlara PUT /positions (aynı öncelik).
 - `sender.py` — gönderim + `outbox/` retry. `config.py` — `.env`; frozen'da
   (`is_frozen`/`app_dir`) tüm kalıcı yollar exe-bitişiği (PyInstaller `_MEIPASS` tuzağı!).
@@ -35,5 +38,5 @@ onefile → `dist/LoLBalanceCollector.exe` (~15MB). Exe repo'ya GİRMEZ; .env as
 exe'yle dağıtılmaz. Yeni collector özelliği merge edilince exe yeniden derlenip dağıtılır.
 
 ## Test
-254 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
+285 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
 dokunmadan, fake/fixture tabanlı.
