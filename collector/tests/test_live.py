@@ -97,6 +97,32 @@ def test_non_custom_skipped(config, eog_custom):
     assert (config.raw_archive_dir / "6874231955.json").is_file()
 
 
+def test_non_summoners_rift_custom_skipped(config, eog_custom):
+    """Custom ARAM (gameMode != CLASSIC) custom-olmayanlar gibi sessizce atlanır
+    (Teoman, 2026-08-13): gönderilmez ama arşivlenip işlenmiş sayılır."""
+    eog_custom["gameMode"] = "ARAM"
+    lcu = FakeLcu(eog=eog_custom)
+    sender, sent = capturing_sender(config)
+    runner = make_runner(config, lcu, sender)
+
+    assert runner.on_end_of_game() is False
+    assert sent == []
+    assert (config.raw_archive_dir / "6874231955.json").is_file()
+    # ikinci tetikte de gönderilmez (dedupe)
+    assert make_runner(config, lcu, sender).on_end_of_game() is False
+    assert sent == []
+
+
+def test_eog_without_game_mode_is_still_processed(config, eog_custom, champion_summary):
+    """Eski şema toleransı: `gameMode` alanı hiç yoksa maç ATLANMAZ."""
+    eog_custom.pop("gameMode")
+    lcu = FakeLcu(eog=eog_custom, champions=champion_summary)
+    sender, sent = capturing_sender(config)
+
+    assert make_runner(config, lcu, sender).on_end_of_game() is True
+    assert [p["source_game_id"] for p in sent] == ["6874231955"]
+
+
 def test_fallback_to_match_history(config, mh_game_custom, champion_summary):
     """EOG bloğu boş dönerse gameflow session'daki gameId ile match history'den alınır."""
     lcu = FakeLcu(
@@ -111,6 +137,54 @@ def test_fallback_to_match_history(config, mh_game_custom, champion_summary):
     assert runner.on_end_of_game() is True
     assert sent[0]["source_game_id"] == "6874231001"
     assert sent[0]["winner_team"] == 200
+
+
+def test_fallback_skips_non_summoners_rift(config, mh_game_custom, champion_summary):
+    """EOG fallback yolu (match-history kaydı) da SR filtresini uygular."""
+    mh_game_custom["gameMode"] = "URF"
+    mh_game_custom["mapId"] = 11  # mod SR olmasa da mapId 11 gelebilir: mod kazanır
+    lcu = FakeLcu(
+        eog={},
+        session={"gameData": {"gameId": 6874231001}},
+        games={6874231001: mh_game_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+
+    assert make_runner(config, lcu, sender).on_end_of_game() is False
+    assert sent == []
+    assert (config.raw_archive_dir / "6874231001.json").is_file()
+
+
+def test_fallback_skips_non_sr_map_id(config, mh_game_custom, champion_summary):
+    """Kemer-askı: gameMode CLASSIC ama mapId 11 değilse (ör. Twisted Treeline) atlanır."""
+    mh_game_custom["mapId"] = 12
+    lcu = FakeLcu(
+        eog={},
+        session={"gameData": {"gameId": 6874231001}},
+        games={6874231001: mh_game_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+
+    assert make_runner(config, lcu, sender).on_end_of_game() is False
+    assert sent == []
+
+
+def test_fallback_processes_summoners_rift_with_map_id(
+    config, mh_game_custom, champion_summary
+):
+    mh_game_custom["mapId"] = 11
+    lcu = FakeLcu(
+        eog={},
+        session={"gameData": {"gameId": 6874231001}},
+        games={6874231001: mh_game_custom},
+        champions=champion_summary,
+    )
+    sender, sent = capturing_sender(config)
+
+    assert make_runner(config, lcu, sender).on_end_of_game() is True
+    assert [p["source_game_id"] for p in sent] == ["6874231001"]
 
 
 def test_send_failure_goes_to_outbox(config, eog_custom, champion_summary):

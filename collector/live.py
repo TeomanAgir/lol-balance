@@ -2,7 +2,8 @@
 
 - Aynı maç için tek tetik: faz kenarı (EndOfGame'e GEÇİŞ) + gameId dedupe
   (bellek + raw_archive dosya varlığı, restart'a dayanıklı).
-- Canlı modda roster filtresi YOK; yalnızca custom olmayan maçlar atlanır.
+- Canlı modda roster filtresi YOK; yalnızca custom olmayan ve Sihirdar Vadisi
+  dışında oynanan (custom ARAM/URF vb.) maçlar atlanır.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from .normalizer import (
     NormalizeError,
     champion_map_from_summary,
     is_custom,
+    is_summoners_rift,
     normalize_eog,
     normalize_match_history_game,
 )
@@ -100,6 +102,11 @@ class LiveRunner:
                          game_id, eog.get("gameType"), eog.get("queueId"))
                 self._process(game_id, eog, None)
                 return False
+            if not is_summoners_rift(eog):
+                log.info("Not a Summoner's Rift game, skipping: %s (gameMode=%s, mapId=%s)",
+                         game_id, eog.get("gameMode"), eog.get("mapId"))
+                self._process(game_id, eog, None)
+                return False
             try:
                 payload = normalize_eog(eog, self._now(), self._get_champion_map())
             except NormalizeError as exc:
@@ -131,6 +138,11 @@ class LiveRunner:
             return False
         if not is_custom(game):
             log.info("Not a custom game (fallback), skipping: %s", game_id)
+            self._process(game_id, game, None)
+            return False
+        if not is_summoners_rift(game):
+            log.info("Not a Summoner's Rift game (fallback), skipping: %s (gameMode=%s, mapId=%s)",
+                     game_id, game.get("gameMode"), game.get("mapId"))
             self._process(game_id, game, None)
             return False
         try:

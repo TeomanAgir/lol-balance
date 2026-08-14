@@ -7,6 +7,7 @@ from collector.normalizer import (
     champion_map_from_summary,
     game_creation_datetime,
     is_custom,
+    is_summoners_rift,
     mh_identity_pairs,
     mh_is_remake,
     normalize_eog,
@@ -354,6 +355,48 @@ class TestIsCustom:
 
     def test_unknown_fields_not_custom(self):
         assert is_custom({}) is False
+
+
+class TestIsSummonersRift:
+    """Yalnız SR custom'ları toplanır (Teoman, 2026-08-13). Ana sinyal `gameMode`;
+    `mapId` varsa kemer-askı. `gameMode` yoksa maç ATLANMAZ (eski şema toleransı)."""
+
+    def test_classic_eog_is_summoners_rift(self, eog_custom):
+        # canlı EOG bloğunda mapId YOK, karar gameMode üzerinden verilir
+        assert "mapId" not in eog_custom
+        assert is_summoners_rift(eog_custom) is True
+
+    def test_match_history_record_with_map_id(self, mh_game_custom):
+        assert is_summoners_rift({**mh_game_custom, "mapId": 11}) is True
+
+    @pytest.mark.parametrize("mode", ["ARAM", "URF", "ONEFORALL", "NEXUSBLITZ", "CHERRY"])
+    def test_non_classic_modes_are_not_summoners_rift(self, mode):
+        assert is_summoners_rift({"gameType": "CUSTOM_GAME", "gameMode": mode}) is False
+
+    @pytest.mark.parametrize("mode", ["classic", " CLASSIC ", "Classic"])
+    def test_game_mode_is_case_and_whitespace_tolerant(self, mode):
+        assert is_summoners_rift({"gameMode": mode}) is True
+
+    def test_missing_game_mode_is_tolerated(self):
+        """Eski/eksik şema: alan yoksa maç atlanmaz (geriye dönük kayıt kaybı olmasın)."""
+        assert is_summoners_rift({}) is True
+        assert is_summoners_rift({"gameType": "CUSTOM_GAME"}) is True
+
+    @pytest.mark.parametrize("mode", ["", "   ", None, 11])
+    def test_empty_or_non_string_game_mode_is_tolerated(self, mode):
+        assert is_summoners_rift({"gameMode": mode}) is True
+
+    def test_non_sr_map_id_alone_is_enough(self):
+        """Twisted Treeline (mapId 10) / ARAM (12) de gameMode CLASSIC taşıyabilir."""
+        assert is_summoners_rift({"gameMode": "CLASSIC", "mapId": 12}) is False
+        assert is_summoners_rift({"gameMode": "CLASSIC", "mapId": "10"}) is False
+
+    def test_sr_map_id_with_missing_mode(self):
+        assert is_summoners_rift({"mapId": 11}) is True
+
+    def test_unreadable_map_id_falls_back_to_game_mode(self):
+        assert is_summoners_rift({"gameMode": "CLASSIC", "mapId": "sihirdar"}) is True
+        assert is_summoners_rift({"gameMode": "ARAM", "mapId": "sihirdar"}) is False
 
 
 class TestHelpers:

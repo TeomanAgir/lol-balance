@@ -1,5 +1,6 @@
 """Backfill modu: kendi hesabının match history'sini geriye tarar,
-custom + roster filtresinden geçen maçları normalize edip gönderir.
+custom + Sihirdar Vadisi + roster filtresinden geçen maçları normalize edip
+gönderir.
 
 Çift gönderim zararsızdır (backend `source_game_id` ile idempotent), bu yüzden
 daha önce gönderilmiş maçlar tekrar gönderilebilir.
@@ -28,6 +29,7 @@ from .normalizer import (
     champion_map_from_summary,
     game_creation_datetime,
     is_custom,
+    is_summoners_rift,
     mh_identity_pairs,
     mh_is_remake,
     normalize_match_history_game,
@@ -48,6 +50,7 @@ class BackfillStats:
     sent: int = 0
     skipped_roster: int = 0
     skipped_remake: int = 0
+    skipped_non_sr: int = 0  # custom ama Sihirdar Vadisi değil (ARAM/URF vb.)
     errors: list[str] = field(default_factory=list)
 
 
@@ -107,6 +110,11 @@ def run_backfill(
             if not is_custom(game_summary):
                 continue
             stats.customs += 1
+            if not is_summoners_rift(game_summary):
+                stats.skipped_non_sr += 1
+                log.info("Not a Summoner's Rift game, skipping: %s (gameMode=%s, mapId=%s)",
+                         game_id, game_summary.get("gameMode"), game_summary.get("mapId"))
+                continue
             try:
                 full = lcu.get_game(game_id)
             except Exception as exc:
@@ -148,8 +156,9 @@ def run_backfill(
 
     log.info(
         "Backfill finished: %d matches scanned, %d custom, %d sent, "
-        "%d blocked by roster filter, %d remakes skipped, %d errors",
+        "%d blocked by roster filter, %d remakes skipped, "
+        "%d non-Summoner's-Rift skipped, %d errors",
         stats.scanned, stats.customs, stats.sent, stats.skipped_roster,
-        stats.skipped_remake, len(stats.errors),
+        stats.skipped_remake, stats.skipped_non_sr, len(stats.errors),
     )
     return stats

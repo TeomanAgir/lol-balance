@@ -190,6 +190,44 @@ def is_custom(raw: dict[str, Any]) -> bool:
     return False
 
 
+#: Sihirdar Vadisi'nin harita kimliği (match-history kayıtlarında `mapId`).
+SUMMONERS_RIFT_MAP_ID = 11
+#: SR maçlarının oyun modu; ARAM/URF/One for All gibi modlar başka değer taşır.
+SUMMONERS_RIFT_GAME_MODE = "CLASSIC"
+
+
+def is_summoners_rift(raw: dict[str, Any]) -> bool:
+    """Maç Sihirdar Vadisi'nde mi oynandı? (Teoman, 2026-08-13 — davranışsal karar)
+
+    Yalnız SR custom'ları toplanır; custom ARAM/URF/One for All gibi maçlar
+    custom-olmayanlar gibi sessizce atlanır. `is_custom` ile AYNI çağrı
+    noktalarında uygulanır.
+
+    Sinyaller (gerçek veride doğrulandı):
+    - `gameMode`: ANA kontrol. Canlı EOG bloğunda `mapId` YOKTUR ama `gameMode`
+      vardır (bkz. `fixtures/eog_custom_real.json`).
+    - `mapId`: kemer-askı. Match-history kayıtlarında hem `gameMode` hem
+      `mapId: 11` gelir; SR dışı bir mapId tek başına elemeye yeter (Twisted
+      Treeline gibi eski haritalar da `gameMode: "CLASSIC"` taşırdı).
+
+    TOLERANS: `gameMode` alanı hiç yoksa (ve mapId de SR-dışını göstermiyorsa)
+    maç ATLANMAZ — eski/eksik şemalarda geriye dönük kayıt kaybı yaşanmasın
+    diye custom tespiti geçmiş maç işlenmeye devam eder.
+    """
+    game_mode = raw.get("gameMode")
+    if isinstance(game_mode, str) and game_mode.strip():
+        if game_mode.strip().upper() != SUMMONERS_RIFT_GAME_MODE:
+            return False
+    map_id = raw.get("mapId")
+    if map_id is not None:
+        try:
+            if int(map_id) != SUMMONERS_RIFT_MAP_ID:
+                return False
+        except (TypeError, ValueError):
+            pass  # okunamayan mapId sinyal sayılmaz; gameMode kararı geçerli kalır
+    return True
+
+
 def eog_end_datetime(raw: dict[str, Any]) -> Optional[datetime]:
     """EOG bloğundaki `endOfGameTimestamp` (epoch ms) → maçın gerçek bitiş anı.
 
