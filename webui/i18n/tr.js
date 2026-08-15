@@ -89,7 +89,7 @@ window.I18N_DICTS.tr = {
   "profile.kda_ratio": "{ratio} KDA",
   "profile.no_stat_matches": "İstatistikli maç yok",
   "profile.card_champion": "Favori karakter",
-  "profile.champ_line": "{n} maç · {pct} galibiyet",
+  "profile.champ_line": "{w} galibiyet · {n} maç",
   "profile.no_champion_data": "Şampiyon verisi yok",
   "profile.card_role": "Favori koridor",
   "profile.no_role_data": "Rol verisi yok",

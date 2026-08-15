@@ -124,10 +124,68 @@ def test_kda_ignores_statless_match(client):
 
 def test_favorite_champion_tie_breaks_alphabetically(client):
     ids = _known_scenario(client)
-    # Ahri 2 maç (1G/1M), Zed 2 maç (1G/1M) → eşitlik, alfabetik küçük: Ahri.
+    # Ahri 2 maç (1G/1M), Zed 2 maç (1G/1M) → galibiyet ve maç sayısı eşit;
+    # son kırılım alfabetik küçük: Ahri.
     assert _stats(client, ids["Ali"])["favorite_champion"] == {
-        "champion": "Ahri", "matches": 2, "winrate": 0.5
+        "champion": "Ahri", "matches": 2, "wins": 1, "winrate": 0.5
     }
+
+
+def _play(client, ids, seq, champion, won):
+    """Ali'yi verilen şampiyonla tek maça sokar (kadro sabit, sonuç parametrik)."""
+    return _ingest(
+        client, ids, f"g{seq}", f"2026-08-{seq:02d}T20:00:00Z",
+        TEN[:5], TEN[5:], winner_team=100 if won else 200,
+        overrides={"Ali": {"champion": champion}},
+    )
+
+
+def test_favorite_champion_prefers_most_wins_not_most_played(client):
+    # api_contract §2 [REVİZE 2026-08-15]: ölçüt galibiyet SAYISI.
+    # Ahri 4 maç / 1 galibiyet, Zed 2 maç / 2 galibiyet → Zed kazanır;
+    # ne maç sayısı ne de alfabetik sıra (Ahri < Zed) bunu geçemez.
+    ids = _make_players(client, TEN)
+    for seq, won in ((1, True), (2, False), (3, False), (4, False)):
+        _play(client, ids, seq, "Ahri", won)
+    for seq in (5, 6):
+        _play(client, ids, seq, "Zed", True)
+    assert _stats(client, ids["Ali"])["favorite_champion"] == {
+        "champion": "Zed", "matches": 2, "wins": 2, "winrate": 1.0
+    }
+
+
+def test_favorite_champion_win_tie_breaks_by_match_count(client):
+    # Galibiyet eşit (2-2) → maç sayısı çok olan: Zed (3 maç) Ahri'yi (2 maç)
+    # geçer; alfabetik kırılım ancak bu da eşitse devreye girer.
+    ids = _make_players(client, TEN)
+    for seq in (1, 2):
+        _play(client, ids, seq, "Ahri", True)
+    for seq, won in ((3, True), (4, True), (5, False)):
+        _play(client, ids, seq, "Zed", won)
+    assert _stats(client, ids["Ali"])["favorite_champion"] == {
+        "champion": "Zed", "matches": 3, "wins": 2, "winrate": 0.67
+    }
+
+
+def test_favorite_champion_without_any_win_uses_match_count(client):
+    # Hiç galibiyet yoksa (hepsi 0) aynı kırılım en çok oynanana düşer.
+    ids = _make_players(client, TEN)
+    _play(client, ids, 1, "Ahri", False)
+    for seq in (2, 3):
+        _play(client, ids, seq, "Zed", False)
+    assert _stats(client, ids["Ali"])["favorite_champion"] == {
+        "champion": "Zed", "matches": 2, "wins": 0, "winrate": 0.0
+    }
+
+
+def test_favorite_champion_exposes_wins_field(client):
+    # `wins` yanıtın alanıdır: winrate + matches'tan türetmeye gerek kalmaz.
+    ids = _make_players(client, TEN)
+    for seq, won in ((1, True), (2, True), (3, False)):
+        _play(client, ids, seq, "Ahri", won)
+    fc = _stats(client, ids["Ali"])["favorite_champion"]
+    assert fc["wins"] == 2
+    assert set(fc) == {"champion", "matches", "wins", "winrate"}
 
 
 def test_favorite_role_ignores_null_position(client):
@@ -221,7 +279,7 @@ def test_null_champion_and_position_excluded_from_favorites(client):
     )
     body = _stats(client, ids["Ali"])
     assert body["favorite_champion"] == {
-        "champion": "Yasuo", "matches": 1, "winrate": 0.0
+        "champion": "Yasuo", "matches": 1, "wins": 0, "winrate": 0.0
     }
     assert body["favorite_role"] == {"role": "UTILITY", "matches": 1}
 
@@ -293,7 +351,7 @@ def test_void_match_excluded_from_all_metrics(client):
         "kills_avg": 10.0, "deaths_avg": 2.0, "assists_avg": 5.0, "ratio": 7.5
     }
     assert after["favorite_champion"] == {
-        "champion": "Ahri", "matches": 1, "winrate": 1.0
+        "champion": "Ahri", "matches": 1, "wins": 1, "winrate": 1.0
     }
     assert after["favorite_role"] == {"role": "MIDDLE", "matches": 1}
     # Ortak maç 2'den 1'e düştü → sinerji eşiğinin (≥2) altına indi.

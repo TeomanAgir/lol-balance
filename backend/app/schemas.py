@@ -122,8 +122,11 @@ class StatsKdaOut(BaseModel):
 
 
 class FavoriteChampionOut(BaseModel):
+    # api_contract §2 [REVİZE 2026-08-15]: seçim ölçütü galibiyet SAYISI;
+    # `wins` bu yüzden yanıtta açıkça döner (winrate tek başına yetmez).
     champion: str
     matches: int
+    wins: int
     winrate: float
 
 

@@ -78,7 +78,12 @@ def _kda(rows: list[sqlite3.Row]) -> dict | None:
 
 
 def _favorite_champion(rows: list[sqlite3.Row]) -> dict | None:
-    """En çok oynanan şampiyon; eşitlikte ad alfabetik küçük olan.
+    """EN FAZLA MAÇ KAZANILAN şampiyon (api_contract §2, REVİZE 2026-08-15).
+
+    Ölçüt galibiyet SAYISIDIR, oran değil: az kazançlı ama çok oynanmış bir
+    şampiyon, daha çok kazanılmış olanı geçemez. Kırılım: galibiyet çok →
+    maç sayısı çok → ad alfabetik küçük. Hiç galibiyeti olmayan bir oyuncuda
+    aynı kırılım 0-kazançlılar arasından seçer (yani "en çok oynanan").
 
     champion NULL olan satırlar hariçtir; hiç kalmazsa None.
     """
@@ -94,11 +99,12 @@ def _favorite_champion(rows: list[sqlite3.Row]) -> dict | None:
     if not counts:
         return None
     champion, (matches, wins) = min(
-        counts.items(), key=lambda item: (-item[1][0], item[0])
+        counts.items(), key=lambda item: (-item[1][1], -item[1][0], item[0])
     )
     return {
         "champion": champion,
         "matches": matches,
+        "wins": wins,
         "winrate": _winrate(wins, matches),
     }
 

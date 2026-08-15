@@ -683,9 +683,11 @@
       statCard(t("profile.card_kda"),
         k ? `${num1(k.kills_avg)} / ${num1(k.deaths_avg)} / ${num1(k.assists_avg)}` : "—",
         k ? t("profile.kda_ratio", { ratio: num2(k.ratio) }) : t("profile.no_stat_matches")) +
+      // Favori karakter [REVİZE 2026-08-15]: seçim ölçütü galibiyet SAYISI →
+      // alt yazı da galibiyeti önde gösterir ("3 galibiyet · 4 mac").
       statCard(t("profile.card_champion"),
         fc ? esc(fc.champion) : "—",
-        fc ? t("profile.champ_line", { n: fc.matches, pct: pctText(fc.winrate) }) : t("profile.no_champion_data")) +
+        fc ? t("profile.champ_line", { w: fc.wins, n: fc.matches }) : t("profile.no_champion_data")) +
       statCard(t("profile.card_role"),
         fr ? esc(roleLabel(fr.role)) : "—",
         fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data")) +
