@@ -62,8 +62,12 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
   `matches: 0`, `winrate: null`).
 - `kda`: yalnız kills/deaths/assists ÜÇÜ DE null olmayan maçlardan; `*_avg` maç başına
   ortalama, `ratio = (ΣK + ΣA) / max(1, ΣD)`. Hiç statlı maç yoksa `kda: null`.
-- `favorite_champion`: champion null olanlar hariç en çok oynanan; eşitlikte ad alfabetik
-  küçük olan; `winrate` o şampiyonla oynanan maçlardaki W/L. Hiç yoksa `null`.
+- `favorite_champion` [REVİZE Teoman, 2026-08-15]: champion null olanlar hariç,
+  EN FAZLA MAÇ KAZANILAN şampiyon (galibiyet sayısı; oran değil). Kırılım: galibiyet
+  çok → o şampiyonla maç sayısı çok → ad alfabetik küçük. Yanıta `wins` alanı eklendi:
+  `{"champion": "Ahri", "matches": 4, "wins": 3, "winrate": 0.75}`. Hiç galibiyet yoksa
+  (tüm şampiyonlarda 0 kazanç) kural aynı kırılımla 0-kazançlılar arasından seçer;
+  hiç şampiyonlu maç yoksa `null`.
 - `favorite_role`: position null hariç en çok oynanan rol; eşitlikte kanonik sıra
   (TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY); hiç yoksa `null`.
 - `synergy`: AYNI TAKIMDA birlikte oynanan valid maçlar; en az 2 ortak maç; sıralama
