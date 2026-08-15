@@ -73,3 +73,14 @@ cd <repo kökü> && backend\.venv\Scripts\python -m pytest collector -q  # colle
 `collector/fixtures/` altındaki gerçek LCU kayıtları oyuncuların puuid ve Riot
 ID'lerini içerir. **Repo private kalmalıdır**; public yapılacaksa fixture'lar
 önce anonimleştirilmelidir.
+
+## Lisans
+
+Kaynağı açıktır ve [PolyForm Noncommercial License 1.0.0](LICENSE.md) ile lisanslıdır:
+projeyi her türlü **ticari olmayan** amaçla (kişisel kullanım, arkadaş grubu, eğitim,
+araştırma) kullanabilir, değiştirebilir ve paylaşabilirsiniz. Ticari kullanım yasaktır.
+
+*LoL Balance, Riot Games tarafından onaylanmamıştır. League of Legends ve Riot Games,
+Riot Games, Inc. şirketinin ticari markalarıdır. Şampiyon/eşya görselleri ve adları
+derleme sırasında Riot'un Data Dragon / CommunityDragon kaynaklarından indirilir ve
+Riot Games'in mülkiyetindedir — bu deponun lisansı kapsamında değildir.*
