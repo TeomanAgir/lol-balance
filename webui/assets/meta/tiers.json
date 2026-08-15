@@ -7,16 +7,16 @@
       "S": [
         "Nasus",
         "Garen",
-        "Malphite"
+        "Malphite",
+        "Sett",
+        "Teemo"
       ],
       "A": [
-        "Teemo",
-        "Sett",
-        "Singed",
         "Darius",
         "Aatrox",
-        "Mordekaiser",
         "Yone",
+        "Singed",
+        "Mordekaiser",
         "Gangplank"
       ],
       "B": [
@@ -27,7 +27,15 @@
         "Dr. Mundo",
         "Camille",
         "Jax",
-        "Yorick"
+        "Yorick",
+        "Tryndamere",
+        "Illaoi",
+        "Urgot",
+        "Pantheon",
+        "Warwick",
+        "Olaf",
+        "Vayne",
+        "Gwen"
       ]
     },
     "jungle": {
@@ -35,31 +43,41 @@
         "Wukong",
         "Nocturne",
         "Briar",
+        "Warwick",
         "Graves",
         "Kayn",
-        "Warwick",
         "Lee Sin",
-        "Shyvana"
+        "Shyvana",
+        "Jarvan IV",
+        "Rammus"
       ],
       "A": [
-        "Rammus",
-        "Sylas",
         "Lillia",
+        "Sylas",
         "Vi",
         "Viego",
         "Shaco",
+        "Sejuani",
         "Zac",
-        "Ekko"
+        "Ekko",
+        "Naafiri"
       ],
       "B": [
-        "Sejuani",
-        "Naafiri",
         "Amumu",
-        "Fiddlesticks",
         "Xin Zhao",
+        "Evelynn",
+        "Fiddlesticks",
         "Udyr",
         "Talon",
-        "Evelynn"
+        "Kha'Zix",
+        "Hecarim",
+        "Aatrox",
+        "Bel'Veth",
+        "Master Yi",
+        "Nunu & Willump",
+        "Zyra",
+        "Nasus",
+        "Elise"
       ]
     },
     "middle": {
@@ -77,7 +95,9 @@
         "Katarina",
         "Vex",
         "Veigar",
-        "Hwei"
+        "Hwei",
+        "Nasus",
+        "Twisted Fate"
       ],
       "B": [
         "Lux",
@@ -87,7 +107,13 @@
         "Ekko",
         "Akali",
         "Yasuo",
-        "Diana"
+        "Diana",
+        "Yone",
+        "Vladimir",
+        "LeBlanc",
+        "Galio",
+        "Zoe",
+        "Annie"
       ]
     },
     "bottom": {
@@ -103,50 +129,77 @@
         "Twitch",
         "Jhin",
         "Xerath",
+        "Veigar",
+        "Seraphine",
         "Zeri",
-        "Veigar"
+        "Ashe",
+        "Miss Fortune",
+        "Vayne"
       ],
       "B": [
         "Ziggs",
         "Yunara",
+        "Sivir",
         "Kog'Maw",
         "Lucian",
-        "Sivir",
         "Hwei",
         "Swain",
-        "Smolder"
+        "Smolder",
+        "Senna",
+        "Aphelios",
+        "Samira",
+        "Yasuo",
+        "Nilah",
+        "Vel'Koz",
+        "Syndra",
+        "Draven",
+        "Brand"
       ]
     },
     "utility": {
       "S": [
         "Thresh",
         "Leona",
-        "Lulu",
         "Nami",
+        "Lulu",
         "Nautilus",
-        "Seraphine",
         "Senna",
-        "Blitzcrank"
+        "Seraphine"
       ],
       "A": [
+        "Blitzcrank",
         "Milio",
         "Braum",
         "Janna",
         "Rell",
-        "Lux",
         "Soraka",
+        "Lux",
         "Rakan",
-        "Sona"
+        "Sona",
+        "Zilean",
+        "Morgana",
+        "Poppy",
+        "Alistar",
+        "Pyke",
+        "Karma"
       ],
       "B": [
         "Bard",
-        "Zyra",
         "Xerath",
+        "Zyra",
         "Pantheon",
         "Vel'Koz",
         "Taric",
         "Maokai",
-        "Brand"
+        "Brand",
+        "Tahm Kench",
+        "Galio",
+        "Yuumi",
+        "Swain",
+        "Shen",
+        "Amumu",
+        "Renata Glasc",
+        "Camille"
       ]
     }
   }
