@@ -1029,20 +1029,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
    Sütun renkleri PALETTEN TÜRETİLİR (yeni sabit renk yok): S pirinç, A takım
    mavisi, B nötr gri. Ton tek değişkende (--mt-tone) toplanır; başlık harfi,
    üst kenar çizgisi ve portre halkası aynı tonu okur. */
-.mt-entry { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
-.mt-link {
-  padding: 6px 2px;
-  min-height: 36px;
-  font-family: var(--display);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--brass);
-  white-space: nowrap;
-  transition: color 0.12s;
-}
-.mt-link:hover { color: var(--text); }
-
 .mt-head { display: flex; justify-content: flex-end; min-height: 16px; margin: -8px 0 6px; }
 .mt-patch {
   font-family: var(--display);
@@ -1112,7 +1098,21 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   color: var(--mt-tone);
 }
 .mt-count { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.mt-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+/* Kademe sütununun İÇİ de ızgaradır (GÖREV 17): şampiyonlar tek sıra inmek
+   yerine satır başına SIĞAN KADAR dizilir. Satır sayısı sabitlenmez, sütun
+   genişliğinden türer — auto-fill + 58px'lik en küçük hücre. Ana kapsayıcı
+   720px'de kapandığı için bir kademe sütununun içi en fazla ~209px olur ve
+   formül orada tam ÜÇE oturur (masaüstünde 3'lü satır); dar ekranda aynı
+   formül kendiliğinden 2'ye, sonra 1'e düşer → hiçbir genişlikte taşma yok.
+   En küçük hücre (58px) portreden (≥560px'te 56px) büyük seçildi: hücre
+   portreyi her zaman kapsar, ad ise overflow-wrap ile sarar. */
+.mt-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 12px 6px;
+  align-items: start;
+}
 .mt-champ { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
 /* Portre kutusunun ÖLÇÜSÜNÜ kapsayıcı verir (dd- sözleşmesi); halka sütun
    tonundadır, böylece süzgeç değişse de kademe gözle ayrılır. */
@@ -1147,13 +1147,17 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   .mt-fico { --pos-ico: 18px; }
   .mt-cols { gap: 6px; }
   .mt-col { padding: 8px 4px 10px; }
+  .mt-list { gap: 10px 4px; }
   .mt-portrait { width: 38px; height: 38px; }
 }
 @media (min-width: 560px) {
   .mt-cols { gap: 12px; }
+  .mt-list { gap: 14px 8px; }
   .mt-portrait { width: 56px; height: 56px; }
-  .mt-name { font-size: 13px; }
-  .mt-role { --pos-ico: 15px; }
+  /* Ad ve rol rozeti bilerek BÜYÜTÜLMEZ (eski 13px / 15px kaldırıldı): sütun
+     içi artık 3'lü ızgara olduğu için hücre ~62px'tir. 11px'te ölçülen 98 adın
+     hiçbiri sarmıyor; 13px'te "Mordekaiser"/"Fiddlesticks" kelime ortasından
+     bölünüyordu. Rozet de 13px'te kalınca dört rollü şampiyon tek satırda. */
 }
 
 /* ── Maç geçmişi ── */
@@ -1885,15 +1889,23 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 10;
 }
-/* 5 sekme dar telefonda da tek satırda kalmalı: etiketler kısa tutuldu, ölçek
-   14px yerine 12px'e indirildi, en dar ekranlarda 11px'e düşer. */
+/* 6 sekme (GÖREV 17: META artık kendi sekmesi) 320px'de bile TEK SATIRDA ve
+   KIRPILMADAN durmalı. Çözüm etiketi kısaltmak DEĞİL (kısaltma i18n borcudur),
+   tipografiyi sekme genişliğine BAĞLAMAKTIR: bir sekme her zaman 100vw/6 ≈
+   16.67vw olduğundan punto da vw'den türetilir ve clamp ile 9.5px…12px arasına
+   kapatılır — basamaklı media query yerine sürekli ölçek, aradaki her genişlikte
+   de doğru. Yatay dolgu ve harf aralığı ölçekle birlikte kapanır; en dar
+   ekranda kazanılan ~3px, en uzun etiketin ("SIRALAMA" / "BALANCE") payıdır.
+   Alt sınır 9.5px, GÖVDE FONTU İÇİN seçildi: Bahnschrift yalnız Windows'ta
+   var, telefonda system-ui'ye düşülür ve ölçüler ~%10 genişler — sınır dar
+   fontla değil, o geniş halle doğrulandı. Ölçümler README'de. */
 .tab {
   flex: 1;
   min-width: 0;
   min-height: 56px;
   padding: 0 2px;
   font-family: var(--display);
-  font-size: 12px;
+  font-size: clamp(9.5px, 2.8vw, 12px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1902,7 +1914,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   border-top: 2px solid transparent;
 }
 .tab.active { color: var(--brass); border-top-color: var(--brass); }
-@media (max-width: 400px) { .tab { font-size: 11px; letter-spacing: 0.01em; } }
+@media (max-width: 460px) { .tab { padding: 0 1px; letter-spacing: 0.01em; } }
+@media (max-width: 360px) { .tab { padding: 0; letter-spacing: 0; } }
 
 /* ── Modal ── */
 .modal-backdrop {

@@ -24,7 +24,6 @@
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     meta: null,                 // assets/meta/tiers.json içeriği (GÖREV 16; null = henüz çekilmedi)
     metaFilter: "ALL",          // META süzgeci: "ALL" | ROLES elemanı
-    metaFrom: "highlights",     // meta hangi görünümden açıldı (şimdilik tek giriş: enler)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
     matches: [],                // son GET /matches yanıtı (GÖREV 10: grafikten detaya atlarken önbellek)
@@ -314,8 +313,8 @@
   // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
   // profile → profileFrom olarak çözülür.
   // Collector sağlığı (GÖREV 13) TEK yerden açılır (Manuel) → sabit eşleme.
-  // META (GÖREV 16) da tek yerden açılır (Enler) ama alan üzerinden çözülür:
-  // ileride ikinci bir giriş eklenirse eşleme değişmesin.
+  // META (GÖREV 16) burada YOKTUR: GÖREV 17 ile kendi sekmesine taşındı
+  // (Teoman kararı) → normal sekme gibi çözülür, geri düğmesi yoktur.
   //
   // Zincir artık ÇİFT YÖNLÜ olabilir (GÖREV 15: maç detayı satırındaki addan
   // profile) → profile→matchdetail→profile sonsuz özyinelemeye girerdi. Bu yüzden
@@ -327,7 +326,6 @@
     map: () => state.mapFrom,
     matchdetail: () => state.matchFrom,
     health: () => "manual",
-    meta: () => state.metaFrom,
   };
   function tabOf(name, seen) {
     seen = seen || new Set();
@@ -1585,7 +1583,6 @@
   // Yükleyici hiç THROW ETMEZ: veri bir uç değil statik dosyadır, hata bu
   // görünümün içinde yazılı durur (toast'a gerek yok, sağlık ekranı deseni).
   async function loadMeta() {
-    $("#btn-meta-back").textContent = backLabel(state.metaFrom);
     const box = $("#meta-body");
     box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     $("#meta-filters").hidden = true;
@@ -1603,15 +1600,6 @@
     state.meta = res.data;
     renderMeta();
   }
-
-  function openMeta() {
-    if (currentView !== "meta") {
-      state.metaFrom = BACK_VIEWS.indexOf(currentView) === -1 ? "highlights" : currentView;
-    }
-    showView("meta");
-  }
-  $("#btn-meta-open").addEventListener("click", openMeta);
-  $("#btn-meta-back").addEventListener("click", () => showView(state.metaFrom));
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   // Kart satırındaki şampiyon portresi (GÖREV 14 uzantısı): kartlar arasında

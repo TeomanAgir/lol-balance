@@ -60,7 +60,8 @@
   <!-- ═══ Leaderboard ═══ -->
   <section id="view-leaderboard" class="view" hidden>
     <p class="view-hint" data-i18n="leaderboard.hint"></p>
-    <!-- Harita (GÖREV 4) girişi: alt çubuk 320px'de 6. sekmeyi kaldırmıyor -->
+    <!-- Harita (GÖREV 4) girişi: harita sekme DEĞİL, buradan açılan detay görünümü
+         (alt çubuk GÖREV 17 ile 6 sekmeye doldu) -->
     <div class="map-entry"><button id="btn-map-from-board" class="map-link" type="button"
         data-i18n="leaderboard.map_link"></button></div>
     <table class="board">
@@ -77,12 +78,6 @@
   <!-- ═══ Haftanın enleri (GÖREV 2) ═══ -->
   <section id="view-highlights" class="view" hidden>
     <p class="view-hint" data-i18n="highlights.hint"></p>
-    <!-- META (GÖREV 16) girişi: alt çubuk 320px'de 6. sekmeyi kaldırmıyor (ölçüm
-         README'de) → harita/sağlık deseniyle "detay" görünümü olarak açılır.
-         Giriş bilerek STATİK düğümdür: Enler gövdesi hata durumunda tamamen
-         yeniden yazılıyor, giriş orada olsaydı /highlights düşünce kaybolurdu. -->
-    <div class="mt-entry"><button id="btn-meta-open" class="mt-link" type="button"
-        data-i18n="highlights.meta_link"></button></div>
     <div id="highlights-body" aria-live="polite"></div>
   </section>
 
@@ -180,13 +175,13 @@
     <p class="rift-note" data-i18n="map.note"></p>
   </section>
 
-  <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — sekme değil, Enler'den açılan detay görünümü ═══ -->
+  <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — kendi alt çubuk sekmesi (GÖREV 17) ═══ -->
   <!-- Veri backend'den DEĞİL, statik dosyadan gelir: assets/meta/tiers.json
        (api_contract §8 "Meta tier verisi"). Süzgeç düğmeleri ve sütunlar app.js'te
-       kurulur; dosya yoksa/bozuksa yalnız bu görünüm hata metni gösterir. -->
+       kurulur; dosya yoksa/bozuksa yalnız bu görünüm hata metni gösterir.
+       Normal sekme olduğu için geri düğmesi YOKTUR (Teoman kararı: üzerine başka
+       modüller bineceği için Enler'in altındaki detay girişi kaldırıldı). -->
   <section id="view-meta" class="view" hidden>
-    <!-- Geri düğmesi metnini loadMeta() yazar (geldiği görünüme göre) -->
-    <button id="btn-meta-back" class="back-btn" type="button"></button>
     <!-- İçerik JS'te kurulur: renderMeta() → "Patch 16.16 · 15 Ağu" -->
     <div class="mt-head"><span id="meta-patch" class="mt-patch"></span></div>
     <p class="view-hint" data-i18n="meta.hint"></p>
@@ -264,6 +259,7 @@
   <button class="tab"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
   <button class="tab"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
   <button class="tab"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
+  <button class="tab"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
   <button class="tab"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
 </nav>
 
