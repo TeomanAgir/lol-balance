@@ -3,3 +3,6 @@ packaging/.build_venv/
 packaging/build/
 packaging/dist/
 packaging/*.spec.bak
+
+# GÖREV 16 — konsolsuz exe çökerse buraya yığın izi düşer (teşhis dosyası)
+collector-error.log

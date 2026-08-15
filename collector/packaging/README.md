@@ -1,7 +1,12 @@
-# Collector paketleme — tek `.exe` (GÖREV 5)
+# Collector paketleme — tek `.exe` (GÖREV 5, GÖREV 16)
 
-Arkadaş PC'lerinde Python/derleme gerektirmeden çalışan tek dosyalık bir konsol
-uygulaması üretir: **`LoLBalanceCollector.exe`** (PyInstaller onefile).
+Arkadaş PC'lerinde Python/derleme gerektirmeden çalışan tek dosyalık bir **pencere**
+uygulaması üretir: **`LoLBalanceCollector.exe`** (PyInstaller onefile + `--windowed`).
+
+> **GÖREV 16'dan beri exe `--windowed` derlenir** (`collector.spec` → `console=False`):
+> çift tıklayan kullanıcı siyah konsol yerine tkinter penceresini görür, log
+> pencerenin içindedir. Ayar `spec` dosyasındadır — `build.bat`'a `--windowed`
+> eklenmez.
 
 ---
 
@@ -56,13 +61,30 @@ sabitlenmiştir (`collector/tests/test_packaging.py`).
 1. `LoLBalanceCollector.exe`'yi **kendine ait bir klasöre** koy
    (ör. `C:\LoLBalance\`) — program ayarlarını ve maç arşivini bu klasöre yazar.
    Masaüstüne ya da İndirilenler'e bırakma.
-2. Çift tıkla. İlk açılışta üç şey sorar:
-   - **Backend adresi** → Enter'a bas (varsayılan doğru adres).
-   - **API anahtarı** → Teoman'ın verdiği anahtarı yapıştır (sağ tık = yapıştır).
-   - **LoL klasörü** → otomatik bulunur, doğruysa Enter'a bas.
+2. Çift tıkla — program penceresi açılır. İlk açılışta küçük kutularla sorar:
+   - **Dil** → `tr` ya da `en`.
+   - **Backend adresi** → boş bırakıp Tamam'a bas (varsayılan doğru adres).
+   - **API anahtarı** → Teoman'ın verdiği anahtarı yapıştır (Ctrl+V).
+   - **LoL klasörü** → otomatik bulunur, doğruysa **Evet**.
+   - **Cihaz adı** → boş bırakırsan bilgisayarının adı kullanılır.
    Windows "Bilgisayarınız korundu" uyarısı verirse: **Ek bilgi → Yine de çalıştır**.
-3. Pencereyi açık bırak ve custom maçları oyna. Maç biter bitmez otomatik gönderilir.
-   Durdurmak için Ctrl+C ya da pencereyi kapat. Oyun akşamı başında tekrar aç.
+3. **Canlı Başlat**'a bas ve custom maçları oyna. Maç biter bitmez otomatik
+   gönderilir; olan biten pencerenin içindeki log alanında akar. Durdurmak için
+   **Canlı Durdur** ya da pencereyi kapat. Oyun akşamı başında tekrar aç.
+
+Penceredeki diğer düğmeler:
+
+| Düğme | Ne yapar |
+|---|---|
+| **Maçları Tara** | LoL client açıkken maç geçmişini geriye tarar (`--backfill` ile aynı) |
+| **Eşyaları Doldur** | Önce dry-run listeler, "Uygula" dersen eski maçların eşyalarını yükler |
+| **Rolleri Doldur** | Aynı dry-run→uygula deseni, roller için |
+| **Ayarlar** | Kurulum sihirbazını yeniden çalıştırır (`--setup` ile aynı) |
+
+Yeni bir sürüm çıkmışsa pencerenin üstünde **sarı bir bant** belirir; "İndir"
+düğmesi indirme sayfasını tarayıcıda açar (indirme otomatik DEĞİLDİR — yeni exe'yi
+indirip eskisinin üzerine kopyalarsın, ayarların ve arşivin klasörde kalır).
+İnternet yoksa bant hiç görünmez, program normal çalışır.
 
 Program LoL client'ine bağlanır bağlanmaz **son 14 günü otomatik tarar** ve sen
 kapalıyken oynanmış custom maçları gönderir ("Yetişiliyor: ..."), sonra canlı moda
@@ -80,20 +102,27 @@ Türkçe yazar (`API anahtarı REDDEDİLDİ`, `Backend'e ULAŞILAMADI` gibi).
 |---|---|
 | Yanlış anahtar/adres girdim | Exe'yi `--setup` ile çalıştır ya da yanındaki `.env`'i düzenle |
 | Programı kapalıyken maç oynadım | Maçlar kaçmaz: exe açılışta son 14 günü kendi tarar; daha eskisi için `--backfill` |
-| Rolleri sonradan düzeltmek | `backfill-positions` (kontrol için `--dry-run` ekle) |
-| Eski maçlarda eşyalar görünmüyor | `backfill-items` — arşivdeki maçların eşya envanterlerini yükler (kontrol için `--dry-run`) |
-| Pencere hemen kapanıyor | Kapanmaz; hata olsa bile "Kapatmak için Enter'a bas" der |
+| Rolleri sonradan düzeltmek | Penceredeki **Rolleri Doldur** (ya da `backfill-positions --dry-run`) |
+| Eski maçlarda eşyalar görünmüyor | Penceredeki **Eşyaları Doldur** (ya da `backfill-items --dry-run`) |
+| Pencere hiç açılmıyor | Klasördeki `.env` bozulmuş olabilir; komut isteminden `LoLBalanceCollector.exe --setup` |
 
 Argümanlı çalıştırmak için klasörde bir komut istemi aç:
 
 ```
 LoLBalanceCollector.exe --help
 LoLBalanceCollector.exe --setup
+LoLBalanceCollector.exe --console                       (pencere yerine konsol canlı mod)
 LoLBalanceCollector.exe --backfill --since 2026-08-01
 LoLBalanceCollector.exe backfill --since 2026-08-01     (aynısı, tiresiz)
 LoLBalanceCollector.exe backfill-positions --dry-run
 LoLBalanceCollector.exe backfill-items --dry-run
 ```
+
+> **`--windowed` uyarısı:** exe konsolsuz derlendiği için CLI komutları **çalışır
+> ama çıktıları görünmez** (`--help` dahil; Windows windowed exe'yi konsola
+> bağlamaz). İş yapılır, log'lar yalnız pencereye/dosyaya gider. Çıktıyı görmek
+> gerekiyorsa kaynaktan `py -m collector ...` koş; günlük kullanımda pencere
+> zaten aynı işleri düğmelerle sunar.
 
 Aynı maç iki kez gönderilse bile backend'de tek kayıt olur (idempotent), bu yüzden
 backfill'i istediğin kadar tekrarlayabilirsin.

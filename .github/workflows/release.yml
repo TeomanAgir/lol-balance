@@ -1,0 +1,45 @@
+# GÖREV 16 Faz A: collector exe'sini etiketle yayınla (Teoman kararı: CI release).
+# Kullanım: sürümü collector/__init__.py'de yükselt, commit'le, sonra:
+#   git tag v0.3.0 && git push origin v0.3.0
+# Bu workflow Windows'ta build.bat'i koşturur (kendi venv'i + collector testleri
+# dahil) ve exe'yi GitHub Release'e ekler. Arkadaşların indirme adresi sabittir:
+#   https://github.com/TeomanAgir/lol-balance/releases/latest
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Exe derle (build.bat — testler dahil)
+        shell: cmd
+        run: collector\packaging\build.bat
+
+      - name: Surum tutarliligi (etiket == collector.__version__)
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $ver = (Select-String -Path collector/__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
+          if ($tag -ne $ver) { Write-Error "Etiket v$tag ama collector.__version__ = $ver — once surumu yukselt."; exit 1 }
+
+      - name: Release olustur ve exe'yi ekle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "collector/packaging/dist/LoLBalanceCollector.exe" `
+            --title "Collector ${{ github.ref_name }}" `
+            --generate-notes

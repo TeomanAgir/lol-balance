@@ -395,6 +395,7 @@ def test_cli_banner_shows_item_backfill_mode(config, monkeypatch, capsys):
 def test_backfill_items_does_not_disturb_positional_backfill_alias(config, monkeypatch):
     """`backfill` pozisyonel komutu eşya moduna kaymaz (regresyon)."""
     from collector import __main__ as cli
+    from collector import commands
 
     called = {}
     monkeypatch.setattr(cli, "load_config", lambda: config)
@@ -404,7 +405,7 @@ def test_backfill_items_does_not_disturb_positional_backfill_alias(config, monke
         cli, "run_items_backfill",
         lambda cfg, *, dry_run: called.setdefault("items", True),
     )
-    monkeypatch.setattr(cli, "read_lockfile", lambda lol_dir: (_ for _ in ()).throw(
+    monkeypatch.setattr(commands, "read_lockfile", lambda lol_dir: (_ for _ in ()).throw(
         cli.LockfileNotFound("yok")
     ))
 
