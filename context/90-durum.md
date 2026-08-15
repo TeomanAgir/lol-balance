@@ -1,6 +1,6 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-08-13 (orkestratör)
+Son güncelleme: 2026-08-15 (orkestratör)
 
 ## Canlı sistem
 - https://lol.teomanagir.com — K8s/VPS, TLS, günlük yedek. 18+ maç, 14+ oyuncu
@@ -27,16 +27,28 @@ salt-okur türetilmiş; profilde pb- vitrini) · 13 collector sağlık paneli
 (heartbeat + CLIENT_ID + migration 0004; webui ch- görünümü Manuel'den girişli) ·
 14 eşya build'leri (BUILD sekmesi + Data Dragon build-time vendoring
 `deploy/fetch_ddragon.py` sürüm 16.16.1 + migration 0005 + backfill-items +
-profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları).
+profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları) ·
+15 boş slot hatası (global .empty tuzağı, 4. kurban) · 16 Collector Remaster
+(tkinter arayüz `gui.py`/`commands.py`/`updates.py`, sürüm 0.3.0, CI release
+`release.yml`: v* etiketi → exe GitHub Release'e; güncelleme bildirimi bant+link).
+
+## 2026-08-14/15 diğer işler
+- META sekmesi (M1 tasarımı; `webui/assets/meta/tiers.json` + `deploy/fetch_meta.py`
+  OP.GG'den yarı otomatik, --write onaylı; alt çubuk 6 sekme, vw-tabanlı punto).
+- Geçmiş + maç detayında resmî rol ikonları (`pos-ico`, CommunityDragon vendored);
+  Geçmiş kartlarında şampiyon portreleri; maç detayında ada tık → profil
+  (backStack geri zinciri); trinket 7. slota sabit; favori karakter = en çok
+  KAZANILAN (wins alanı); display_name XSS kaçışlaması (12 nokta, tam denetim).
+- backfill-items canlıya koşuldu (15 maç/150 envanter); HANDOFF/ORCHESTRATION
+  docs/ altına taşındı (CLAUDE.md kökte).
 
 ## Açık not
-- GÖREV 13+14 canlıda TAM etkinleşmek için exe yeniden derleme + dağıtım bekliyor
-  (heartbeat/kimlik/items yeni exe'de; sürüm 0.2.0'a yükseltildi). Dağıtım sonrası
-  Teoman kendi PC'sinde `backfill-items` (önce --dry-run) koşarsa eski maçların
-  build'leri dolar; arkadaşlar da arşivlerinden koşturabilir.
-- Data Dragon patch güncellemesi: `deploy/fetch_ddragon.py` içindeki
-  DDRAGON_VERSION değiştir + redeploy (api_contract §8).
-- new_modules.md'de kodlanacak açık görev kalmadı (IMPOSSIBLE uzak vizyon).
+- İLK RELEASE bekleniyor: `git tag v0.3.0 && git push origin v0.3.0` → CI exe'yi
+  Release'e ekler; arkadaşlara releases/latest linki gönderilir (GÖREV 13+14+16
+  tek dağıtımda; sonraki sürümlerde pencere kendisi haber verir).
+- Data Dragon patch güncellemesi: `deploy/fetch_ddragon.py` DDRAGON_VERSION +
+  redeploy; META verisi: `deploy/fetch_meta.py` → fark → `--write` → commit.
+- new_modules.md'de bekleyen: GÖREV 17 (sinerji formülü — tartışma aşamasında).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler
