@@ -87,7 +87,7 @@ window.I18N_DICTS.en = {
   "profile.kda_ratio": "{ratio} KDA",
   "profile.no_stat_matches": "No matches with stats",
   "profile.card_champion": "Favorite champion",
-  "profile.champ_line": "{n} matches · {pct} win rate",
+  "profile.champ_line": "{w} wins · {n} matches",
   "profile.no_champion_data": "No champion data",
   "profile.card_role": "Favorite lane",
   "profile.no_role_data": "No role data",

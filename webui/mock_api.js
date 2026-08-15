@@ -314,7 +314,10 @@
       };
     }
 
-    // favorite_champion: champion null hariç en çok oynanan; eşitlikte ad alfabetik küçük.
+    // favorite_champion [REVİZE 2026-08-15]: champion null hariç EN FAZLA MAÇ
+    // KAZANILAN şampiyon (galibiyet sayısı, oran değil); kırılım galibiyet çok →
+    // maç sayısı çok → ad alfabetik küçük. Hiç galibiyet yoksa kural kendiliğinden
+    // en çok oynanana düşer.
     const champs = new Map();
     for (const { m, part } of mine) {
       if (!part.champion) continue;
@@ -324,9 +327,13 @@
       champs.set(part.champion, c);
     }
     const favC = [...champs.values()]
-      .sort((a, b) => b.matches - a.matches || a.champion.localeCompare(b.champion))[0];
+      .sort((a, b) => b.wins - a.wins || b.matches - a.matches ||
+                      a.champion.localeCompare(b.champion))[0];
     const favorite_champion = favC
-      ? { champion: favC.champion, matches: favC.matches, winrate: +(favC.wins / favC.matches).toFixed(3) }
+      ? {
+          champion: favC.champion, matches: favC.matches, wins: favC.wins,
+          winrate: +(favC.wins / favC.matches).toFixed(3),
+        }
       : null;
 
     // favorite_role: position null hariç en çok oynanan; eşitlikte kanonik rol sırası.
