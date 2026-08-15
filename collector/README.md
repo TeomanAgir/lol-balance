@@ -53,12 +53,52 @@ anahtar/adres ilk saniyede Türkçe raporlanır (program bu yüzden durmaz).
 
 ## Çalıştırma
 
-### Canlı mod
+### Arayüz (argümansız — GÖREV 16)
 
 ```powershell
 cd lol-balance
-py -m collector
+py -m collector          # exe: çift tıklama
 ```
+
+Argümansız çalıştırma **tkinter penceresini** açar (sıfır ek bağımlılık). Pencerede:
+
+- **Durum bandı** — bağlantı/canlı durum (`LoL client bekleniyor`, `canlı — maç
+  bekleniyor`, `bağlantı koptu, yeniden bağlanılıyor` ...) ve son işlenen maç.
+- **Gömülü log alanı** — normalde terminale düşen tüm log satırları pencerenin
+  içinde akar (logging handler → thread-safe kuyruk → Text widget). En eski
+  satırlar 1500'ü aşınca kırpılır.
+- **Düğmeler** — `Canlı Başlat/Durdur` · `Maçları Tara` (backfill) · `Eşyaları
+  Doldur` · `Rolleri Doldur` · `Ayarlar`. Eşya/rol düğmeleri **önce dry-run**
+  koşar, özeti gösterir ve yalnızca "Uygula" onayıyla gerçeğini koşar.
+- **Sarı güncelleme bandı** — açılışta GitHub Releases'e tek bir istek atılır;
+  yeni sürüm varsa "Yeni sürüm X.Y.Z — İndir" görünür ve düğme
+  `https://github.com/TeomanAgir/lol-balance/releases/latest` adresini tarayıcıda
+  açar. Erişilemezse (internet yok, GitHub 403 ...) **sessizce geçilir**;
+  güncelleme kontrolü hiçbir koşulda programı etkilemez. Otomatik güncelleme
+  YOKTUR (bilinçli: GÖREV 16 kararı, v2'ye ertelendi).
+
+Aynı anda tek iş çalışır: bir iş sürerken diğer düğmeler kilitlenir (canlı mod
+kendi düğmesini "Durdur" olarak açık tutar). İşler arka plan thread'indedir,
+pencere donmaz; çalışan iş varken pencere kapatılmak istenirse onay sorulur.
+
+İlk açılışta `.env` yoksa kurulum sihirbazı **tkinter diyaloglarıyla** koşar —
+soru akışı, doğrulamalar ve `.env` yazımı konsol sihirbazıyla **aynı koddur**
+(`wizard.run_wizard`, yalnız G/Ç uçları değişir).
+
+> tkinter bulunamazsa (kaynaktan koşan minimal Python kurulumu) pencere yerine
+> konsol canlı moduna düşülür ve bu durum ekrana yazılır.
+
+### Canlı mod (konsol)
+
+```powershell
+cd lol-balance
+py -m collector --console
+```
+
+`--console`, GÖREV 16 öncesindeki argümansız davranışın **birebir aynısıdır**
+(pencere açılmaz, log terminale akar, Ctrl+C ile durur). Tüm diğer CLI komutları
+(`backfill`, `backfill-positions`, `backfill-items`, `--setup`, `--dry-run`,
+`--since`) da değişmeden terminalden çalışır.
 
 - `gameflow-phase`'i poll'lar; `EndOfGame` fazına **geçişte** bir kez tetiklenir
   (aynı maç için gameId ile dedupe — restart'a dayanıklı, `raw_archive/` üzerinden).

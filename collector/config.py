@@ -19,6 +19,9 @@ from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 
+#: Zorunlu ayarlar: hiçbiri yoksa (ne `.env` ne ortam değişkeni) sihirbaz çalışır.
+REQUIRED_ENV_KEYS = ("LOL_DIR", "BACKEND_URL", "API_KEY")
+
 #: Cihaz kimliği üst sınırı (docs/api_contract.md §6, docs/ingest_contract.md "client_id").
 CLIENT_ID_MAX_LEN = 64
 
@@ -120,7 +123,7 @@ def load_config(env_file: Path | None = None) -> Config:
             break
     merged = {**file_env, **os.environ}
 
-    missing = [k for k in ("LOL_DIR", "BACKEND_URL", "API_KEY") if not merged.get(k)]
+    missing = [k for k in REQUIRED_ENV_KEYS if not merged.get(k)]
     if missing:
         # Geç import: i18n bu modülden find_env_file/_load_env_file alır (döngü kırılır).
         from .i18n import msg

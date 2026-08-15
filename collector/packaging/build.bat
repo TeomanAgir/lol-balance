@@ -4,6 +4,9 @@ REM  LoL Balance Collector — tek .exe derleme (GOREV 5)
 REM  Kullanim:  collector\packaging\build.bat
 REM  Cikti:     collector\packaging\dist\LoLBalanceCollector.exe
 REM  Not: build venv'i AYRIDIR; backend\.venv'e PyInstaller kurulmaz.
+REM  GOREV 16: exe --windowed derlenir (konsol penceresi YOK, arayuz acilir).
+REM  Bu ayar collector.spec icindedir (console=False) — komut satirinda
+REM  --windowed VERILMEZ, spec dosyasi otoritedir.
 REM ===================================================================
 setlocal enabledelayedexpansion
 

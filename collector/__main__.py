@@ -1,18 +1,27 @@
 """CLI girişi.
 
-Canlı mod:    python -m collector            (exe: çift tıklama)
+Arayüz:       python -m collector            (exe: çift tıklama → tkinter penceresi)
+Konsol canlı: python -m collector --console  (arayüzsüz eski canlı mod)
 Backfill:     python -m collector --backfill [--since YYYY-MM-DD]
               python -m collector backfill  [--since YYYY-MM-DD]   (aynısı)
 Rol backfill: python -m collector backfill-positions [--dry-run]
 Eşya backfill:python -m collector backfill-items [--dry-run]
 Kurulum:      python -m collector --setup    (.env'i yeniden oluşturur)
 
+GÖREV 16 Faz C: ARGÜMANSIZ çalıştırma arayüzü açar (`gui.py`); argümanlı her
+komut eskisi gibi terminalden çalışır. tkinter bulunamazsa (kaynaktan koşan
+minimal Python) sessizce eski konsol canlı moduna düşülür.
+
 Canlı mod, LCU'ya her bağlandığında canlı döngüden ÖNCE sınırlı bir "oto-yetişme"
 backfill'i koşar (son `CATCHUP_DAYS` gün, varsayılan 14, `0` = kapalı) — böylece
-collector kapalıyken oynanan custom'lar da toplanır (bkz. catchup.py).
+collector kapalıyken oynanan custom'lar da toplanır (bkz. catchup.py). Canlı
+döngü ve LCU'lu backfill mantığı `commands.py`'dedir: arayüz aynı fonksiyonları
+çağırır, kopya yoktur.
 
 Paketlenmiş exe'de (`sys.frozen`) tüm kalıcı dosyalar exe'nin yanındadır ve
-`.env` yoksa ilk açılış sihirbazı çalışır (bkz. wizard.py).
+`.env` yoksa ilk açılış sihirbazı çalışır (bkz. wizard.py). Exe `--windowed`
+derlenir: konsol YOKTUR, `sys.stdout`/`stdin` `None` olabilir — `print()` bu
+durumda sessizdir, `input()` ise ÇAĞRILMAZ (bkz. `_pause_if_frozen`).
 """
 
 from __future__ import annotations
@@ -21,29 +30,23 @@ import argparse
 import logging
 import os
 import sys
-import time
 import traceback
 from datetime import date
 
 from . import __version__, i18n
-from .backfill import run_backfill
 from .backfill_items import run_items_backfill
 from .backfill_positions import run_position_backfill
-from .catchup import run_catchup
-from .config import app_dir, find_env_file, is_frozen, load_config
+from .commands import run_backfill_command, run_live_command
+from .config import REQUIRED_ENV_KEYS, app_dir, find_env_file, is_frozen, load_config
 from .i18n import msg
-from .lcu import HttpLcuClient
-from .live import LcuConnectionLost, LiveRunner
-from .lockfile import LockfileNotFound, read_lockfile
+from .lockfile import LockfileNotFound
 from .sender import Sender
 from .wizard import report_backend_check, run_wizard, stdin_is_interactive
 
 log = logging.getLogger("collector")
 
-_LOCKFILE_WAIT_S = 10.0
-_RECONNECT_WAIT_S = 5.0
-
-REQUIRED_ENV_KEYS = ("LOL_DIR", "BACKEND_URL", "API_KEY")
+LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+LOG_DATEFMT = "%H:%M:%S"
 
 
 def _parse_since(value: str) -> date:
@@ -102,20 +105,44 @@ def _build_parser() -> argparse.ArgumentParser:
                         help=msg("cli.help.since"))
     parser.add_argument("--dry-run", action="store_true", help=msg("cli.help.dry_run"))
     parser.add_argument("--setup", action="store_true", help=msg("cli.help.setup"))
+    parser.add_argument("--console", action="store_true", help=msg("cli.help.console"))
     parser.add_argument("--version", action="version", version=f"collector {__version__}")
     return parser
+
+
+def _configure_logging() -> None:
+    """Kök logger. `--windowed` exe'de `sys.stderr` YOKTUR: StreamHandler kurulmaz."""
+    handlers = None if sys.stderr is not None else [logging.NullHandler()]
+    logging.basicConfig(
+        level=logging.INFO, format=LOG_FORMAT, datefmt=LOG_DATEFMT, handlers=handlers
+    )
+
+
+def _maybe_run_gui() -> int | None:
+    """Argümansız çalıştırma: arayüzü aç. tkinter yoksa None (konsola düşülür)."""
+    from . import gui
+
+    if not gui.tkinter_available():
+        log.warning("tkinter is not available, falling back to console live mode")
+        print(msg("gui.unavailable"))
+        return None
+    return gui.run_gui()
 
 
 def main(argv: list[str] | None = None) -> int:
     # Dil, config'de varsa daha --help/banner basılmadan sessizce yüklenir.
     i18n.resolve_language(allow_prompt=False)
-    args = _build_parser().parse_args(argv)
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
+    args = _build_parser().parse_args(effective_argv)
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    _configure_logging()
+
+    # GÖREV 16 Faz C: çift tıklama (argüman YOK) → tkinter arayüzü. Argümanlı
+    # her komut (ve `--console`) aşağıdaki eski akıştan geçer.
+    if not effective_argv:
+        code = _maybe_run_gui()
+        if code is not None:
+            return code
 
     # Config var ama dil alanı yoksa (i18n öncesi kurulum): ilk soru dil seçimi.
     # --setup'ta sihirbaz kendi sorar; .env hiç yoksa da ilk soruyu sihirbaz sorar.
@@ -150,53 +177,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if _wants_backfill(args):
         try:
-            info = read_lockfile(config.lol_dir)
+            stats = run_backfill_command(config, sender, since=args.since)
         except LockfileNotFound as exc:
             log.error("Lockfile not found: %s — is the LoL client running, is LOL_DIR correct?", exc)
             return 1
-        lcu = HttpLcuClient(info)
-        try:
-            sender.send_heartbeat("lcu-connected")
-            sender.flush_outbox()
-            stats = run_backfill(config, lcu, sender, since=args.since)
-            sender.send_heartbeat("backfill-done")
         finally:
-            lcu.close()
             sender.close()
         return 0 if not stats.errors else 1
 
     # Canlı mod: client kapalıysa bekle, bağlantı koparsa yeniden bağlan
-    log.info("Live mode started (poll interval %.1fs)", config.poll_interval_s)
+    # (döngünün kendisi commands.run_live_command'dedir — arayüz de onu çağırır).
     print(msg("cli.live_hint"))
     print(msg("cli.live_stop_hint"))
-    lockfile_warned = False
     try:
-        while True:
-            try:
-                info = read_lockfile(config.lol_dir)
-            except LockfileNotFound:
-                if not lockfile_warned:
-                    log.info("LoL client appears closed (no lockfile), waiting...")
-                    lockfile_warned = True
-                time.sleep(_LOCKFILE_WAIT_S)
-                continue
-            lockfile_warned = False
-
-            lcu = HttpLcuClient(info)
-            runner = LiveRunner(config, lcu, sender)
-            try:
-                # GÖREV 13: bağlantı kurulur kurulmaz haber ver (yetişme uzun
-                # sürebilir; panelde cihaz "ayakta" görünsün). Hata yutulur.
-                sender.send_heartbeat("lcu-connected")
-                # Her bağlantıda (ilk + yeniden) canlı döngüden ÖNCE sınırlı
-                # yetişme; hata yutulur, canlı mod engellenmez (catchup.py).
-                run_catchup(config, lcu, sender)
-                runner.poll_forever()
-            except LcuConnectionLost:
-                log.info("LCU connection lost, will reconnect...")
-                time.sleep(_RECONNECT_WAIT_S)
-            finally:
-                lcu.close()
+        run_live_command(config, sender)
+        return 0
     except KeyboardInterrupt:
         log.info("Stopped.")
         return 0
@@ -204,13 +199,22 @@ def main(argv: list[str] | None = None) -> int:
         sender.close()
 
 
+def _has_console() -> bool:
+    """`--windowed` exe'de konsol yoktur: stdin/stdout `None` olur."""
+    return sys.stdin is not None and sys.stdout is not None
+
+
 def _pause_if_frozen() -> None:
-    """Çift tıklamayla açılan exe penceresi anında kapanmasın (yalnız frozen'da)."""
-    if not is_frozen():
+    """Çift tıklamayla açılan exe penceresi anında kapanmasın (yalnız frozen'da).
+
+    `--windowed` derlemede bekletilecek konsol penceresi YOKTUR ve `input()`
+    "lost sys.stdin" ile patlar — bu durumda hiç çağrılmaz.
+    """
+    if not is_frozen() or not _has_console():
         return
     try:
         input(msg("cli.press_enter"))
-    except (EOFError, KeyboardInterrupt, OSError):
+    except (EOFError, KeyboardInterrupt, OSError, RuntimeError):
         pass
 
 
@@ -226,6 +230,8 @@ def _configure_console() -> None:
     except Exception:
         pass
     for stream in (sys.stdout, sys.stderr):
+        if stream is None:  # --windowed: yönlendirilecek akış yok
+            continue
         try:
             # line_buffering: çıktı dosyaya yönlendirildiğinde de anında görünsün
             stream.reconfigure(  # type: ignore[union-attr]
@@ -233,6 +239,31 @@ def _configure_console() -> None:
             )
         except Exception:
             pass
+
+
+#: Konsolsuz (`--windowed`) exe çökerse yığın izinin yazıldığı dosya.
+CRASH_LOG_NAME = "collector-error.log"
+
+
+def _report_crash() -> None:
+    """Yığın izini konsola; konsol yoksa exe'nin yanındaki dosyaya yazar.
+
+    `--windowed` derlemede `sys.stderr` `None`'dır: `traceback.print_exc()` orada
+    AttributeError'a döner ve asıl hata büsbütün kaybolur. Bu yüzden hem yazma
+    denemesi korunaklıdır hem de konsolsuzken diske düşülür (arkadaşın PC'sinde
+    çıkan hatayı teşhis etmenin tek yolu).
+    """
+    text = traceback.format_exc()
+    if sys.stderr is not None:
+        try:
+            sys.stderr.write(text)
+            return
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        (app_dir() / CRASH_LOG_NAME).write_text(text, encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 — teşhis dosyası yazılamıyorsa da çıkış temiz olsun
+        pass
 
 
 def run(argv: list[str] | None = None) -> int:
@@ -250,7 +281,7 @@ def run(argv: list[str] | None = None) -> int:
         print(msg("cli.stopped"))
         code = 0
     except Exception:  # noqa: BLE001 — pencere kapanmadan yığın izi görünsün
-        traceback.print_exc()
+        _report_crash()
         code = 1
     _pause_if_frozen()
     return code

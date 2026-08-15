@@ -275,9 +275,13 @@ def _cli_env(monkeypatch, lol_dir):
 
 
 def _stub_cli(monkeypatch, cli, calls):
+    """CLI + paylaşılan komut katmanı (GÖREV 16'dan beri canlı/backfill akışı
+    `collector.commands`'tedir; CLI ve arayüz aynı fonksiyonları çağırır)."""
+    from collector import commands
+
     monkeypatch.setattr(cli, "report_backend_check", lambda url, key: None)
-    monkeypatch.setattr(cli, "read_lockfile", lambda lol_dir: {"port": 1, "password": "x"})
-    monkeypatch.setattr(cli, "HttpLcuClient", lambda info: FakeLcu())
+    monkeypatch.setattr(commands, "read_lockfile", lambda lol_dir: {"port": 1, "password": "x"})
+    monkeypatch.setattr(commands, "HttpLcuClient", lambda info: FakeLcu())
     monkeypatch.setattr(cli, "Sender", lambda config: FakeSender(calls))
 
 
@@ -288,6 +292,8 @@ def _stub_cli(monkeypatch, cli, calls):
 def test_positional_backfill_is_an_alias_of_the_flag(tmp_path, monkeypatch, capsys, argv):
     from collector import __main__ as cli
 
+    from collector import commands
+
     _cli_env(monkeypatch, tmp_path)
     calls: list[str] = []
     _stub_cli(monkeypatch, cli, calls)
@@ -297,9 +303,9 @@ def test_positional_backfill_is_an_alias_of_the_flag(tmp_path, monkeypatch, caps
         seen["since"] = since
         return BackfillStats(scanned=1, sent=1)
 
-    monkeypatch.setattr(cli, "run_backfill", fake_backfill)
+    monkeypatch.setattr(commands, "run_backfill", fake_backfill)
     monkeypatch.setattr(
-        cli, "run_catchup", lambda *a, **k: pytest.fail("tam backfill'de yetişme koşmaz")
+        commands, "run_catchup", lambda *a, **k: pytest.fail("tam backfill'de yetişme koşmaz")
     )
 
     assert cli.main(argv) == 0
@@ -311,11 +317,16 @@ def test_positional_backfill_is_an_alias_of_the_flag(tmp_path, monkeypatch, caps
 
 def test_positional_backfill_does_not_affect_backfill_positions(tmp_path, monkeypatch):
     from collector import __main__ as cli
+    from collector import commands
 
     _cli_env(monkeypatch, tmp_path)
     monkeypatch.setattr(cli, "report_backend_check", lambda url, key: None)
     monkeypatch.setattr(
-        cli, "run_backfill", lambda *a, **k: pytest.fail("rol backfill'de match backfill yok")
+        cli, "run_backfill_command",
+        lambda *a, **k: pytest.fail("rol backfill'de match backfill yok"),
+    )
+    monkeypatch.setattr(
+        commands, "run_backfill", lambda *a, **k: pytest.fail("rol backfill'de match backfill yok")
     )
     seen = {}
 
@@ -337,7 +348,9 @@ def test_unknown_positional_command_still_rejected(monkeypatch):
 
 
 def test_live_mode_runs_catchup_before_the_poll_loop(tmp_path, monkeypatch, capsys):
+    """`--console`: GÖREV 16 öncesinin argümansız canlı modu birebir korunur."""
     from collector import __main__ as cli
+    from collector import commands
 
     _cli_env(monkeypatch, tmp_path)
     calls: list[str] = []
@@ -346,18 +359,18 @@ def test_live_mode_runs_catchup_before_the_poll_loop(tmp_path, monkeypatch, caps
     order: list[str] = []
 
     class FakeRunner:
-        def __init__(self, config, lcu, sender):
+        def __init__(self, config, lcu, sender, **kwargs):
             pass
 
         def poll_forever(self):
             order.append("poll")
             raise KeyboardInterrupt  # tek tur sonra canlı döngüden çık
 
-    monkeypatch.setattr(cli, "LiveRunner", FakeRunner)
+    monkeypatch.setattr(commands, "LiveRunner", FakeRunner)
     monkeypatch.setattr(
-        cli, "run_catchup", lambda config, lcu, sender: order.append("catchup")
+        commands, "run_catchup", lambda config, lcu, sender: order.append("catchup")
     )
 
-    assert cli.main([]) == 0
+    assert cli.main(["--console"]) == 0
     assert order == ["catchup", "poll"]  # yetişme canlı döngüden ÖNCE
     assert "canlı mod" in capsys.readouterr().out  # cli.live_hint akışı korundu

@@ -58,6 +58,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.help.dry_run": "backfill-positions / backfill-items: print what would be "
                             "sent, do not send",
         "cli.help.setup": "Re-run the setup wizard (rewrites .env)",
+        "cli.help.console": "Live mode in the console, without the window "
+                            "(the old no-argument behaviour)",
         "cli.since_format": "--since must be in YYYY-MM-DD format: {value}",
         # -- CLI runtime --
         "cli.setup_done": "Setup complete. To start collecting, run the program "
@@ -139,6 +141,66 @@ MESSAGES: dict[str, dict[str, str]] = {
                            "  → BACKEND_URL may be wrong (it must NOT end with /api/v1).",
         "check.unexpected": "The backend returned an unexpected response "
                             "(HTTP {status}): {body}",
+        # -- window (GOREV 16 phase C) --
+        "gui.title": "LoL Balance Collector v{version}",
+        "gui.banner": "LoL Balance Collector v{version} started.",
+        "gui.first_run": "No settings file yet - the setup wizard is starting.",
+        "gui.unavailable": "The window could not be opened (tkinter is missing), "
+                           "starting live mode in the console.",
+        "gui.need_setup": "Settings are incomplete: run 'Settings' first.",
+        "gui.config_error": "Settings could not be read: {error}",
+        "gui.status_line": "Status: {state}   |   Last match: {match}",
+        "gui.last_match_none": "-",
+        "gui.status.idle": "waiting",
+        "gui.status.stopping": "stopping...",
+        "gui.status.stopped": "stopped",
+        "gui.status.waiting_client": "waiting for the LoL client",
+        "gui.status.connected": "connected to the client",
+        "gui.status.catchup": "catching up (recent matches)",
+        "gui.status.live": "live - watching for matches",
+        "gui.status.reconnecting": "connection lost, reconnecting",
+        "gui.status.backfill": "scanning match history",
+        "gui.status.items": "filling in items",
+        "gui.status.positions": "filling in roles",
+        "gui.status.settings": "setup wizard",
+        "gui.btn.live_start": "Start live",
+        "gui.btn.live_stop": "Stop live",
+        "gui.btn.backfill": "Scan matches",
+        "gui.btn.items": "Fill in items",
+        "gui.btn.positions": "Fill in roles",
+        "gui.btn.settings": "Settings",
+        "gui.job.name.live": "live mode",
+        "gui.job.name.backfill": "match scan",
+        "gui.job.name.items": "item backfill",
+        "gui.job.name.positions": "role backfill",
+        "gui.job.name.settings": "setup",
+        "gui.job.started": "{job} started.",
+        "gui.job.done": "{job} finished.",
+        "gui.job.failed": "{job} failed: {error}",
+        "gui.live.stopping": "Stop requested, the live loop is winding down...",
+        "gui.backfill.no_lockfile": "The LoL client does not seem to be running "
+                                    "(no lockfile in {path}). Open the client, or fix "
+                                    "the LoL folder in Settings.",
+        "gui.dry_run.title": "Apply?",
+        "gui.dry_run.started": "Dry run: nothing will be sent yet, only listed.",
+        "gui.dry_run.question": "Dry run result:\n\n{summary}\n\nApply these changes?",
+        "gui.dry_run.cancelled": "Cancelled, nothing was sent.",
+        "gui.dry_run.applied": "Applied: {summary}",
+        "gui.summary.backfill": "{scanned} matches scanned, {customs} customs, "
+                                "{sent} sent, {errors} errors",
+        "gui.summary.items": "{archives} raw matches, {matched} matched, "
+                             "{updated} matches, {participants} inventories, {errors} errors",
+        "gui.summary.positions": "{archives} raw matches, {matched} matched, "
+                                 "{updated} matches, {positions} roles, "
+                                 "{unresolved} unresolved, {errors} errors",
+        "gui.update.banner": "New version {version} is available - Download",
+        "gui.update.button": "Download",
+        "gui.update.open_failed": "Could not open the browser ({error}). "
+                                  "Download address: {url}",
+        "gui.wizard.title": "Collector setup",
+        "gui.wizard.cancelled": "Setup cancelled, settings were not changed.",
+        "gui.close.title": "Close?",
+        "gui.close.question": "{job} is still running. Stop it and close the window?",
     },
     "tr": {
         # -- dil seçimi (bilerek iki dilde de aynı) --
@@ -163,6 +225,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "cli.help.dry_run": "backfill-positions / backfill-items: ne gönderileceğini "
                             "yazdır, gönderme",
         "cli.help.setup": "Kurulum sihirbazını yeniden çalıştır (.env'i yeniden yazar)",
+        "cli.help.console": "Canlı modu pencere açmadan konsolda çalıştır "
+                            "(eski argümansız davranış)",
         "cli.since_format": "--since YYYY-MM-DD formatında olmalı: {value}",
         # -- CLI çalışma zamanı --
         "cli.setup_done": "Kurulum bitti. Toplamayı başlatmak için programı normal "
@@ -244,6 +308,65 @@ MESSAGES: dict[str, dict[str, str]] = {
         "check.not_found": "Adres bulunamadı (HTTP 404): {url}{path}\n"
                            "  → BACKEND_URL yanlış olabilir (sonunda /api/v1 OLMAMALI).",
         "check.unexpected": "Backend beklenmedik yanıt verdi (HTTP {status}): {body}",
+        # -- arayüz (GÖREV 16 Faz C) --
+        "gui.title": "LoL Balance Collector v{version}",
+        "gui.banner": "LoL Balance Collector v{version} başlatıldı.",
+        "gui.first_run": "Henüz ayar dosyası yok — kurulum sihirbazı açılıyor.",
+        "gui.unavailable": "Pencere açılamadı (tkinter yok), canlı mod konsolda "
+                           "başlatılıyor.",
+        "gui.need_setup": "Ayarlar eksik: önce 'Ayarlar'ı çalıştır.",
+        "gui.config_error": "Ayarlar okunamadı: {error}",
+        "gui.status_line": "Durum: {state}   |   Son maç: {match}",
+        "gui.last_match_none": "—",
+        "gui.status.idle": "bekliyor",
+        "gui.status.stopping": "durduruluyor...",
+        "gui.status.stopped": "durduruldu",
+        "gui.status.waiting_client": "LoL client bekleniyor",
+        "gui.status.connected": "client'a bağlanıldı",
+        "gui.status.catchup": "yetişiliyor (son maçlar)",
+        "gui.status.live": "canlı — maç bekleniyor",
+        "gui.status.reconnecting": "bağlantı koptu, yeniden bağlanılıyor",
+        "gui.status.backfill": "maç geçmişi taranıyor",
+        "gui.status.items": "eşyalar dolduruluyor",
+        "gui.status.positions": "roller dolduruluyor",
+        "gui.status.settings": "kurulum sihirbazı",
+        "gui.btn.live_start": "Canlı Başlat",
+        "gui.btn.live_stop": "Canlı Durdur",
+        "gui.btn.backfill": "Maçları Tara",
+        "gui.btn.items": "Eşyaları Doldur",
+        "gui.btn.positions": "Rolleri Doldur",
+        "gui.btn.settings": "Ayarlar",
+        "gui.job.name.live": "canlı mod",
+        "gui.job.name.backfill": "maç tarama",
+        "gui.job.name.items": "eşya backfill",
+        "gui.job.name.positions": "rol backfill",
+        "gui.job.name.settings": "kurulum",
+        "gui.job.started": "{job} başladı.",
+        "gui.job.done": "{job} bitti.",
+        "gui.job.failed": "{job} başarısız: {error}",
+        "gui.live.stopping": "Durdurma istendi, canlı döngü kapanıyor...",
+        "gui.backfill.no_lockfile": "LoL client açık görünmüyor ({path} içinde lockfile "
+                                    "yok). Client'i aç ya da Ayarlar'dan LoL klasörünü "
+                                    "düzelt.",
+        "gui.dry_run.title": "Uygulansın mı?",
+        "gui.dry_run.started": "Önce dry-run: hiçbir şey gönderilmiyor, yalnız listeleniyor.",
+        "gui.dry_run.question": "Dry-run sonucu:\n\n{summary}\n\nBu değişiklikler "
+                                "uygulansın mı?",
+        "gui.dry_run.cancelled": "Vazgeçildi, hiçbir şey gönderilmedi.",
+        "gui.dry_run.applied": "Uygulandı: {summary}",
+        "gui.summary.backfill": "{scanned} maç tarandı, {customs} custom, "
+                                "{sent} gönderildi, {errors} hata",
+        "gui.summary.items": "{archives} ham maç, {matched} eşleşti, {updated} maç, "
+                             "{participants} envanter, {errors} hata",
+        "gui.summary.positions": "{archives} ham maç, {matched} eşleşti, {updated} maç, "
+                                 "{positions} rol, {unresolved} çözülemedi, {errors} hata",
+        "gui.update.banner": "Yeni sürüm {version} çıktı — İndir",
+        "gui.update.button": "İndir",
+        "gui.update.open_failed": "Tarayıcı açılamadı ({error}). İndirme adresi: {url}",
+        "gui.wizard.title": "Collector kurulumu",
+        "gui.wizard.cancelled": "Kurulum iptal edildi, ayarlar değişmedi.",
+        "gui.close.title": "Kapatılsın mı?",
+        "gui.close.question": "{job} hâlâ çalışıyor. Durdurulup pencere kapatılsın mı?",
     },
 }
 

@@ -44,12 +44,18 @@ class LiveRunner:
         sender: Sender,
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        should_stop: Optional[Callable[[], bool]] = None,
+        on_match: Optional[Callable[[str], None]] = None,
     ):
         self._config = config
         self._lcu = lcu
         self._sender = sender
         self._sleep = sleep
         self._now = now
+        # GÖREV 16: arayüzün "Durdur" düğmesi için işbirlikçi kesme + son maç bildirimi.
+        # CLI bunları vermez; verilmediğinde davranış birebir eskisi gibidir.
+        self._should_stop = should_stop or (lambda: False)
+        self._on_match = on_match
         self._processed: set[str] = set()
         self._champion_map: Optional[dict[int, str]] = None
         self._last_heartbeat: Optional[datetime] = None
@@ -102,6 +108,16 @@ class LiveRunner:
         self._processed.add(game_id)
         if payload_dict is not None:
             self._sender.send_or_outbox(payload_dict)
+            self._notify_match(game_id)
+
+    def _notify_match(self, game_id: str) -> None:
+        """Arayüzün durum bandı için: son işlenen maç. Geri çağrı hatası yutulur."""
+        if self._on_match is None:
+            return
+        try:
+            self._on_match(game_id)
+        except Exception:  # noqa: BLE001 — arayüz hatası toplamayı ASLA durdurmaz
+            log.debug("on_match callback failed (ignored)", exc_info=True)
 
     # --- ana akış ---
 
@@ -172,12 +188,19 @@ class LiveRunner:
         return True
 
     def poll_forever(self) -> None:
-        """Ana döngü. LCU art arda yanıt vermezse LcuConnectionLost fırlatır."""
+        """Ana döngü. LCU art arda yanıt vermezse LcuConnectionLost fırlatır.
+
+        `should_stop` verilmişse döngü her turun başında sorar ve istendiğinde
+        istisnasız döner (arayüzün "Durdur" düğmesi).
+        """
         self._sender.flush_outbox()
         previous_phase: Optional[str] = None
         failures = 0
         self._last_heartbeat = self._now()
         while True:
+            if self._should_stop():
+                log.info("Live loop stop requested.")
+                return
             try:
                 phase = self._lcu.get_gameflow_phase()
                 failures = 0
