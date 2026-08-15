@@ -74,3 +74,16 @@ cd <repo root> && backend\.venv\Scripts\python -m pytest collector -q  # collect
 The real LCU captures under `collector/fixtures/` contain players' puuids and
 Riot IDs. **The repository must remain private**; if it is ever to be made
 public, the fixtures must be anonymized first.
+
+## License
+
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md):
+you may use, modify and share this project for any **noncommercial** purpose
+(personal use, friend groups, education, research). Commercial use is not permitted.
+
+*LoL Balance isn't endorsed by Riot Games and doesn't reflect the views or opinions
+of Riot Games or anyone officially involved in producing or managing League of
+Legends. League of Legends and Riot Games are trademarks or registered trademarks
+of Riot Games, Inc. Champion/item images and names are fetched at build time from
+Riot's Data Dragon / CommunityDragon and remain Riot Games' property — they are
+not covered by this repository's license.*
