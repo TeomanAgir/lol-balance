@@ -63,7 +63,10 @@ yok — Teoman'ın PC'sinde repo kökünde durur; orkestratör oradan okur).
   savunulan kararların Teoman onayıyla revizyonunu gerektirir.
 - Faz 2 pair-synergy rating modeli KAPSAM DIŞI (gösterim sinerjisi zaten var).
 
-## Bilinen tuzaklar (özet — ayrıntı 00-ortak.md)
+## Bilinen tuzaklar (özet — İŞLETİM DEFTERİ: docs/HANDOFF.md, mutlaka oku)
+- Kritik üçlü: git commit ÇIKTISINI doğrula (sessiz düşebilir) · gh'a çok satırlı
+  metin HEP --body-file ile · etiket daima güncel MAIN'de atılır (workflow tanımı
+  etiketlenen commit'ten okunur). Tamamı + worker/doğrulama dersleri HANDOFF'ta.
 - GitHub Actions pull_request bazen run üretmez → PR'ı close/reopen.
 - Yerel `backend/data/lol_balance.db` ESKİ kopyadır (10 maç, pozisyonsuz) —
   canlı DB değil; E2E'de rol senaryosu için scratch kopyaya elle pozisyon yazılır.
