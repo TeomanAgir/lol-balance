@@ -1,4 +1,4 @@
-# lol-balance
+﻿# lol-balance
 
 🇬🇧 English: [README.md](README.md)
 
@@ -19,7 +19,7 @@ toplama → rating (OpenSkill tabanlı harman modeli) → takım dengeleme → w
 
 1. **Contract'lar donmuştur.** `docs/` altındaki dosyalar tek taraflı değiştirilmez;
    sorun bulursan `docs/CHANGE_REQUESTS.md`'ye yaz, karar orkestrasyon sürecinden çıkar
-   (bkz. `CLAUDE.md` ve `ORCHESTRATION.md`).
+   (bkz. `CLAUDE.md` ve `docs/ORCHESTRATION.md`).
 2. **Dizin sınırı:** her bileşen yalnızca kendi dizininde değişir; bileşenler birbirini
    contract'taki örnek payload'larla mock'lar.
 3. **Test zorunlu.** Üç paket de pytest kullanır; CI her push/PR'da üçünü koşar.

@@ -1,4 +1,4 @@
-# lol-balance
+﻿# lol-balance
 
 🇹🇷 Türkçe: [README.tr.md](README.tr.md)
 
@@ -19,7 +19,7 @@ collection from the LCU → rating (OpenSkill-based blend model) → team balanc
 
 1. **Contracts are frozen.** Files under `docs/` are never changed unilaterally;
    if you find a problem, write it up in `docs/CHANGE_REQUESTS.md` — the decision
-   comes out of the orchestration process (see `CLAUDE.md` and `ORCHESTRATION.md`).
+   comes out of the orchestration process (see `CLAUDE.md` and `docs/ORCHESTRATION.md`).
 2. **Directory boundary:** each component changes only within its own directory;
    components mock each other using the example payloads in the contracts.
 3. **Tests are mandatory.** All three packages use pytest; CI runs all three on every push/PR.
