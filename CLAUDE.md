@@ -1,6 +1,6 @@
-# Orkestratör Talimatı (Claude Code)
+﻿# Orkestratör Talimatı (Claude Code)
 
-Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi dağıtmak, sınırları korumak, entegre etmek ve doğrulamaktır. İlk iş: `ORCHESTRATION.md` ve `docs/` altındaki üç contract'ı oku — bu dosya onların yerine geçmez, üstüne yetki ve karar bağlamı ekler.
+Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi dağıtmak, sınırları korumak, entegre etmek ve doğrulamaktır. İlk iş: `docs/ORCHESTRATION.md` ve `docs/` altındaki üç contract'ı oku — bu dosya onların yerine geçmez, üstüne yetki ve karar bağlamı ekler.
 
 ## Yetki modeli
 - Repo'da `docs/` altını DEĞİŞTİREBİLEN tek taraf sensin; onu da yalnızca aşağıdaki süreçle yaparsın.

@@ -39,6 +39,12 @@ Yeni gerçek fixture eklerken: ÖNCE anonimleştir (Player numaraları çakışm
 onefile → `dist/LoLBalanceCollector.exe` (~15MB). Exe repo'ya GİRMEZ; .env asla
 exe'yle dağıtılmaz. Yeni collector özelliği merge edilince exe yeniden derlenip dağıtılır.
 
+## Arayüz (GÖREV 16)
+Argümansız açılış = tkinter penceresi (`gui.py`; tkinter YALNIZ orada, geç import —
+AST testiyle kilitli). CLI/GUI ortak komut katmanı `commands.py`; güncelleme
+kontrolü `updates.py` (GitHub releases/latest, her hata sessiz). `--console` eski
+konsol canlı modu. Paketleme --windowed; çökme günlüğü `collector-error.log`.
+
 ## Sağlık (GÖREV 13)
 `CLIENT_ID` (.env; sihirbaz sorar, yoksa hostname) her ingest payload'ına eklenir
 (`sender.with_client_id`); heartbeat `sender.send_heartbeat` — anlar: LCU bağlantısı,
@@ -47,5 +53,5 @@ Heartbeat hatası HER ZAMAN yutulur, outbox'a yazılmaz. Sürüm: `__init__.__ve
 (dağıtım öncesi yükselt).
 
 ## Test
-403 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
+479 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
 dokunmadan, fake/fixture tabanlı.

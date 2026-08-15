@@ -1,7 +1,7 @@
-# Devir Notu — Kök Faz Tamamlandı (2026-08-11)
+﻿# Devir Notu — Kök Faz Tamamlandı (2026-08-11)
 
 Yeni oturum/agent için mevcut durumun tek sayfalık özeti. Ayrıntı: `CLAUDE.md`
-(orkestrasyon yetki modeli), `ORCHESTRATION.md`, `docs/` (contract'lar),
+(orkestrasyon yetki modeli), `docs/ORCHESTRATION.md`, `docs/` (contract'lar),
 `docs/CHANGE_REQUESTS.md` (tüm kararlar, gerekçeli).
 
 ## Ne yayında
