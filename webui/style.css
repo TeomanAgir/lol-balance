@@ -1832,80 +1832,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   .mb-tip { max-width: 160px; }
 }
 
-/* ── Manuel giriş ── */
-.manual-list { display: flex; flex-direction: column; gap: 8px; }
-.manual-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 8px 8px 14px;
-}
-.manual-row .p-name { font-weight: 600; }
-.team-toggle { display: flex; gap: 6px; }
-.team-toggle button {
-  min-height: 44px;
-  min-width: 72px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-}
-.team-toggle .tt-blue[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
-.team-toggle .tt-red[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; }
-
-.winner-pick {
-  margin-top: 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-.winner-pick legend {
-  font-family: var(--display);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  padding: 0 6px;
-}
-.winner-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 14px;
-  margin-right: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-}
-.winner-opt.blue { color: var(--blue); }
-.winner-opt.red { color: var(--red); }
-.winner-opt input { accent-color: currentColor; width: 18px; height: 18px; }
-
-/* ── Collector sağlığı (GÖREV 13) — "ch-" öneki bu görünüme aittir ──
-   Sekme değil, Manuel'den açılan detay görünümü. Kartlar tek sütun akar:
-   320px'de de yatay taşma yok, satırlar dar ekranda sarar.
+/* ── Collector sağlığı (GÖREV 13; GÖREV 20 ile kendi sekmesine taşındı) —
+   "ch-" öneki bu görünüme aittir. Kartlar tek sütun akar: 320px'de de
+   yatay taşma yok, satırlar dar ekranda sarar.
    Durum rengi tek başına taşıyıcı DEĞİLDİR: nokta + metin birlikte gider
    (metinler app.js'te health.status_* anahtarlarından gelir). */
-.ch-entry { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
-.ch-link {
-  padding: 6px 2px;
-  min-height: 36px;
-  font-family: var(--display);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--brass);
-  white-space: nowrap;
-  transition: color 0.12s;
-}
-.ch-link:hover { color: var(--text); }
-
 .ch-bar {
   display: flex;
   align-items: center;
