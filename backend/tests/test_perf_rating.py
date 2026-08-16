@@ -3,8 +3,8 @@
 Çarpan matematiğinin kendisi rating paketinde test edilir; buradaki testler
 yalnızca backend'in statları DB'den doğru taşıyıp Engine'e geçirdiğini doğrular.
 
-Default ENGINE_VERSION artık blend50 olduğundan (çarpan YOK), bu dosyadaki
-testler perf-v1'i AÇIKÇA seçer. Blend50 testleri: tests/test_blend_rating.py.
+Default ENGINE_VERSION artık blend20 olduğundan (çarpan YOK), bu dosyadaki
+testler perf-v1'i AÇIKÇA seçer. Harman testleri: tests/test_blend_rating.py.
 """
 from __future__ import annotations
 

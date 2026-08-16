@@ -1,12 +1,18 @@
-# Rating Contract — Performans Ağırlıklı Engine — v2
+# Rating Contract — Performans Ağırlıklı Engine — v3
 
 **Karar dayanağı:** Teoman, 2026-08-11 — "KDA, hasar payı gibi metrikler rating'e de girsin"
 (CHANGE_REQUESTS kaydı). Bu, önceki "rating'e giren tek sinyal W/L'dir" kararının insan
 tarafından revize edilmiş hâlidir.
 
 **v2 eki (Teoman, 2026-08-11, ikinci karar):** W/L %50 + performans %50 doğrudan katkı —
-`openskill-pl-blend50-v1` (bkz. "Harman engine" bölümü). AKTİF version budur.
+`openskill-pl-blend50-v1` (bkz. "Harman engine" bölümü).
 `openskill-pl-perf-v1` (çarpan yaklaşımı) tanımlı ve geçerli kalır ama aktif değildir.
+
+**v3 eki (Teoman, 2026-08-16, üçüncü karar):** W/L etkisi %20'ye düşürüldü, performans %80 —
+`openskill-pl-blend20-v1` (bkz. "Harman Engine — blend20" bölümü). AKTİF version budur;
+rol evreni de aynı version'la işler. Karar, canlı 19 maçlık veriyle koşulan %50/%25/%20
+simülasyonuna dayanır (CHANGE_REQUESTS kaydı). `openskill-pl-blend50-v1` tanımlı ve
+geçerli kalır ama aktif değildir.
 
 ## Tasarım ilkeleri
 
@@ -106,7 +112,7 @@ carpan = clamp(1 + ALPHA * (perf - 1), 1 - CAP, 1 + CAP)           # [0.7, 1.3]
 
 ---
 
-# Harman Engine — `openskill-pl-blend50-v1` (AKTİF)
+# Harman Engine — `openskill-pl-blend50-v1` (tanımlı, aktif değil — bkz. blend20)
 
 **Amaç:** İyi oyuncunun bireysel gücü, takım şansından bağımsız olarak rating'in yarısını
 belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
@@ -167,7 +173,58 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 
 ---
 
-# Rol Rating Evreni — blend50 rol bazlı (GÖREV 0)
+# Harman Engine — `openskill-pl-blend20-v1` (AKTİF)
+
+**Karar dayanağı:** Teoman, 2026-08-16 — "sıralamada çok kötü oyuncular sadece W/L sayesinde
+çok yukarıdalar"; W/L etkisi %20'ye düşürüldü, performans %80'e çıkarıldı. Karar öncesi
+%50/%25/%20 senaryoları canlı verinin (19 maç, 18 oyuncu) tam replay simülasyonuyla
+karşılaştırıldı; %50 kolonunun canlı leaderboard'la 18/18 birebir eşleşmesi doğrulama
+ön koşuluydu (CHANGE_REQUESTS kaydı).
+
+## Model
+
+blend50 ile TEK fark harman ağırlığıdır; diğer her şey (W/L çekirdeği, perf_score
+hesabı, P_avg tanımı, null/nötr kuralları, dengeleme mekaniği) blend50 bölümündeki
+tanımlarla BİREBİR aynıdır:
+
+1. **W/L çekirdeği:** mu/sigma güncellemeleri `openskill-pl-v1` ile birebir aynı
+   (saf PlackettLuce, çarpan yok). blend50'nin mu/sigma geçmişiyle de bit-bit aynıdır —
+   yalnız efektif skor katmanı değişir.
+2. **Efektif rating:**
+   ```
+   MU_0 = 25, K = 20, W = 0.8           # bu version'a dondurulmuş sabitler
+   mu_eff  = (1-W) * mu + W * (MU_0 + K * (P_avg - 1))
+   score   = mu_eff - 3 * sigma          # görünen/sıralanan değer
+   ```
+   Version adındaki "20", W/L (mu) payını söyler: mu katkısı %20, performans katkısı %80.
+   `W` konvansiyonu blend50 ile aynıdır (W = performans ağırlığı).
+3. **perf_score / P_avg:** fonksiyonlar blend50 ile özdeş olduğundan değerler de özdeştir;
+   `rating_history.perf_score` bu version satırlarına da aynı şekilde yazılır. P_avg
+   yalnız AKTİF version'ın valid satırları üzerinden hesaplanır (mevcut kural).
+4. **Maçsız oyuncu:** P_avg = 1.0 → mu_eff = 25, score = 0 civarı (nötr; blend50 ile aynı).
+5. **Sabit dondurma kuralı sürer:** W/K/MU_0 "tuning"i bu version içinde yasaktır;
+   herhangi bir oran değişikliği = yeni version string'i + insan onayı.
+
+## API etkisi
+
+blend50'nin "API etkisi" bölümü aynen geçerlidir (alan şekilleri değişmez):
+`rating: {mu, sigma, ordinal, perf_avg, score}` yapısı, leaderboard'un `score` sıralaması,
+`perf_score` kolonu, `Engine.perf_scores` / `Engine.effective` API'si — hepsi aynı; yalnız
+`Engine.effective` bu version sabitleriyle hesaplar. Aktif version yine `ENGINE_VERSION`
+config'iyle seçilir; `openskill-pl-blend20-v1`'e geçiş REPLAY GEREKTİRİR (iki evren).
+
+## Test yükümlülükleri (blend20)
+
+- mu/sigma geçmişi `openskill-pl-v1` (ve blend50) replay'iyle bit-bit aynı.
+- perf_score fonksiyonu blend50'ninkiyle birebir aynı değerleri üretir.
+- Efektif skor: bilinen (mu, sigma, P_avg) üçlülerinde beklenen mu_eff/score
+  (ör. mu=25, P_avg=1 → mu_eff=25; P_avg=1.25 → mu_eff = 0.2*mu + 0.8*30).
+- Maçsız oyuncu nötr; score monotonluğu (P_avg arttıkça score artar) korunur.
+- blend50 testleri değişmeden geçmeye devam eder (version tanımlı kalır).
+
+---
+
+# Rol Rating Evreni — aktif blend rol bazlı (GÖREV 0)
 
 **Karar dayanağı:** Teoman, 2026-08-11 — `new_modules.md` GÖREV 0 + sohbet kararları
 (CHANGE_REQUESTS kaydı). Rol verisi hibrittir: collector tahmini + manuel düzeltme.
@@ -177,10 +234,12 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 1. **Ana rating DEĞİŞMEZ.** Rol evreni ayrı bir state uzayıdır: (player, role) başına
    mu/sigma. `role ∈ {TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY}`. İki evren ayrı hesaplanır,
    birbirini asla etkilemez.
-2. **Formül ana engine ile BİREBİR aynı:** `openskill-pl-blend50-v1` sabitleri
-   (MU_0=25, K=20, W=0.5), saf W/L PlackettLuce çekirdeği (çarpan yok), aynı default
-   parametreler. `engine_version` string'i AYNIDIR; evren ayrımı tabloyla yapılır
-   (`role_rating_history`, bkz. db_schema migration 0003).
+2. **Formül ana AKTİF engine ile BİREBİR aynı:** aktif harman version'ının sabitleri
+   (bugün `openskill-pl-blend20-v1`: MU_0=25, K=20, W=0.8), saf W/L PlackettLuce
+   çekirdeği (çarpan yok), aynı default parametreler. `engine_version` string'i ana
+   evrenin AKTİF version'ıyla AYNIDIR; evren ayrımı tabloyla yapılır
+   (`role_rating_history`, bkz. db_schema migration 0003). Aktif version değişince
+   rol evreni de aynı version'la REPLAY edilir.
 3. **Uygunluk kuralı (deterministik):** valid bir maç rol evrenine yalnızca şu koşulda
    girer: 10 katılımcının 10'unda da `position` dolu VE her takımda 5 farklı rolün her
    birinden tam 1 tane. Aksi halde maç rol evrenine GİRMEZ (ana evren yine işler).
@@ -190,8 +249,8 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
    `perf_score` ana evrendeki maç perf değeriyle aynıdır (aynı stats, aynı fonksiyon).
 5. **P_avg rol bazındadır:** `P_avg(player, role) = AVG(role_rating_history.perf_score)`
    — yalnız valid maçlar, yalnız bu engine_version, yalnız o rolün satırları.
-   `mu_eff_role = 0.5*mu_role + 0.5*(25 + 20*(P_avg_role - 1))`,
-   `score_role = mu_eff_role - 3*sigma_role`.
+   `mu_eff_role = (1-W)*mu_role + W*(25 + 20*(P_avg_role - 1))` (W = aktif version'ın
+   perf ağırlığı; blend20'de 0.8), `score_role = mu_eff_role - 3*sigma_role`.
 6. **Hiç oynanmamış rol:** default prior + P_avg=1.0 → score 0 (nötr).
 7. **Position düzeltmesi** (`PUT /matches/{id}/positions`) rol evreninde replay tetikler;
    ana evren bit-bit değişmeden kalır. Rol replay'i her zaman `match_participants.position`'ın
@@ -227,7 +286,7 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 
 - Uygun olmayan maç (herhangi bir position null / takımda rol seti bozuk) rol evrenine
   girmez; ana evren etkilenmez.
-- Uygun maçta mu/sigma güncellemesi blend50 çekirdeğiyle aynı mekaniktedir; replay
+- Uygun maçta mu/sigma güncellemesi aktif blend çekirdeğiyle aynı mekaniktedir; replay
   deterministiktir (iki kez koş → bit-bit aynı).
 - `balance_roles`: elle kurgulanmış senaryoda optimal atama; "sadece TOP oynamış" iki
   güçlü oyuncu, rol skorları ayrıştığında aynı takıma düşmez; determinizm (aynı girdi →

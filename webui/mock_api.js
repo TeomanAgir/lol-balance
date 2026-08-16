@@ -4,7 +4,7 @@
   "use strict";
 
   // ── Mock roster: 14 kişilik gerçekçi havuz (1 tanesi hiç maç oynamamış) ──
-  // rating: harman engine (openskill-pl-blend50-v1) şekli {mu, sigma, ordinal, perf_avg, score}.
+  // rating: harman engine (openskill-pl-blend20-v1) şekli {mu, sigma, ordinal, perf_avg, score}.
   // Yigit ve Selin'de perf_avg null: harman-dışı version durumunun temsili (score = ordinal).
   // Ece hiç maç oynamadı → contract gereği perf_avg = 1.0 (nötr), score ≈ 0.
   const players = [
@@ -24,12 +24,12 @@
     { id: 14, display_name: "Ece",    riot_id: "Ece#NEW",       matches_played: 0,  rating: { mu: 25.0, sigma: 8.333, ordinal: 0.0, perf_avg: 1.0 } },
   ];
 
-  // Contract formülü (rating_contract.md "Harman Engine"): W=0.5, MU_0=25, K=20.
+  // Contract formülü (rating_contract.md "Harman Engine — blend20"): W=0.8, MU_0=25, K=20.
   // perf_avg null → harman-dışı version: score = ordinal.
   const scoreOf = (r) =>
     r.perf_avg == null
       ? r.ordinal
-      : +(0.5 * r.mu + 0.5 * (25 + 20 * (r.perf_avg - 1)) - 3 * r.sigma).toFixed(1);
+      : +(0.2 * r.mu + 0.8 * (25 + 20 * (r.perf_avg - 1)) - 3 * r.sigma).toFixed(1);
   players.forEach(p => { p.rating.score = scoreOf(p.rating); });
 
   const CHAMPS = ["Ahri", "Lee Sin", "Jinx", "Thresh", "Darius", "Yasuo", "Lux", "Ezreal", "Vi", "Orianna"];
@@ -40,7 +40,7 @@
   // Mock'ta her oyuncunun bir ana + bir ikincil rolü maç görmüş, kalan 3 rol default.
   const defaultRole = () => ({ mu: 25.0, sigma: 8.333, perf_avg: 1.0, score: 0.0, matches: 0 });
   const roleScoreOf = (mu, sigma, perf) =>
-    +(0.5 * mu + 0.5 * (25 + 20 * (perf - 1)) - 3 * sigma).toFixed(1);
+    +(0.2 * mu + 0.8 * (25 + 20 * (perf - 1)) - 3 * sigma).toFixed(1);
 
   // SENARYO BAYRAĞI (GÖREV 4): bu rolde HİÇ kimsenin maçı yokmuş gibi davranılır
   // (5 anahtar yine döner, hepsi default prior). Harita ekranındaki soluk "—"
@@ -415,7 +415,7 @@
       .sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at));
 
     // mu W/L ile yürür, sigma yavaşça daralır, P_avg kümülatif ortalamadır —
-    // score = 0.5*mu + 0.5*(25 + 20*(P_avg-1)) - 3*sigma (rating_contract harman).
+    // score = 0.2*mu + 0.8*(25 + 20*(P_avg-1)) - 3*sigma (rating_contract harman/blend20).
     let mu = 25, sigma = 8.333, perfSum = 0;
     const points = [];
     mine.forEach((m, i) => {
@@ -432,7 +432,7 @@
         win,
         champion: part.champion,
         position: part.position,
-        score_after: +(0.5 * mu + 0.5 * (25 + 20 * (pAvg - 1)) - 3 * sigma).toFixed(2),
+        score_after: +(0.2 * mu + 0.8 * (25 + 20 * (pAvg - 1)) - 3 * sigma).toFixed(2),
         stats: noStats ? null : {
           kills: part.stats.kills, deaths: part.stats.deaths, assists: part.stats.assists,
         },
@@ -441,7 +441,7 @@
 
     return {
       player_id: id,
-      engine_version: "openskill-pl-blend50-v1",
+      engine_version: "openskill-pl-blend20-v1",
       points: id === HIST_SINGLE_PLAYER ? points.slice(0, 1) : points,
     };
   }
@@ -848,7 +848,7 @@
       const body = JSON.parse(opts.body);
       const ids = [...new Set(body.player_ids || [])];
       if (ids.length !== 10) return err(422, "Dengeleme için tam 10 farklı oyuncu seçilmelidir.");
-      return json({ engine_version: "openskill-pl-blend50-v1", suggestions: balanceSuggestions(ids) });
+      return json({ engine_version: "openskill-pl-blend20-v1", suggestions: balanceSuggestions(ids) });
     }
 
     // Nemesis maçı (GÖREV 3): /balance ile aynı yanıt + "nemesis" nesnesi.
@@ -866,7 +866,7 @@
       if (missing.length)
         return err(422, `Nemesis çifti seçimin dışında: ${missing.map(x => x.display_name).join(" ve ")} de seçilmeli.`);
       return json({
-        engine_version: "openskill-pl-blend50-v1",
+        engine_version: "openskill-pl-blend20-v1",
         suggestions: nemesisSuggestions(ids, pair),
         nemesis: { source: nem.active, role: pair.role, player_ids: pids },
       });

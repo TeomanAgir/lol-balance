@@ -47,7 +47,7 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
 |---|---|---|---|
 | `API_KEY` | evet | — | Tüm `/api/v1` isteklerinde beklenen `X-API-Key` değeri |
 | `DB_PATH` | hayır | `backend/data/lol_balance.db` | SQLite dosya yolu |
-| `ENGINE_VERSION` | hayır | `openskill-pl-perf-v1` | Aktif rating engine versiyonu |
+| `ENGINE_VERSION` | hayır | `openskill-pl-blend20-v1` | Aktif rating engine versiyonu |
 | `WEBUI_DIR` | hayır | `../webui` | Statik servis edilecek dizin |
 
 ## Tasarım notları
