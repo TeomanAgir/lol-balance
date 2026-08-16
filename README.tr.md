@@ -5,6 +5,9 @@
 Arkadaş grubunun League of Legends 5v5 custom maçları için: LCU'dan otomatik veri
 toplama → rating (OpenSkill tabanlı harman modeli) → takım dengeleme → web UI.
 
+📖 Oyuncu musun? Skorun nasıl hesaplandığını merak ediyorsan:
+[Skorun Nasıl Hesaplanıyor? — Oyuncu Rehberi](docs/rating_guide.md)
+
 ## Bileşenler
 
 | Dizin | Ne | Teknoloji |
