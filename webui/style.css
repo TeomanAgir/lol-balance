@@ -1325,6 +1325,27 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--red); }
 .delta.none { color: var(--muted); }
+/* ── Geçmiş kartı K/D/A sütunu (GÖREV 19) — "mc-" öneki ──
+   Ad (.p-who, flex:1 + ellipsis) ile delta arasında SABİT genişlikli soluk
+   sayı: adın kırpılması KDA'yı bozamaz, delta hizası oynamaz. k/d/a'dan biri
+   null ise app.js span'ı HİÇ basmaz (yer tutucu yok). Dar ekran kuralı aşağıda:
+   sabit parça eklediği için mevcut <410px taşmasını büyütmesin diye gizlenir. */
+.team .mc-kda {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Dar ekranda KDA sütunu GİZLENİR (GÖREV 19 kararı: gizleme serbest, taşmayı
+   büyütmek yasak). Ölçüm (mock, iframe viewport): KDA açıkken kart taşması
+   480px'te 0, 470px'te 2, 430px'te 26, 390px'te 24px; gizleyince tüm bu
+   genişliklerde taban çizgisiyle birebir aynı (390px'te 0, ilk taşma yine
+   320px'te 12px). Eşik bu yüzden 479'dur — <410px davranışı değişmez. */
+@media (max-width: 479px) {
+  .match-teams .mc-kda { display: none; }
+}
 /* ── Maç kartı şampiyon portresi (GÖREV 14 uzantısı) — "mc-" öneki ──
    Kutunun boyutunu KAPSAYICI verir (dd- sözleşmesi); satır yüksekliğini
    büyütmemek için 19px'te kalır. Takım rengi çerçevesi YOK: satırın sol
@@ -1537,6 +1558,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .md-name.red { text-align: right; }
 .md-champ { color: var(--muted); font-size: 11px; }
+/* Maç detayı K/D/A (GÖREV 19): ad hücresinin (beş sekmede ortak şablon) kalıcı
+   parçası — sekme değişince kaybolmaz. Alt yazıyla aynı soluk dil; ızgara
+   sütununa SABİT genişlik eklemez (hücre minmax(0,1fr) içinde ellipsis'e düşer),
+   bu yüzden KS1 bar/ibre düzeni ve 320px taşma davranışı değişmez. */
+.md-kda { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* Ad artık profile giden GERÇEK düğme (GÖREV 15) — görünüm değişmez:
    - justify-self start/end + max-width:100% → düğme metnin genişliğinde durur,
      ızgara sütunları (minmax(0,1fr) auto minmax(0,1fr)) dokunulmaz kalır, yani
