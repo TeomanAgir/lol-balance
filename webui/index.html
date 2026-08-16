@@ -31,7 +31,7 @@
     <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
     <button class="sb-item"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
     <button class="sb-item"        data-view="faq"         type="button" data-i18n="common.tab_faq"></button>
-    <button class="sb-item"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
+    <button class="sb-item"        data-view="health"      type="button" data-i18n="common.tab_health"></button>
   </nav>
   <div class="sb-bottom">
     <!-- Dil düğmesi hedef dili gösterir: tr sözlüğünde "EN", en sözlüğünde "TR" —
@@ -260,36 +260,11 @@
     <div id="matchdetail-body" aria-live="polite"></div>
   </section>
 
-  <!-- ═══ Manuel giriş ═══ -->
-  <section id="view-manual" class="view" hidden>
-    <p class="view-hint" data-i18n="manual.hint"></p>
-    <!-- Collector sağlığı (GÖREV 13) girişi: yeni sekme değil, Manuel'den açılan
-         detay görünümü (harita/profil deseni; gezinmede Manuel yanık kalır). -->
-    <div class="ch-entry"><button id="btn-health-open" class="ch-link" type="button"
-        data-i18n="manual.health_link"></button></div>
-    <div id="manual-roster" class="manual-list"></div>
-
-    <fieldset class="winner-pick">
-      <legend data-i18n="manual.winner_legend"></legend>
-      <!-- Metin ayrı span'dedir: data-i18n textContent yazar, radyo input'u korunur -->
-      <label class="winner-opt blue"><input type="radio" name="winner" value="100"><span data-i18n="manual.winner_blue"></span></label>
-      <label class="winner-opt red"><input type="radio" name="winner" value="200"><span data-i18n="manual.winner_red"></span></label>
-    </fieldset>
-
-    <div class="action-bar">
-      <!-- İçerik JS'te kurulur: updateManualCounter() → "Mavi {b}/5 · Kırmızı {r}/5" -->
-      <div id="manual-counter" class="pick-counter small"></div>
-      <button id="btn-manual-submit" class="btn-primary" type="button"
-              data-i18n="manual.submit_btn" disabled></button>
-    </div>
-  </section>
-
-  <!-- ═══ Collector sağlığı (GÖREV 13) — sekme değil, Manuel'den açılan detay görünümü ═══ -->
+  <!-- ═══ Collector sağlığı (GÖREV 13; GÖREV 20 ile kendi sekmesine taşındı) ═══ -->
   <!-- Veri: GET /health/collectors (api_contract §6). Otomatik polling YOK:
-       görünüm açılınca bir kez çekilir, "Yenile" düğmesi elle tazeler. -->
+       görünüm açılınca bir kez çekilir, "Yenile" düğmesi elle tazeler. Normal
+       sekme gibi çözülür (META deseni, GÖREV 17), geri düğmesi yoktur. -->
   <section id="view-health" class="view" hidden>
-    <!-- Geri düğmesi metnini loadHealth() yazar (her zaman Manuel'e döner) -->
-    <button id="btn-health-back" class="back-btn" type="button"></button>
     <p class="view-hint" data-i18n="health.hint"></p>
     <div class="ch-bar">
       <!-- İçerik JS'te kurulur: loadHealth() → "3 cihaz" -->

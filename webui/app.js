@@ -18,7 +18,6 @@
     roster: [],                 // GET /players sonucu
     board: [],                  // GET /leaderboard sonucu (harita ekranı, GÖREV 4)
     selected: new Set(),        // dengeleme seçimi (player_id)
-    manualTeams: new Map(),     // manuel giriş: player_id -> 100 | 200
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
     profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita | maç detayı)
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
@@ -350,7 +349,7 @@
   // ── Sekme yönlendirme ─────────────────────────────────────────
   const loaders = {
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
-    map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
+    map: loadMap, matches: loadMatches, profile: loadProfile,
     matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
     faq: loadFaq, faqdetail: loadFaqDetail,
   };
@@ -360,9 +359,8 @@
   // Maç detayı (GÖREV 8) iki yerden açılır: Geçmiş kartı ve (GÖREV 10) profil
   // grafiğindeki nokta → geldiği görünümün sekmesi yanar, profilden gelişte zincir
   // profile → profileFrom olarak çözülür.
-  // Collector sağlığı (GÖREV 13) TEK yerden açılır (Manuel) → sabit eşleme.
-  // META (GÖREV 16) burada YOKTUR: GÖREV 17 ile kendi sekmesine taşındı
-  // (Teoman kararı) → normal sekme gibi çözülür, geri düğmesi yoktur.
+  // META (GÖREV 16) ve Sağlık (GÖREV 13, GÖREV 20 ile kendi sekmesine taşındı)
+  // burada YOKTUR → normal sekme gibi çözülür, geri düğmesi yoktur.
   //
   // Zincir artık ÇİFT YÖNLÜ olabilir (GÖREV 15: maç detayı satırındaki addan
   // profile) → profile→matchdetail→profile sonsuz özyinelemeye girerdi. Bu yüzden
@@ -373,7 +371,6 @@
     profile: () => state.profileFrom,
     map: () => state.mapFrom,
     matchdetail: () => state.matchFrom,
-    health: () => "manual",
     faqdetail: () => "faq",   // SSS detayı TEK yerden açılır (SSS listesi) → sabit eşleme
   };
   function tabOf(name, seen) {
@@ -2508,90 +2505,11 @@
     });
   }
 
-  // ── 4) Manuel maç girişi ──────────────────────────────────────
-  async function loadManual(force) {
-    await fetchRoster(force);
-    const box = $("#manual-roster");
-    box.innerHTML = "";
-    for (const p of state.roster) {
-      const row = document.createElement("div");
-      row.className = "manual-row";
-      row.innerHTML =
-        `<span class="p-name">${esc(p.display_name)}</span>
-         <div class="team-toggle">
-           <button type="button" class="tt-blue" aria-pressed="false">${t("common.blue")}</button>
-           <button type="button" class="tt-red" aria-pressed="false">${t("common.red")}</button>
-         </div>`;
-      const btnB = row.querySelector(".tt-blue");
-      const btnR = row.querySelector(".tt-red");
-      const setTeam = (team) => {
-        if (state.manualTeams.get(p.id) === team) state.manualTeams.delete(p.id);
-        else state.manualTeams.set(p.id, team);
-        const cur = state.manualTeams.get(p.id);
-        btnB.setAttribute("aria-pressed", cur === 100);
-        btnR.setAttribute("aria-pressed", cur === 200);
-        updateManualCounter();
-      };
-      btnB.addEventListener("click", () => setTeam(100));
-      btnR.addEventListener("click", () => setTeam(200));
-      const cur = state.manualTeams.get(p.id);
-      btnB.setAttribute("aria-pressed", cur === 100);
-      btnR.setAttribute("aria-pressed", cur === 200);
-      box.appendChild(row);
-    }
-    updateManualCounter();
-  }
-
-  function manualCounts() {
-    let blue = 0, red = 0;
-    for (const tm of state.manualTeams.values()) tm === 100 ? blue++ : red++;
-    return { blue, red };
-  }
-
-  function updateManualCounter() {
-    const { blue, red } = manualCounts();
-    $("#manual-counter").textContent = t("manual.counter", { blue, red });
-    const winner = document.querySelector("input[name=winner]:checked");
-    $("#btn-manual-submit").disabled = !(blue === 5 && red === 5 && winner);
-  }
-  document.querySelectorAll("input[name=winner]").forEach(r =>
-    r.addEventListener("change", updateManualCounter));
-
-  $("#btn-manual-submit").addEventListener("click", async () => {
-    const btn = $("#btn-manual-submit");
-    const winner = Number(document.querySelector("input[name=winner]:checked").value);
-    btn.disabled = true;
-    btn.textContent = t("common.saving");
-    try {
-      const res = await api("/ingest/match", {
-        method: "POST",
-        body: {
-          source: "manual",
-          source_game_id: "manual:" + crypto.randomUUID(),
-          played_at: new Date().toISOString(),
-          duration_s: null,
-          winner_team: winner,
-          participants: [...state.manualTeams].map(([player_id, team]) =>
-            ({ player_id, team, position: null })),
-        },
-      });
-      toast(res.duplicate ? t("manual.duplicate") : t("manual.saved"), "ok");
-      state.manualTeams.clear();
-      document.querySelectorAll("input[name=winner]").forEach(r => { r.checked = false; });
-      loadManual(true).catch(e => toast(e.message));
-    } catch (e) {
-      toast(e.message);
-    } finally {
-      btn.textContent = t("manual.submit_btn");
-      updateManualCounter();
-    }
-  });
-
-  // ── 5) Collector sağlığı (GÖREV 13) ───────────────────────────
-  // Veri: GET /health/collectors (api_contract §6). Sekme DEĞİL: Manuel ekranından
-  // açılan detay görünümü (harita/profil deseni; tabOf → "manual", geri düğmesi
-  // hep Manuel'e döner). Otomatik polling YOK — görünüm açılınca bir kez çekilir,
-  // "Yenile" elle tazeler (basit kalsın; heartbeat aralığı zaten dakikalar mertebesinde).
+  // ── 4) Collector sağlığı (GÖREV 13; GÖREV 20 ile kendi sekmesine taşındı) ──
+  // Veri: GET /health/collectors (api_contract §6). Normal sekme gibi çözülür
+  // (META deseni, GÖREV 17), geri düğmesi yoktur. Otomatik polling YOK —
+  // görünüm açılınca bir kez çekilir, "Yenile" elle tazeler (basit kalsın;
+  // heartbeat aralığı zaten dakikalar mertebesinde).
   //
   // EŞİKLER UI SABİTİDİR: contract'ta yoktur, backend bu ayrımı bilmez. Değişirse
   // yalnız burası değişir (yanıt şekli aynı kalır).
@@ -2657,10 +2575,7 @@
       </article>`;
   }
 
-  // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir
-  // (maç detayındaki desenin aynısı).
   async function loadHealth() {
-    $("#btn-health-back").textContent = t("common.back_manual");
     const box = $("#health-body");
     const btn = $("#btn-health-refresh");
     const count = $("#health-count");
@@ -2697,8 +2612,6 @@
     box.innerHTML = `<div class="ch-list">${devices.map(chCard).join("")}</div>`;
   }
 
-  $("#btn-health-open").addEventListener("click", () => showView("health"));
-  $("#btn-health-back").addEventListener("click", () => showView("manual"));
   // Elle yenileme: görünüm zaten açık, sekme değiştirmeden aynı yükleyici koşar.
   $("#btn-health-refresh").addEventListener("click", () =>
     loadHealth().catch(e => toast(e.message)));
