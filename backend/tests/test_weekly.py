@@ -14,7 +14,7 @@ from conftest import make_roster_payload
 
 from app.services.weekly import weekly_highlights
 
-ENGINE = "openskill-pl-blend50-v1"
+ENGINE = "openskill-pl-blend20-v1"
 
 # Sabit "şimdi": pencere = 2026-08-13T12:00:00Z < played_at <= 2026-08-20T12:00:00Z
 NOW = datetime(2026, 8, 20, 12, 0, 0, tzinfo=timezone.utc)
@@ -119,12 +119,14 @@ def _ordinal_delta(db, player_id, first_match_id, last_match_id):
 # --------------------------------------------------------------------------
 # Ana senaryo
 # --------------------------------------------------------------------------
-# Pencere DIŞI (2026-08-01..03), her maçı team100 kazanır:
+# Pencere DIŞI (2026-08-01..06), her maçı team100 kazanır:
 #   100 = [Zirve, Ali, Burak, Cem, Deniz]  200 = [Emre, Fatma, Gizem, Hakan, Irmak]
-#   → Zirve 3G/0M ile en yüksek güncel score'u alır ve pencerede HİÇ oynamaz.
+#   → Zirve 6G/0M ile en yüksek güncel score'u alır ve pencerede HİÇ oynamaz.
+#   (blend20'de mu payı %20 olduğundan 3 galibiyet yetmez: az maç = yüksek sigma
+#   cezası mu avantajını yer; 6 galibiyet Zirve'yi rahat marjla zirvede tutar.)
 # Pencere İÇİ (08-14, 08-16, 08-19), her maçı team100 kazanır:
 #   100 = [Emre, Fatma, Gizem, Hakan, Irmak]  200 = [Ali, Burak, Cem, Deniz, Jale]
-#   → Emre grubu 3 mağlubiyetin ardından 3 galibiyet: pencere içi yükseliş onlarda.
+#   → Emre grubu 6 mağlubiyetin ardından 3 galibiyet: pencere içi yükseliş onlarda.
 # Statlar tüm katılımcılarda aynı (perf = 1.0 nötr) → aynı takımdaki oyuncuların
 # rating yörüngesi BİREBİR aynıdır; bu, eşitlik kırılımlarını test edilebilir kılar.
 OLD_100 = ["Zirve", "Ali", "Burak", "Cem", "Deniz"]
@@ -136,7 +138,7 @@ WIN_200 = ["Ali", "Burak", "Cem", "Deniz", "Jale"]
 def _scenario(client):
     """(ids, pencere içi maç id'leri kronolojik) döner."""
     ids = _make_players(client, TEN + ["Zirve"])
-    for i, day in enumerate(("01", "02", "03")):
+    for i, day in enumerate(("01", "02", "03", "04", "05", "06")):
         _ingest(client, ids, f"old{i}", f"2026-08-{day}T20:00:00Z",
                 OLD_100, OLD_200, winner_team=100)
     window_ids = [
@@ -185,7 +187,7 @@ def test_matches_in_window_excludes_older_matches(client, db):
     }
     # Kazanan pencere dışında da oynamış olabilir; sayaç yalnız pencereyi sayar.
     assert best["matches_in_window"] == 3
-    assert played[best["display_name"]] in (3, 6)
+    assert played[best["display_name"]] in (3, 9)
 
 
 def test_rising_star_uses_window_endpoints(client, db):

@@ -453,7 +453,7 @@ def test_balance_nemesis_pins_pair_to_opposite_teams(client):
     assert r.status_code == 200, r.text
     body = r.json()
 
-    assert body["engine_version"] == "openskill-pl-blend50-v1"
+    assert body["engine_version"] == "openskill-pl-blend20-v1"
     assert body["nemesis"] == {
         "source": "weekly", "role": role, "player_ids": [ids[A], ids[B]]
     }
