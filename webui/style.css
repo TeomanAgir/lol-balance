@@ -2028,6 +2028,125 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .modal .btn-primary { width: 100%; }
 
+/* ── SSS (FAQ) — sınıflar fq- önekli (global ad alanı dersi) ──
+   Liste: GitHub issue listesi hissinde tıklanabilir kartlar (başlık + özet).
+   Kart gövdesi stat-card/ch-card ile aynı dili konuşur: surface zemin, line
+   çerçeve, 10px radius; hover'da pirinç vurgu (name-link/sb-kb deseni). */
+.fq-list { display: grid; gap: 10px; }
+.fq-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.fq-card:hover { border-color: var(--brass-dim); background: var(--surface-2); }
+.fq-card-title {
+  display: block;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.fq-card:hover .fq-card-title { color: var(--brass); }
+.fq-card-sum { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
+
+/* Hata kutusu META/health hata desenidir (mt-error) */
+.fq-error {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+}
+.fq-err-title { font-weight: 600; }
+.fq-err-detail { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+/* Madde gövdesi: mdToHtml çıktısı yalnız bu kapsayıcıda yaşar; element
+   seçicileri .fq-doc altına kilitli, global sızıntı yok. */
+.fq-doc {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px 22px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.fq-doc h1, .fq-doc h2, .fq-doc h3, .fq-doc h4, .fq-doc h5, .fq-doc h6 {
+  font-family: var(--display);
+  letter-spacing: 0.02em;
+  margin: 20px 0 8px;
+}
+.fq-doc h1 { font-size: 24px; margin-top: 0; color: var(--brass); }
+.fq-doc h2 {
+  font-size: 19px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+.fq-doc h3 { font-size: 16px; }
+.fq-doc p { margin: 8px 0; }
+.fq-doc ul, .fq-doc ol { margin: 8px 0; padding-left: 22px; }
+.fq-doc li { margin: 4px 0; }
+.fq-doc a { color: var(--blue); text-decoration: underline; }
+.fq-doc a:hover { color: var(--brass); }
+.fq-doc strong { color: var(--text); }
+.fq-doc code {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.fq-pre {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  overflow-x: auto;    /* dar ekranda blok kendi içinde kayar */
+}
+.fq-pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  white-space: pre;
+  font-size: 13px;
+  color: var(--text);
+}
+.fq-doc blockquote {
+  border-left: 3px solid var(--brass-dim);
+  background: color-mix(in srgb, var(--brass) 6%, transparent);
+  border-radius: 0 8px 8px 0;
+  padding: 8px 14px;
+  margin: 10px 0;
+  color: var(--muted);
+}
+.fq-doc blockquote p { margin: 4px 0; }
+/* Tablo sarmalayıcıda yatay kayar: 320px'te sayfa genişlemez (md-graph kuralı) */
+.fq-tablewrap { overflow-x: auto; margin: 10px 0; }
+.fq-doc table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.fq-doc th, .fq-doc td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.fq-doc th {
+  background: var(--surface-2);
+  font-family: var(--display);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;

@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "slug": "skor-hesabi",
+      "title": {
+        "tr": "Skorun nasıl hesaplanıyor?",
+        "en": "How is your score computed?"
+      },
+      "summary": {
+        "tr": "Leaderboard'daki sayının tüm mutfağı: mu/sigma, performans puanı, P_avg ve harman — adım adım.",
+        "en": "The whole kitchen behind the leaderboard number: mu/sigma, performance score, P_avg and the blend — step by step."
+      },
+      "file": {
+        "tr": "tr/skor-hesabi.md",
+        "en": "en/skor-hesabi.md"
+      }
+    },
+    {
+      "slug": "kazandik-skor-az-artti",
+      "title": {
+        "tr": "Kazandık ama skorum çok az arttı. Neden?",
+        "en": "We won but my score barely moved. Why?"
+      },
+      "summary": {
+        "tr": "W/L skorun yalnızca %20'si; skoru asıl oynatan maç içi performansındır.",
+        "en": "W/L is only 20% of the score; what really moves it is your in-game performance."
+      },
+      "file": {
+        "tr": "tr/kazandik-skor-az-artti.md",
+        "en": "en/kazandik-skor-az-artti.md"
+      }
+    },
+    {
+      "slug": "kaybettik-skor-artti",
+      "title": {
+        "tr": "Kaybettik ama skorum arttı. Bu nasıl oluyor?",
+        "en": "We lost but my score went up. How?"
+      },
+      "summary": {
+        "tr": "Bilinçli bir tasarım kararı: kaybeden takımda bile iyi oynamak boşa gitmez.",
+        "en": "A deliberate design decision: playing well on the losing team is never wasted."
+      },
+      "file": {
+        "tr": "tr/kaybettik-skor-artti.md",
+        "en": "en/kaybettik-skor-artti.md"
+      }
+    },
+    {
+      "slug": "stat-kasma",
+      "title": {
+        "tr": "Stat kasarsam skor kasabilir miyim?",
+        "en": "Can I farm stats to farm score?"
+      },
+      "summary": {
+        "tr": "Sınırlı — her bileşen 0.5–2.0 arasına kırpılır; sınırların nedenleri burada.",
+        "en": "Only so far — every component is clamped to 0.5–2.0; here is why those bounds exist."
+      },
+      "file": {
+        "tr": "tr/stat-kasma.md",
+        "en": "en/stat-kasma.md"
+      }
+    },
+    {
+      "slug": "void-mac",
+      "title": {
+        "tr": "Maç iptal (void) edilirse ne olur?",
+        "en": "What happens if a match is voided?"
+      },
+      "summary": {
+        "tr": "Maç hesaptan tamamen çıkarılır ve tüm geçmiş yeniden hesaplanır.",
+        "en": "The match is removed from the books entirely and the whole history is recomputed."
+      },
+      "file": {
+        "tr": "tr/void-mac.md",
+        "en": "en/void-mac.md"
+      }
+    },
+    {
+      "slug": "yeni-oyuncu-sifir",
+      "title": {
+        "tr": "Yeni gelen arkadaşım neden 0'da?",
+        "en": "Why is my newly joined friend at 0?"
+      },
+      "summary": {
+        "tr": "Herkes 0'dan başlar: nötr güç tahmini eksi tam belirsizlik.",
+        "en": "Everyone starts at 0: a neutral strength estimate minus full uncertainty."
+      },
+      "file": {
+        "tr": "tr/yeni-oyuncu-sifir.md",
+        "en": "en/yeni-oyuncu-sifir.md"
+      }
+    }
+  ]
+}

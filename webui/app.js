@@ -24,6 +24,7 @@
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
     meta: null,                 // assets/meta/tiers.json içeriği (GÖREV 16; null = henüz çekilmedi)
     metaFilter: "ALL",          // META süzgeci: "ALL" | ROLES elemanı
+    faqSlug: null,              // açık olan SSS maddesinin slug'ı (SSS görevi; #faq/<slug>)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
     matches: [],                // son GET /matches yanıtı (GÖREV 10: grafikten detaya atlarken önbellek)
@@ -351,6 +352,7 @@
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, manual: loadManual, profile: loadProfile,
     matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
+    faq: loadFaq, faqdetail: loadFaqDetail,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -372,6 +374,7 @@
     map: () => state.mapFrom,
     matchdetail: () => state.matchFrom,
     health: () => "manual",
+    faqdetail: () => "faq",   // SSS detayı TEK yerden açılır (SSS listesi) → sabit eşleme
   };
   function tabOf(name, seen) {
     seen = seen || new Set();
@@ -384,6 +387,7 @@
 
   function showView(name, forceReload = false) {
     currentView = name;
+    syncFaqHash(name);
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
     document.querySelectorAll(".sb-item").forEach(tb => tb.classList.toggle("active", tb.dataset.view === tab));
@@ -1650,6 +1654,307 @@
     renderMeta();
   }
 
+  // ── 2g) SSS (FAQ) — statik içerikli sekme + madde detayı ──────
+  // Veri backend'den DEĞİL statik dosyalardan gelir (META deseni): manifest
+  // assets/faq/index.json kartları, assets/faq/{tr,en}/*.md dosyaları içeriği
+  // taşır. İstekler X-API-Key TAŞIMAZ, USE_MOCK yolundan geçmez, bir kez çekilip
+  // önbelleğe alınır ve ASLA reject etmez — dosya yokluğu bu görünümün hata
+  // durumudur, uygulamanın değil.
+  //
+  // Madde detayının KALICI adresi vardır: #faq/<slug>. Uygulamanın kalanı hash
+  // kullanmadığı için kural dardır: yalnız #faq ve #faq/<slug> tanınır, diğer
+  // görünümlere geçerken FAQ hash'i temizlenir (başka hash'e dokunulmaz).
+  // Adres yazımı replaceState iledir (hashchange tetiklemez, geçmişi şişirmez);
+  // hashchange dinleyicisi yalnız DIŞ değişimi (elle yazılan/yapıştırılan adres)
+  // yakalar. Geri düğmesi health desenidir: her zaman SSS listesine döner.
+  const FAQ_URL = "assets/faq/index.json";
+  const FAQ_BASE = "assets/faq/";
+  const FAQ_SLUG_RE = /^[a-z0-9-]+$/;
+  const FAQ_HASH_RE = /^#faq(?:\/([a-z0-9-]+))?$/;
+  let faqPromise = null;
+  const faqDocCache = new Map(); // md yolu -> Promise<{text} | {err}>
+
+  // Şema dışı madde (slug yok/bozuk, title/file nesne değil, slug tekrarı)
+  // sessizce elenir: bozuk tek kayıt listeyi düşürmez (META hücre deseni).
+  function faqParseItems(d) {
+    if (!d || typeof d !== "object" || !Array.isArray(d.items)) return null;
+    const seen = new Set();
+    const out = [];
+    for (const it of d.items) {
+      if (!it || typeof it !== "object") continue;
+      if (typeof it.slug !== "string" || !FAQ_SLUG_RE.test(it.slug) || seen.has(it.slug)) continue;
+      if (!it.title || typeof it.title !== "object") continue;
+      if (!it.file || typeof it.file !== "object") continue;
+      seen.add(it.slug);
+      out.push(it);
+    }
+    return out;
+  }
+
+  // Hata METNİ değil TÜRÜ önbelleğe alınır (fetchMeta dersi): dil değişince
+  // mesaj yeniden üretilir.
+  function fetchFaq() {
+    if (faqPromise) return faqPromise;
+    faqPromise = window.fetch(FAQ_URL)
+      .then(r => {
+        if (!r.ok) return { err: { kind: "http", status: r.status } };
+        return r.json().then(
+          d => {
+            const items = faqParseItems(d);
+            return items ? { items } : { err: { kind: "shape" } };
+          },
+          () => ({ err: { kind: "shape" } }));
+      })
+      .catch(() => ({ err: { kind: "network" } }));
+    return faqPromise;
+  }
+
+  function fetchFaqDoc(path) {
+    if (!faqDocCache.has(path)) {
+      faqDocCache.set(path, window.fetch(FAQ_BASE + path)
+        .then(r => (r.ok
+          ? r.text().then(text => ({ text }))
+          : { err: { kind: "http", status: r.status } }))
+        .catch(() => ({ err: { kind: "network" } })));
+    }
+    return faqDocCache.get(path);
+  }
+
+  const faqErrText = (e) =>
+    e.kind === "http" ? t("faq.err_http", { status: e.status })
+      : e.kind === "shape" ? t("faq.err_shape")
+      : t("faq.err_network");
+
+  const faqErrorHtml = (title, e) =>
+    `<div class="fq-error">
+       <p class="fq-err-title">${title}</p>
+       <p class="fq-err-detail">${esc(faqErrText(e))}</p>
+     </div>`;
+
+  // Manifest'teki {tr, en} nesnesinden aktif dilin metni; yoksa diğer dile
+  // düşülür (ddText deseni), o da yoksa boş döner.
+  function faqLangText(obj) {
+    if (!obj || typeof obj !== "object") return "";
+    const order = window.I18n.getLang() === "tr" ? ["tr", "en"] : ["en", "tr"];
+    for (const k of order) {
+      const v = obj[k];
+      if (typeof v === "string" && v.trim()) return v;
+    }
+    return "";
+  }
+  const faqFilePath = (item) => faqLangText(item.file) || null;
+
+  // ── SSS: markdown → HTML (mini, framework'süz) ────────────────
+  // GÜVENLİK: kaynak metnin TAMAMI önce esc() ile kaçışlanır; dönüşüm kaçışlanmış
+  // metin üzerinde çalışır ve yalnız kendi ürettiği etiketleri ekler → md dosyası
+  // içine gömülü HTML asla çalışmaz (display_name XSS dersindeki disiplin).
+  // Kapsam bilinçli dar: başlık, paragraf, **kalın**, *italik*, `kod`, ``` blok,
+  // tablo, alıntı, sıralı/sırasız liste, [link](url). Alt çizgi italik BİLEREK
+  // yok: P_avg / mu_eff gibi adlar metinde geçiyor, _..._ kuralı onları bozardı.
+
+  // Yalnız güvenli hedefler: http(s), mailto, sayfa içi #, göreli yol.
+  // javascript: gibi şema taşıyan diğer URL'ler linke ÇEVRİLMEZ (düz metin kalır).
+  function fqHref(u) {
+    if (/^(https?:\/\/|mailto:|#)/i.test(u)) return u;
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(u)) return u; // şemasız = göreli
+    return null;
+  }
+
+  function mdInline(s) {
+    // Kod parçaları önce ayrılır: içlerinde * [ ] gibi imler biçimlendirilmez.
+    const codes = [];
+    s = s.replace(/`([^`]+)`/g, (m, c) => {
+      codes.push(c);
+      return "\x00" + (codes.length - 1) + "\x00";
+    });
+    s = s.replace(/\[([^\]]+)\]\(([^()\s]+)\)/g, (m, txt, url) => {
+      const href = fqHref(url);
+      if (!href) return txt;
+      const ext = /^https?:\/\//i.test(href) ? ` target="_blank" rel="noopener"` : "";
+      return `<a href="${href}"${ext}>${txt}</a>`;
+    });
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    // Tek yıldız italik: ** artıklarıyla çakışmasın diye solunda * olmayan eş.
+    s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");
+    return s.replace(/\x00(\d+)\x00/g, (m, i) => `<code>${codes[Number(i)]}</code>`);
+  }
+
+  // Tablo = hücreli satır + hemen altında ayraç satırı (|---|---|).
+  const fqIsSepRow = (s) =>
+    typeof s === "string" && /^\s*\|?[\s|:-]+\|[\s|:-]*$/.test(s) && s.indexOf("-") !== -1;
+  const fqIsTableAt = (lines, i) =>
+    lines[i].indexOf("|") !== -1 && i + 1 < lines.length && fqIsSepRow(lines[i + 1]);
+  // Paragraf biriktirmeyi kesen blok başlangıçları (alıntı imi kaçış sonrası &gt;).
+  const FQ_BLOCK_RE = /^(#{1,6}\s|```|&gt;( |$)|[-*+]\s|\d+\.\s)/;
+
+  function mdBlocks(lines) {
+    const out = [];
+    const blank = (s) => !s || !s.trim();
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (blank(line)) { i++; continue; }
+      // ``` çitli kod bloğu: içerik OLDUĞU GİBİ (satır içi biçim yok)
+      if (/^```/.test(line)) {
+        const buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+        i++; // kapanış çiti (dosya sonunda eksikse sorun değil)
+        out.push(`<pre class="fq-pre"><code>${buf.join("\n")}</code></pre>`);
+        continue;
+      }
+      const h = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (h) {
+        const n = h[1].length;
+        out.push(`<h${n}>${mdInline(h[2])}</h${n}>`);
+        i++;
+        continue;
+      }
+      // Alıntı: ardışık &gt; satırları toplanır, içeriği yeniden blok işlenir.
+      if (/^&gt;( |$)/.test(line)) {
+        const buf = [];
+        while (i < lines.length && /^&gt;( |$)/.test(lines[i]))
+          buf.push(lines[i++].replace(/^&gt; ?/, ""));
+        out.push(`<blockquote>${mdBlocks(buf)}</blockquote>`);
+        continue;
+      }
+      // Liste: madde imiyle başlar; 2+ boşluk girintili satırlar maddenin devamıdır.
+      if (/^[-*+]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+        const ordered = /^\d+\.\s+/.test(line);
+        const startRe = ordered ? /^\d+\.\s+/ : /^[-*+]\s+/;
+        const items = [];
+        while (i < lines.length && startRe.test(lines[i])) {
+          let item = lines[i].replace(startRe, "");
+          i++;
+          while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !startRe.test(lines[i].trim()))
+            item += " " + lines[i++].trim();
+          items.push(`<li>${mdInline(item)}</li>`);
+        }
+        out.push(ordered ? `<ol>${items.join("")}</ol>` : `<ul>${items.join("")}</ul>`);
+        continue;
+      }
+      if (fqIsTableAt(lines, i)) {
+        const cells = (s) =>
+          s.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(c => mdInline(c.trim()));
+        const head = cells(line);
+        i += 2; // başlık + ayraç
+        const rows = [];
+        while (i < lines.length && !blank(lines[i]) && lines[i].indexOf("|") !== -1)
+          rows.push(cells(lines[i++]));
+        // Sarmalayıcı yatay kaydırır: dar ekranda tablo sayfayı genişletmez.
+        out.push(`<div class="fq-tablewrap"><table><thead><tr>` +
+          head.map(c => `<th>${c}</th>`).join("") + `</tr></thead><tbody>` +
+          rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("") +
+          `</tbody></table></div>`);
+        continue;
+      }
+      // Paragraf: boş satıra ya da yeni blok başlangıcına dek biriktirilir.
+      const buf = [line.trim()];
+      i++;
+      while (i < lines.length && !blank(lines[i]) && !FQ_BLOCK_RE.test(lines[i]) && !fqIsTableAt(lines, i))
+        buf.push(lines[i++].trim());
+      out.push(`<p>${mdInline(buf.join(" "))}</p>`);
+    }
+    return out.join("");
+  }
+
+  const mdToHtml = (src) =>
+    mdBlocks(esc(String(src).replace(/\r\n?/g, "\n")).split("\n"));
+
+  // ── SSS: liste + detay görünümleri ────────────────────────────
+  // Yükleyiciler hiç THROW ETMEZ (META deseni): hata görünümün içinde yazılı durur.
+  async function loadFaq() {
+    const box = $("#faq-list");
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    const res = await fetchFaq();
+    if (res.err) {
+      box.innerHTML = faqErrorHtml(t("faq.error_title"), res.err);
+      return;
+    }
+    if (!res.items.length) {
+      box.innerHTML = `<p class='empty'>${t("faq.empty")}</p>`;
+      return;
+    }
+    // Kartlar GitHub issue listesi hissinde: başlık + tek cümlelik özet.
+    box.innerHTML = res.items.map(it =>
+      `<button type="button" class="fq-card" data-slug="${esc(it.slug)}">
+         <span class="fq-card-title">${esc(faqLangText(it.title))}</span>
+         <span class="fq-card-sum">${esc(faqLangText(it.summary))}</span>
+       </button>`).join("");
+    box.querySelectorAll(".fq-card").forEach(btn =>
+      btn.addEventListener("click", () => openFaqItem(btn.dataset.slug)));
+  }
+
+  function openFaqItem(slug) {
+    state.faqSlug = slug;
+    clearBack();
+    showView("faqdetail");
+  }
+  $("#btn-faqdetail-back").addEventListener("click", () => showView("faq"));
+
+  // Geri düğmesi metni burada yazılır → dil değişiminde kendiliğinden tazelenir.
+  // Deep-link ile ilk giriş bu görünüm olabilir: manifest burada da çekilir.
+  async function loadFaqDetail() {
+    $("#btn-faqdetail-back").textContent = t("common.back_faq");
+    const box = $("#faqdetail-body");
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    const res = await fetchFaq();
+    if (res.err) {
+      box.innerHTML = faqErrorHtml(t("faq.error_title"), res.err);
+      return;
+    }
+    const item = res.items.find(x => x.slug === state.faqSlug);
+    if (!item) {
+      // Bayat/bozuk deep-link: madde yok — kısa mesaj, liste geri düğmesi duruyor.
+      box.innerHTML = `<p class='empty'>${t("faq.not_found")}</p>`;
+      return;
+    }
+    const path = faqFilePath(item);
+    const doc = path ? await fetchFaqDoc(path) : { err: { kind: "shape" } };
+    if (doc.err) {
+      box.innerHTML = faqErrorHtml(t("faq.item_error"), doc.err);
+      return;
+    }
+    box.innerHTML = `<article class="fq-doc">${mdToHtml(doc.text)}</article>`;
+  }
+
+  // ── SSS: kalıcı adres (#faq, #faq/<slug>) ─────────────────────
+  const fqSetUrl = (u) => {
+    try { history.replaceState(null, "", u); } catch { /* file:// vb. kısıtlı ortam */ }
+  };
+  // showView her geçişte çağırır: SSS görünümleri adresi yazar, diğerleri
+  // yalnız FAQ hash'ini temizler (uygulamanın başka hash'i yok, ona dokunulmaz).
+  function syncFaqHash(name) {
+    const h = name === "faq" ? "#faq"
+      : name === "faqdetail" && state.faqSlug ? "#faq/" + state.faqSlug
+      : null;
+    if (h) {
+      if (location.hash !== h) fqSetUrl(h);
+    } else if (FAQ_HASH_RE.test(location.hash)) {
+      fqSetUrl(location.pathname + location.search);
+    }
+  }
+  // Adresteki FAQ hash'ini görünüme çevirir; FAQ hash'i değilse false döner
+  // (başlangıçta varsayılan görünüme düşülür).
+  function faqRouteFromHash() {
+    const m = FAQ_HASH_RE.exec(location.hash);
+    if (!m) return false;
+    if (m[1]) state.faqSlug = m[1];
+    clearBack();
+    showView(m[1] ? "faqdetail" : "faq");
+    return true;
+  }
+  // Yalnız DIŞ hash değişimi (adres çubuğuna yazma, tarayıcı geri'si): kendi
+  // yazdığımız replaceState bu olayı tetiklemez. Zaten açık görünümse dokunulmaz.
+  window.addEventListener("hashchange", () => {
+    const m = FAQ_HASH_RE.exec(location.hash);
+    if (!m) return;
+    const already = m[1]
+      ? currentView === "faqdetail" && state.faqSlug === m[1]
+      : currentView === "faq";
+    if (!already) faqRouteFromHash();
+  });
+
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   // Kart satırındaki şampiyon portresi (GÖREV 14 uzantısı): kartlar arasında
   // gezerken aranan maç yüzlerden tanınsın diye adın ÖNÜNE küçük portre girer.
@@ -2377,5 +2682,7 @@
 
   // ── Başlangıç ─────────────────────────────────────────────────
   if (!state.apiKey) openKeyModal();
-  showView("balance");
+  // Deep-link: adres #faq ya da #faq/<slug> ise doğrudan o SSS görünümü açılır
+  // (paylaşılan link ilk açılışta da çalışır); değilse varsayılan görünüm.
+  if (!faqRouteFromHash()) showView("balance");
 })();
