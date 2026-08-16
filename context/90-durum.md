@@ -1,6 +1,14 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-08-15 (orkestratör)
+Son güncelleme: 2026-08-16 (orkestratör)
+
+## 2026-08-16: aktif engine `openskill-pl-blend20-v1`
+- Teoman kararı (simülasyon destekli, CHANGE_REQUESTS 2026-08-16): W/L %20 + perf %80
+  (`mu_eff = 0.2*mu + 0.8*(25+20*(P_avg-1))`). blend50 tanımlı kaldı, aktif değil.
+- Testler: rating 156 · backend 251 · collector 479; E2E scratch'te iki evren replay
+  determinizmi + leaderboard formülü + eski engine satırlarının korunumu PASS.
+- DEPLOY SONRASI ADIM: canlıda `POST /admin/replay` (tek çağrı iki evreni kurar);
+  replay'e dek herkes nötr görünür (P_avg satırı olmadığından).
 
 ## Canlı sistem
 - https://lol.teomanagir.com — K8s/VPS, TLS, günlük yedek. 18+ maç, 14+ oyuncu

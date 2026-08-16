@@ -21,9 +21,10 @@ Bağlam aktarımı worker'lara HER ZAMAN `context/` üzerinden (protokol: `conte
 
 ## Aktif rating modeli
 
-`openskill-pl-blend50-v1` (spec: rating_contract "Harman Engine"):
-`score = [0.5·mu + 0.5·(25 + 20·(P_avg−1))] − 3·sigma`. Rol evreni ayrı tablo, birebir
+`openskill-pl-blend20-v1` (Teoman, 2026-08-16; spec: rating_contract "Harman Engine — blend20"):
+`score = [0.2·mu + 0.8·(25 + 20·(P_avg−1))] − 3·sigma`. Rol evreni ayrı tablo, birebir
 aynı formül. Sabitler version'a donuk — tuning = yeni version + Teoman onayı.
+Geçiş canlıda `POST /admin/replay` GEREKTİRDİ (iki evren; replay'e dek herkes nötr görünür).
 Faz 2 (pair synergy rating) hâlâ kapsam dışı; sinerji yalnız gösterim.
 
 ## Orkestratör işletim defteri (bu oturumların pahalı dersleri)
