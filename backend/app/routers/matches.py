@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from rating import ROLES
+from rating import ROLES, Engine
 
 from ..config import Settings, get_settings
 from ..deps import get_db
@@ -15,7 +15,8 @@ from ..schemas import (
     PositionsUpdateResponse,
 )
 from ..services.items import dump_items, load_items, validate_items
-from ..services.ratings import replay
+from ..services.rating_history import historical_score, match_perf_prefixes
+from ..services.ratings import is_blend, replay
 from ..services.role_ratings import replay_roles
 
 router = APIRouter()
@@ -26,17 +27,62 @@ _MATCH_COLUMNS = (
 )
 
 
+def _rating_change(
+    row: sqlite3.Row,
+    engine: Engine,
+    blend: bool,
+    prefixes: dict[int, tuple[tuple[float, int], tuple[float, int]]],
+) -> dict | None:
+    """`rating_change` nesnesi (api_contract §3); rating satırı yoksa None.
+
+    `score_before`/`score_after` (GÖREV 18) rating tarihçesi endpoint'iyle
+    BİREBİR aynı tanımdır: kümülatif önek P_avg'li tarihsel efektif score,
+    hesap `rating_history.historical_score` üzerinden (formül kopyalanmaz).
+    "önce" öneki maçı hariç tutar; oyuncunun önceki maçı yoksa default durum
+    (rh.mu_before/sigma_before zaten default + boş önek → nötr P_avg).
+    """
+    if row["mu_after"] is None:
+        return None
+    (before_sum, before_count), (after_sum, after_count) = prefixes[
+        row["player_id"]
+    ]
+    return {
+        "mu_before": row["mu_before"],
+        "sigma_before": row["sigma_before"],
+        "mu_after": row["mu_after"],
+        "sigma_after": row["sigma_after"],
+        # Hassasiyet: 2 ondalık, yuvarlama yalnız çıktıda (api_contract §3).
+        "score_before": round(
+            historical_score(
+                engine, blend, row["mu_before"], row["sigma_before"],
+                before_sum, before_count,
+            ),
+            2,
+        ),
+        "score_after": round(
+            historical_score(
+                engine, blend, row["mu_after"], row["sigma_after"],
+                after_sum, after_count,
+            ),
+            2,
+        ),
+    }
+
+
 def _serialize_match(
     conn: sqlite3.Connection, match: sqlite3.Row, engine_version: str
 ) -> dict:
     """Tek maçın yanıt şekli — liste ve tekil endpoint TEK bu fonksiyonu kullanır
     (api_contract §3: `GET /matches/{id}` liste elemanıyla BİREBİR aynı şekil).
     """
+    engine = Engine(version=engine_version)
+    blend = is_blend(engine)
     participants = conn.execute(
         "SELECT mp.player_id, p.display_name, mp.team, mp.position, mp.champion,"
         " mp.kills, mp.deaths, mp.assists, mp.gold, mp.cs,"
         " mp.damage_to_champs, mp.vision_score, mp.items_json,"
-        " rh.mu_before, rh.sigma_before, rh.mu_after, rh.sigma_after "
+        " rh.mu_before, rh.sigma_before, rh.mu_after, rh.sigma_after,"
+        " rh.perf_score "
         "FROM match_participants mp "
         "JOIN players p ON p.id = mp.player_id "
         "LEFT JOIN rating_history rh ON rh.match_id = mp.match_id"
@@ -44,6 +90,18 @@ def _serialize_match(
         "WHERE mp.match_id = ? ORDER BY mp.team, mp.id",
         (engine_version, match["id"]),
     ).fetchall()
+    # Önek toplamları yalnız rating satırı olan katılımcılar için gerekir;
+    # void maçta (replay satırları silmiştir) hiç sorgu atılmaz.
+    scored_ids = [
+        row["player_id"] for row in participants if row["mu_after"] is not None
+    ]
+    prefixes = (
+        match_perf_prefixes(
+            conn, engine_version, match["id"], match["played_at"], scored_ids
+        )
+        if scored_ids
+        else {}
+    )
     return {
         **dict(match),
         "participants": [
@@ -65,16 +123,7 @@ def _serialize_match(
                 # api_contract §3 (GÖREV 14): null = "bilinmiyor" (eski exe/maç),
                 # [] = "bilgi var, envanter boş".
                 "items": load_items(row["items_json"]),
-                "rating_change": (
-                    {
-                        "mu_before": row["mu_before"],
-                        "sigma_before": row["sigma_before"],
-                        "mu_after": row["mu_after"],
-                        "sigma_after": row["sigma_after"],
-                    }
-                    if row["mu_after"] is not None
-                    else None
-                ),
+                "rating_change": _rating_change(row, engine, blend, prefixes),
             }
             for row in participants
         ],
