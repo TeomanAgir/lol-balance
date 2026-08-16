@@ -5,6 +5,9 @@
 For a friend group's League of Legends 5v5 custom matches: automatic data
 collection from the LCU → rating (OpenSkill-based blend model) → team balancing → web UI.
 
+📖 Player guide (Turkish): how your score is computed, step by step —
+[docs/rating_guide.md](docs/rating_guide.md)
+
 ## Components
 
 | Directory | What | Technology |
