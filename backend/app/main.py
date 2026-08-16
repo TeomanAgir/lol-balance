@@ -9,6 +9,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from starlette.responses import Response
+from starlette.types import Scope
+
 from .config import get_settings
 from .db import run_migrations
 from .deps import require_api_key
@@ -22,6 +25,21 @@ from .routers import (
     nemesis,
     players,
 )
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """Statik yanıtlara `Cache-Control: no-cache` ekler.
+
+    Amaç: deploy sonrası tarayıcının eski CSS/JS'i taze index.html ile
+    karıştırmasını önlemek. no-store DEĞİL: ETag/If-None-Match revalidasyonu
+    (304) çalışmaya devam eder; sadece "revalidate etmeden kullanma" denir.
+    Yalnız webui mount'unu etkiler, /api/v1 yanıtlarına dokunmaz.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def _validation_detail(exc: RequestValidationError) -> str:
@@ -57,7 +75,7 @@ def create_app() -> FastAPI:
 
     webui = Path(settings.webui_dir)
     if webui.is_dir():
-        app.mount("/", StaticFiles(directory=webui, html=True), name="webui")
+        app.mount("/", NoCacheStaticFiles(directory=webui, html=True), name="webui")
 
     return app
 
