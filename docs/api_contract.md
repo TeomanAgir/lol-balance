@@ -279,7 +279,8 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
               "cs": 201, "damage_to_champs": 24810, "vision_score": 21},
     "items": [6697, 6676, 3036, 3031, 1055, 2523, 3340],
     "rating_change": {"mu_before": 25.0, "sigma_before": 8.333,
-                      "mu_after": 26.1, "sigma_after": 7.9}
+                      "mu_after": 26.1, "sigma_after": 7.9,
+                      "score_before": 0.0, "score_after": 1.86}
   }]
 }]
 ```
@@ -288,6 +289,16 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
 - `rating_change` **nullable**: maç `void` ise veya bu maç için rating satırı yoksa `null` gelir.
   Rating değişimi düz alan olarak DEĞİL, bu iç nesnede taşınır — `null`, "rating'e girmedi"
   durumunu ifade edebilmek için gereklidir.
+- `score_before`/`score_after` (GÖREV 18, Teoman 2026-08-16): katılımcının EFEKTİF
+  score'u — bu maçtan önce / sonra. Tanım "Rating tarihçesi" (§2) `score_after` ile
+  BİREBİR aynıdır: harman engine'de kümülatif P_avg'lı `mu_eff - 3*sigma` (o maç
+  dahil kronolojik önek; `score_before` aynı önekten o maç HARİÇ, oyuncunun hiç
+  önceki maçı yoksa default durumdan), harman olmayan engine'de `mu - 3*sigma`.
+  Hesap rating paketinin yardımcılarıyla yapılır (formül backend'e kopyalanmaz);
+  2 ondalığa yuvarlanır; `POST /admin/replay` sonrası bit-bit aynı kalmalıdır.
+  Gösterim: web UI Geçmiş kartındaki delta `score_after - score_before`'dur (W/L
+  çekirdek mu farkı DEĞİL — blend20'de mu payı %20'ye düşünce çekirdek delta
+  kullanıcı algısındaki "puan"la ters düşebiliyordu; GÖREV 18 kaydı).
 
 ## 4. Dengeleme (çekirdek özellik) — HER ZAMAN rol bazlı (GÖREV 0)
 ```
