@@ -30,6 +30,7 @@
     <button class="sb-item"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
     <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
     <button class="sb-item"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
+    <button class="sb-item"        data-view="faq"         type="button" data-i18n="common.tab_faq"></button>
     <button class="sb-item"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
   </nav>
   <div class="sb-bottom">
@@ -217,6 +218,24 @@
     <div id="meta-filters" class="mt-filters" role="group"
          data-i18n-aria-label="meta.filter_aria" hidden></div>
     <div id="meta-body" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ SSS (FAQ) — kendi gezinme sekmesi (Teoman talebi, 2026-08-16) ═══ -->
+  <!-- Veri backend'den DEĞİL statik dosyalardan gelir (META deseni):
+       assets/faq/index.json manifest'i kartları, assets/faq/{tr,en}/*.md
+       dosyaları madde içeriğini taşır. Madde detayının kalıcı adresi vardır:
+       #faq/<slug> (deep-link app.js "SSS" bloğunda çözülür). İçerik markdown'dan
+       app.js'teki mdToHtml ile render edilir: önce HTML kaçışı, sonra dönüşüm. -->
+  <section id="view-faq" class="view" hidden>
+    <p class="view-hint" data-i18n="faq.hint"></p>
+    <div id="faq-list" class="fq-list" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ SSS madde detayı — sekme değil, SSS listesinden açılan detay görünümü ═══ -->
+  <section id="view-faqdetail" class="view" hidden>
+    <!-- Geri düğmesi metnini loadFaqDetail() yazar (her zaman SSS listesine döner) -->
+    <button id="btn-faqdetail-back" class="back-btn" type="button"></button>
+    <div id="faqdetail-body" aria-live="polite"></div>
   </section>
 
   <!-- ═══ Oyuncu profili (GÖREV 1) — sekme değil, sıralama/enler'den açılan detay görünümü ═══ -->
