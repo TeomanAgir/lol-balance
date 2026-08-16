@@ -45,8 +45,10 @@ class BlendParams:
 # mevcut bir version'ın parametreleri asla değiştirilmez.
 # "perf" None ise performans ÇARPANI yoktur (mu/sigma güncellemesi saf W/L).
 # "blend" None ise efektif rating harmanı yoktur (effective() ValueError).
-# blend50'de perf bilinçli olarak None'dır: performans hem çarpanda hem
-# harman teriminde sayılırsa çift sayım olur (contract "Model" §1).
+# blend version'larında perf bilinçli olarak None'dır: performans hem çarpanda
+# hem harman teriminde sayılırsa çift sayım olur (contract "Model" §1).
+# blend20 ile blend50 arasındaki TEK fark harman ağırlığıdır (w): version
+# adındaki sayı W/L (mu) payını söyler (blend20 → mu %20, performans %80).
 _VERSIONS = {
     "openskill-pl-v1": {
         "model": dict(_BASE_PARAMS),
@@ -68,6 +70,11 @@ _VERSIONS = {
         "model": dict(_BASE_PARAMS),
         "perf": None,
         "blend": BlendParams(mu_0=25.0, k=20.0, w=0.5),
+    },
+    "openskill-pl-blend20-v1": {
+        "model": dict(_BASE_PARAMS),
+        "perf": None,
+        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.8),
     },
 }
 
@@ -164,15 +171,19 @@ class Engine:
     def effective(self, mu: float, sigma: float, p_avg: float) -> EffectiveRating:
         """Efektif rating: mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)).
 
-        Yalnızca harman version'larında (`openskill-pl-blend50-v1`) geçerlidir;
-        diğerlerinde ValueError (yanlış version'la sıralama üretmek sessiz veri
-        bozulması olur, erken patlasın). p_avg: oyuncunun kariyer perf
-        ortalaması; maçı olmayan oyuncu için 1.0 geçilir.
+        Yalnızca harman version'larında (`openskill-pl-blend50-v1`,
+        `openskill-pl-blend20-v1`) geçerlidir; diğerlerinde ValueError (yanlış
+        version'la sıralama üretmek sessiz veri bozulması olur, erken patlasın).
+        p_avg: oyuncunun kariyer perf ortalaması; maçı olmayan oyuncu için
+        1.0 geçilir.
         """
         if self._blend is None:
+            blend_versions = sorted(
+                v for v, spec in _VERSIONS.items() if spec["blend"] is not None
+            )
             raise ValueError(
                 f"effective() harman sabiti olmayan version'da çağrılamaz: "
-                f"{self.version!r} (harman version: 'openskill-pl-blend50-v1')"
+                f"{self.version!r} (harman version'ları: {blend_versions})"
             )
         b = self._blend
         mu_eff = (1.0 - b.w) * mu + b.w * (b.mu_0 + b.k * (p_avg - 1.0))
