@@ -1974,6 +1974,16 @@
   // <select>, dengeleme kartları ve profil metin etiketi kullanmaya devam eder.
   const mcRoleHtml = (pos) => posIconHtml(pos, roleLabel(pos), "pos-tag");
 
+  // Ham K/D/A metni (GÖREV 19) — Geçmiş kartı VE maç detayının beş sekmesi
+  // aynı yardımcıyı kullanır. Kural (CHANGE_REQUESTS 2026-08-17): k/d/a'nın
+  // ÜÇÜNDEN HERHANGİ BİRİ null ise KDA HİÇ gösterilmez — kısmi değer de "—" de
+  // basılmaz (çağıran null'da span'ı atlar). Etiketsiz salt sayıdır ("7/2/9"),
+  // bu yüzden i18n anahtarı gerekmez (KDA gösterimi evrensel).
+  const kdaText = (stats) =>
+    stats && stats.kills != null && stats.deaths != null && stats.assists != null
+      ? `${stats.kills}/${stats.deaths}/${stats.assists}`
+      : null;
+
   async function loadMatches() {
     await fetchRoster();
     // Sözlükler bir kez yüklenir ve reject etmez; yoksa portreler yer tutucu
@@ -2004,9 +2014,14 @@
             const deltaHtml = rc
               ? `<span class="delta ${rcDelta >= 0 ? "up" : "down"}">${fmtDelta(rcDelta)}</span>`
               : `<span class="delta none">—</span>`;
+            // GÖREV 19: ham K/D/A adla delta ARASINDA ayrı (soluk) bir sütundur —
+            // .p-who'nun içine girmez ki adın ellipsis'i KDA'yı kırpmasın; null'da
+            // span hiç basılmaz (yer tutucu yok, satır eski haliyle çizilir).
+            const kda = kdaText(p.stats);
+            const kdaHtml = kda ? `<span class="mc-kda">${kda}</span>` : "";
             return `<li>${mcRoleHtml(p.position)}` +
                    mcChampHtml(p.champion) +
-                   `<span class="p-who">${esc(p.display_name)}</span>${deltaHtml}</li>`;
+                   `<span class="p-who">${esc(p.display_name)}</span>${kdaHtml}${deltaHtml}</li>`;
           }).join("") + "</ul>";
       };
       // Rol düzeltme paneli: yalnız DEĞİŞEN roller PUT edilir (kısmi güncelleme serbest).
@@ -2168,8 +2183,17 @@
   // side: {id, name, champ, value} — eşleşmeyen satırda taraf boş olabilir.
   // id = player_id (contract §3 katılımcı alanı): ad düğmesi profili buradan açar.
   const mdSide = (p, key) =>
-    p ? { id: p.player_id, name: p.display_name, champ: p.champion, value: mdValue(p, key) }
-      : { id: null, name: "—", champ: null, value: null };
+    p ? { id: p.player_id, name: p.display_name, champ: p.champion, value: mdValue(p, key),
+          kda: kdaText(p.stats) }
+      : { id: null, name: "—", champ: null, value: null, kda: null };
+
+  // KDA parçası (GÖREV 19) — oyuncu satırı ad hücresinin KALICI parçasıdır:
+  // beş sekmenin ortak satır başlığında durur, sekme değişince kaybolmaz.
+  // Ayna düzen: mavi tarafta adın/alt yazının SONUNA, kırmızı tarafta BAŞINA
+  // eklenir (merkeze en yakın uç). null → boş string (hiç gösterilmez).
+  const mdKdaHtml = (kda, side) => !kda ? ""
+    : side === "blue" ? ` <span class="md-kda">${kda}</span>`
+    : `<span class="md-kda">${kda}</span> `;
   // Takım toplamı: null'lar toplama girmez; hepsi null ise toplam da null'dır.
   const mdTeamSum = (parts, key) => {
     const vals = parts.map(p => mdValue(p, key)).filter(v => v != null);
@@ -2225,10 +2249,12 @@
     return `<div class="md-row">
         <div class="md-row-names">
           ${mdNameHtml("blue", left.id,
-            esc(left.name) + (left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : ""))}
+            esc(left.name) + (left.champ ? ` <span class="md-champ">· ${esc(left.champ)}</span>` : "")
+            + mdKdaHtml(left.kda, "blue"))}
           ${roleHtml}
           ${mdNameHtml("red", right.id,
-            (right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : "") + esc(right.name))}
+            mdKdaHtml(right.kda, "red")
+            + (right.champ ? `<span class="md-champ">${esc(right.champ)} · </span>` : "") + esc(right.name))}
         </div>
         <div class="md-bars">
           <span class="md-val left${mdLead(lv, rv)}">${star(isMax(lv))} ${mdFmt(stat, lv)}</span>
@@ -2334,9 +2360,13 @@
   // zaten var, bu yüzden burada tekrarlanmaz.
   function mbRowHtml(roleHtml, blue, red) {
     // Ad hücresi diğer dört sekmeyle AYNI şablondur (mdNameHtml) → profile tık
-    // beş sekmede de aynı davranır.
+    // beş sekmede de aynı davranır. KDA da aynı kalıcı parçadır (GÖREV 19):
+    // BUILD sekmesinde de görünür, mdRowHtml ile aynı ayna düzende.
     const cell = (p, side) =>
-      mdNameHtml(side, p ? p.player_id : null, esc(p ? p.display_name : "—"));
+      mdNameHtml(side, p ? p.player_id : null,
+        side === "blue"
+          ? esc(p ? p.display_name : "—") + mdKdaHtml(p ? kdaText(p.stats) : null, "blue")
+          : mdKdaHtml(p ? kdaText(p.stats) : null, "red") + esc(p ? p.display_name : "—"));
     return `<div class="md-row mb-row">
         <div class="md-row-names">
           ${cell(blue, "blue")}

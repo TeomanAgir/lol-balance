@@ -178,6 +178,9 @@
         // m === 2 maçında bazı stat alanları null (contract: stats alanları nullable) —
         // maç detayındaki (GÖREV 8) "—" + 0 genişlikte bar yolu denenebilsin.
         if (m === 2 && i === 4) part.stats.vision_score = null;
+        // GÖREV 19: k/d/a'dan yalnız BİRİ null → o satırda KDA HİÇ görünmemeli
+        // (kısmi "7/—/9" da "—" da yok). Geçmiş kartı + maç detayı bu maçla denenir.
+        if (m === 2 && i === 4) part.stats.kills = null;
         if (m === 2 && i === 9) { part.stats.gold = null; part.stats.damage_to_champs = null; }
         // m === 3 maçında mavi takımda MÜKERRER rol (iki ORMAN, TOP yok) — maç
         // detayının rol eşleştirmesi artakalanları "?" satırına düşürmeli.
