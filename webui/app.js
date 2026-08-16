@@ -1688,8 +1688,16 @@
         return `<ul class="team ${team === 100 ? "blue" : "red"} ${won ? "won" : ""}">` +
           members.map(p => {
             const rc = p.rating_change; // nullable: void maç / rating satırı yok → delta gösterme
+            // GÖREV 18: delta = EFEKTİF score farkı (api_contract §3) — W/L çekirdek
+            // mu farkı değil. Eski cache'li yanıtta score alanları yoksa mu farkına
+            // düşülür (hata fırlatılmaz); renk sınıfları (up/down) aynı kalır.
+            const rcDelta = rc
+              ? (rc.score_after != null && rc.score_before != null
+                  ? rc.score_after - rc.score_before
+                  : rc.mu_after - rc.mu_before)
+              : null;
             const deltaHtml = rc
-              ? `<span class="delta ${rc.mu_after - rc.mu_before >= 0 ? "up" : "down"}">${fmtDelta(rc.mu_after - rc.mu_before)}</span>`
+              ? `<span class="delta ${rcDelta >= 0 ? "up" : "down"}">${fmtDelta(rcDelta)}</span>`
               : `<span class="delta none">—</span>`;
             return `<li>${mcRoleHtml(p.position)}` +
                    mcChampHtml(p.champion) +

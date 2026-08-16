@@ -32,6 +32,12 @@
       : +(0.2 * r.mu + 0.8 * (25 + 20 * (r.perf_avg - 1)) - 3 * r.sigma).toFixed(1);
   players.forEach(p => { p.rating.score = scoreOf(p.rating); });
 
+  // GÖREV 18: maç önü/sonu EFEKTİF score (api_contract §3 rating_change
+  // score_before/score_after). scoreOf ile aynı harman formülü, nokta değerlerle
+  // çağrılır; contract gereği 2 ondalığa yuvarlanır.
+  const effScoreAt = (mu, sigma, pavg) =>
+    +(0.2 * mu + 0.8 * (25 + 20 * (pavg - 1)) - 3 * sigma).toFixed(2);
+
   const CHAMPS = ["Ahri", "Lee Sin", "Jinx", "Thresh", "Darius", "Yasuo", "Lux", "Ezreal", "Vi", "Orianna"];
   const POS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 
@@ -106,6 +112,19 @@
     const p = players.find(x => x.id === pid);
     const won = team === winner;
     const delta = (won ? 1 : -1) * (0.4 + ((pid * 7 + seed * 3) % 10) / 12);
+    // GÖREV 18: efektif score alanları — kümülatif P_avg taklidi. O maçın perf'i
+    // kariyer ortalamasını 1/n ağırlıkla oynatır (kronolojik önek ortalaması
+    // gibi). Kazananın perf'i ortalamanın üstüne, kaybedeninki altına eğilimli;
+    // seed sapmasıyla İYİ OYNAYAN KAYBEDEN pozitif score delta'sı alabilir
+    // (blend'in kabul edilen ödünleşimi — UI'da yeşil "+" iki yönde de görünsün).
+    const muAfter = p ? p.rating.mu : 25;
+    const muBefore = +(muAfter - delta).toFixed(2);
+    const sigmaAfter = +(p ? p.rating.sigma : 8.333).toFixed(3);
+    const sigmaBefore = +(sigmaAfter + 0.05).toFixed(3);
+    const pavgBefore = p && p.rating.perf_avg != null ? p.rating.perf_avg : 1.0;
+    const n = Math.max(1, p ? p.matches_played : 1);
+    const perfGame = pavgBefore + (won ? 0.15 : -0.35) + (((pid * 7 + seed * 5) % 12) / 12 - 0.3);
+    const pavgAfter = pavgBefore + (perfGame - pavgBefore) / n;
     return {
       player_id: pid,
       display_name: p ? p.display_name : "?",
@@ -125,10 +144,12 @@
       },
       items: mkItems(pid, position, seed),
       rating_change: {
-        mu_before: +((p ? p.rating.mu : 25) - delta).toFixed(2),
-        sigma_before: +((p ? p.rating.sigma : 8.333) + 0.05).toFixed(3),
-        mu_after: +(p ? p.rating.mu : 25).toFixed(2),
-        sigma_after: +(p ? p.rating.sigma : 8.333).toFixed(3),
+        mu_before: muBefore,
+        sigma_before: sigmaBefore,
+        mu_after: +muAfter.toFixed(2),
+        sigma_after: sigmaAfter,
+        score_before: effScoreAt(muBefore, sigmaBefore, pavgBefore),
+        score_after: effScoreAt(muAfter, sigmaAfter, pavgAfter),
       },
     };
   }
@@ -923,6 +944,10 @@
           const delta = won ? 0.8 : -0.8;
           const mu = p ? p.rating.mu : 25;
           const sigma = p ? p.rating.sigma : 8.333;
+          const sigmaAfter = +Math.max(0.5, sigma - 0.05).toFixed(3);
+          // GÖREV 18: manuel girişte stat yok → perf_score NULL → P_avg oynamaz;
+          // score farkı yalnız mu/sigma hareketinden gelir (contract'la tutarlı).
+          const pavg = p && p.rating.perf_avg != null ? p.rating.perf_avg : 1.0;
           return {
             player_id: pt.player_id,
             display_name: p ? p.display_name : "?",
@@ -937,7 +962,9 @@
               mu_before: +mu.toFixed(2),
               sigma_before: +sigma.toFixed(3),
               mu_after: +(mu + delta).toFixed(2),
-              sigma_after: +Math.max(0.5, sigma - 0.05).toFixed(3),
+              sigma_after: sigmaAfter,
+              score_before: effScoreAt(mu, sigma, pavg),
+              score_after: effScoreAt(mu + delta, sigmaAfter, pavg),
             },
           };
         }),
