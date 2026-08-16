@@ -8,6 +8,8 @@ window.I18N_DICTS.en = {
   "common.lang_btn_title": "Switch to Turkish",
   "common.key_btn": "Key",
   "common.key_btn_title": "Change the API key",
+  "common.nav_aria": "Main navigation",
+  "common.menu_btn": "Open the menu",
   "common.tab_balance": "Balance",
   "common.tab_leaderboard": "Ranks",
   "common.tab_highlights": "Weekly",

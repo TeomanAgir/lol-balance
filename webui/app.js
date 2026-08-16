@@ -298,7 +298,53 @@
     $("#key-modal").hidden = true;
     showView(currentView, true); // aktif görünümü yeni anahtarla yeniden yükle
   });
-  $("#btn-key").addEventListener("click", openKeyModal);
+  // Mobilde anahtar modalı çekmecenin üstüne binmesin: önce çekmece kapanır
+  // (masaüstünde sbCloseNav no-op'tur, panel zaten sabittir).
+  $("#btn-key").addEventListener("click", () => { sbCloseNav(); openKeyModal(); });
+
+  // ── Sol gezinme kabuğu (GÖREV 17, K1 "Sade Ray") ──────────────
+  // Masaüstünde (≥880px) panel hep açıktır; bu blok yalnız mobil çekmeceyi
+  // sürer. Açıkken: scrim tıkı ve Esc kapatır, odak çekmecede döner (basit
+  // odak tuzağı), body scroll'u kilitlenir (body.sb-lock). Kapatan etkileşim
+  // klavyeden geldiyse odak hamburger düğmesine iade edilir.
+  const sbApp = $("#sb-app");
+  const sbNav = $("#sb-nav");
+  const sbBurger = $("#sb-burger");
+  const sbIsOpen = () => sbApp.classList.contains("sb-open");
+  function sbOpenNav() {
+    sbApp.classList.add("sb-open");
+    sbBurger.setAttribute("aria-expanded", "true");
+    document.body.classList.add("sb-lock");
+    const target = sbNav.querySelector(".sb-item.active") || sbNav.querySelector("button");
+    if (target) target.focus();
+  }
+  function sbCloseNav(refocus = false) {
+    if (!sbIsOpen()) return;
+    sbApp.classList.remove("sb-open");
+    sbBurger.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("sb-lock");
+    if (refocus) sbBurger.focus();
+  }
+  sbBurger.addEventListener("click", () => (sbIsOpen() ? sbCloseNav(true) : sbOpenNav()));
+  $("#sb-scrim").addEventListener("click", () => sbCloseNav());
+  document.addEventListener("keydown", (e) => {
+    if (!sbIsOpen()) return;
+    if (e.key === "Escape") { sbCloseNav(true); return; }
+    if (e.key !== "Tab") return;
+    // Basit odak tuzağı: Tab sırası çekmecedeki düğmeler arasında döner.
+    const focusables = sbNav.querySelectorAll("button:not([disabled])");
+    if (!focusables.length) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!sbNav.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  });
+  // Çekmece açıkken pencere masaüstü genişliğine dönerse durum sıfırlanır
+  // (panel zaten sabit görünür; kilit/scrim asılı kalmasın).
+  const sbMq = window.matchMedia("(min-width: 880px)");
+  const sbOnMq = () => { if (sbMq.matches) sbCloseNav(); };
+  if (sbMq.addEventListener) sbMq.addEventListener("change", sbOnMq);
+  else sbMq.addListener(sbOnMq); // eski Safari yedeği
 
   // ── Sekme yönlendirme ─────────────────────────────────────────
   const loaders = {
@@ -340,14 +386,15 @@
     currentView = name;
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
-    document.querySelectorAll(".tab").forEach(tb => tb.classList.toggle("active", tb.dataset.view === tab));
+    document.querySelectorAll(".sb-item").forEach(tb => tb.classList.toggle("active", tb.dataset.view === tab));
     window.scrollTo({ top: 0 });
     loaders[name](forceReload).catch(e => toast(e.message));
   }
   // Sekmeye basmak zinciri TERK ETMEKTİR: birikmiş geri kareleri düşer
   // (yeni zincir sıfırdan kurulur, bayat kare geri düğmesine karışmaz).
-  document.querySelectorAll(".tab").forEach(tb =>
-    tb.addEventListener("click", () => { clearBack(); showView(tb.dataset.view); }));
+  // Mobil çekmece seçimden sonra kapanır (masaüstünde sbCloseNav no-op).
+  document.querySelectorAll(".sb-item").forEach(tb =>
+    tb.addEventListener("click", () => { clearBack(); showView(tb.dataset.view); sbCloseNav(true); }));
 
   async function fetchRoster(force = false) {
     if (state.roster.length && !force) return state.roster;
@@ -2314,7 +2361,8 @@
     loadHealth().catch(e => toast(e.message)));
 
   // ── Dil (GÖREV 6) ─────────────────────────────────────────────
-  // Sağ üstteki düğme hedef dili gösterir (sözlük değeri: tr'de "EN", en'de "TR");
+  // Panelin alt bloğundaki düğme (GÖREV 17'de sağ üstten taşındı) hedef dili
+  // gösterir (sözlük değeri: tr'de "EN", en'de "TR");
   // apply() data-i18n taşıdığı için metni de kendiliğinden günceller.
   $("#btn-lang").addEventListener("click", () =>
     window.I18n.setLang(window.I18n.getLang() === "tr" ? "en" : "tr"));

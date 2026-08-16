@@ -14,16 +14,46 @@
 </head>
 <body>
 
-<header class="topbar">
-  <h1 class="brand">LoL <span>Balance</span></h1>
-  <div class="topbar-actions">
+<!-- ═══ Uygulama kabuğu (GÖREV 17, K1 "Sade Ray"): kalıcı sol gezinme ═══
+     Masaüstünde (≥880px) panel hep açık sabit sütundur; mobilde soldan kayan
+     çekmece (üst bardaki hamburger açar, scrim/Esc kapatır — app.js "Sol
+     gezinme kabuğu" bloğu). Sekme seti ve data-view mekanizması alt çubuk
+     dönemindekiyle birebir aynıdır; liste DÜZDÜR, ileride grup başlığı
+     gerekirse .sb-list içine .sb-gap ayracı + başlık eklenerek büyür. -->
+<div id="sb-app" class="sb-app">
+
+<aside id="sb-nav" class="sb-nav" data-i18n-aria-label="common.nav_aria">
+  <div class="sb-brand">LoL <span>Balance</span></div>
+  <nav class="sb-list">
+    <button class="sb-item active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
+    <button class="sb-item"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
+    <button class="sb-item"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
+    <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
+    <button class="sb-item"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
+    <button class="sb-item"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
+  </nav>
+  <div class="sb-bottom">
     <!-- Dil düğmesi hedef dili gösterir: tr sözlüğünde "EN", en sözlüğünde "TR" —
          böylece apply() düğmeyi de kendiliğinden günceller. -->
-    <button id="btn-lang" class="key-btn lang-btn" type="button"
+    <button id="btn-lang" class="sb-kb sb-lang" type="button"
             data-i18n="common.lang_btn" data-i18n-title="common.lang_btn_title"></button>
-    <button id="btn-key" class="key-btn" type="button"
+    <button id="btn-key" class="sb-kb" type="button"
             data-i18n="common.key_btn" data-i18n-title="common.key_btn_title"></button>
   </div>
+</aside>
+
+<!-- Mobil çekmece karartması: tıklayınca çekmece kapanır (app.js) -->
+<div id="sb-scrim" class="sb-scrim" aria-hidden="true"></div>
+
+<div class="sb-content">
+
+<!-- Mobil üst bar: yalnız <880px görünür; masaüstünde marka panelde -->
+<header class="sb-topbar">
+  <button id="sb-burger" class="sb-burger" type="button" aria-expanded="false"
+          aria-controls="sb-nav" data-i18n-aria-label="common.menu_btn">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <h1 class="sb-tb-brand">LoL <span>Balance</span></h1>
 </header>
 
 <main id="main">
@@ -60,8 +90,7 @@
   <!-- ═══ Leaderboard ═══ -->
   <section id="view-leaderboard" class="view" hidden>
     <p class="view-hint" data-i18n="leaderboard.hint"></p>
-    <!-- Harita (GÖREV 4) girişi: harita sekme DEĞİL, buradan açılan detay görünümü
-         (alt çubuk GÖREV 17 ile 6 sekmeye doldu) -->
+    <!-- Harita (GÖREV 4) girişi: harita sekme DEĞİL, buradan açılan detay görünümü -->
     <div class="map-entry"><button id="btn-map-from-board" class="map-link" type="button"
         data-i18n="leaderboard.map_link"></button></div>
     <table class="board">
@@ -175,7 +204,7 @@
     <p class="rift-note" data-i18n="map.note"></p>
   </section>
 
-  <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — kendi alt çubuk sekmesi (GÖREV 17) ═══ -->
+  <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — kendi gezinme sekmesi (GÖREV 17) ═══ -->
   <!-- Veri backend'den DEĞİL, statik dosyadan gelir: assets/meta/tiers.json
        (api_contract §8 "Meta tier verisi"). Süzgeç düğmeleri ve sütunlar app.js'te
        kurulur; dosya yoksa/bozuksa yalnız bu görünüm hata metni gösterir.
@@ -216,7 +245,7 @@
   <section id="view-manual" class="view" hidden>
     <p class="view-hint" data-i18n="manual.hint"></p>
     <!-- Collector sağlığı (GÖREV 13) girişi: yeni sekme değil, Manuel'den açılan
-         detay görünümü (harita/profil deseni; alt çubukta Manuel yanık kalır). -->
+         detay görünümü (harita/profil deseni; gezinmede Manuel yanık kalır). -->
     <div class="ch-entry"><button id="btn-health-open" class="ch-link" type="button"
         data-i18n="manual.health_link"></button></div>
     <div id="manual-roster" class="manual-list"></div>
@@ -254,14 +283,8 @@
 
 </main>
 
-<nav class="tabbar">
-  <button class="tab active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
-  <button class="tab"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
-  <button class="tab"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
-  <button class="tab"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
-  <button class="tab"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
-  <button class="tab"        data-view="manual"      type="button" data-i18n="common.tab_manual"></button>
-</nav>
+</div><!-- /.sb-content -->
+</div><!-- /#sb-app -->
 
 <!-- API key modal -->
 <div id="key-modal" class="modal-backdrop" hidden>

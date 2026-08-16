@@ -15,6 +15,7 @@
   --ok: #4caf7d;
   --display: "Bahnschrift", "Arial Narrow", system-ui, sans-serif;
   --body: system-ui, "Segoe UI", sans-serif;
+  --sb-w: 200px; /* sol gezinme paneli genişliği (GÖREV 17) */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -30,8 +31,9 @@ body {
   font-size: 16px;
   line-height: 1.45;
   min-height: 100dvh;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom)); /* tabbar payı */
 }
+/* Mobil çekmece açıkken arka plan kaymaz (app.js sınıfı basar/kaldırır) */
+body.sb-lock { overflow: hidden; }
 
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 button:focus-visible, input:focus-visible, a:focus-visible {
@@ -39,45 +41,160 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Üst bar ── */
-.topbar {
+/* ── Uygulama kabuğu: kalıcı sol gezinme (GÖREV 17, K1 "Sade Ray") ──
+   Alt sekme çubuğunun görsel dili dikeye çevrildi: ince yüzey paneli, uppercase
+   display-font etiketler, aktif öğede 3px pirinç SOL şerit (tabbar'daki
+   border-top'un doksan derece dönmüş hali). Masaüstünde (≥880px) panel HEP
+   AÇIK sabit sütundur; mobilde soldan kayan çekmece + scrim (app.js sürer).
+   Sınıflar sb- öneklidir (global ad alanı dersi: .empty çakışması). */
+.sb-app { display: flex; min-height: 100dvh; }
+.sb-content { flex: 1 1 auto; min-width: 0; }
+
+.sb-nav {
+  z-index: 25; /* modal (30) altında, içerik üstünde */
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  flex: 0 0 var(--sb-w);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  padding: 18px 0 calc(14px + env(safe-area-inset-bottom));
 }
-.brand {
+.sb-brand {
   font-family: var(--display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
 }
-.brand span { color: var(--brass); }
-.key-btn {
+.sb-brand span { color: var(--brass); }
+.sb-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 44px; /* dokunmatik hedef */
+  padding: 11px 18px 11px 15px;
+  border-left: 3px solid transparent;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color 0.12s, background-color 0.12s;
+}
+.sb-item:hover { color: var(--text); }
+.sb-item.active {
+  color: var(--brass);
+  border-left-color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 7%, transparent);
+}
+/* Gruplamaya hazırlık (K1'deki çizgili boşluk iması): liste bugün DÜZ,
+   ileride grup gerekirse .sb-list içine bu ayraç + başlık eklenir. */
+.sb-gap { height: 20px; position: relative; }
+.sb-gap::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  width: 30px;
+  border-top: 1px solid var(--line);
+}
+/* Panelin alt bloğu: dil (TR/EN monogramı, display font) + API anahtarı (GÖREV 6) */
+.sb-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--line);
+  padding: 12px 14px 0;
+  display: flex;
+  gap: 8px;
+}
+.sb-kb {
+  flex: 1;
   font-size: 13px;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   min-height: 40px;
+  white-space: nowrap;
 }
-.key-btn:hover { color: var(--brass); border-color: var(--brass-dim); }
-/* Sağ üst düğme grubu: dil + anahtar (GÖREV 6) */
-.topbar-actions { display: flex; align-items: center; gap: 8px; }
-/* Dil düğmesi anahtar düğmesiyle aynı kabuğu paylaşır; kısa TR/EN monogramı
-   marka yazısıyla aynı display fontunu taşır. */
-.lang-btn {
+.sb-kb:hover { color: var(--brass); border-color: var(--brass-dim); }
+.sb-lang {
+  flex: 0 0 auto;
+  min-width: 48px;
   font-family: var(--display);
   font-weight: 700;
   letter-spacing: 0.1em;
-  min-width: 48px;
   text-transform: uppercase;
 }
 
+/* Mobil üst bar + çekmece parçaları (masaüstünde bar gizli, scrim etkisiz) */
+.sb-topbar { display: none; }
+.sb-burger {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: 8px;
+}
+.sb-burger:hover { color: var(--brass); }
+.sb-burger svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.sb-tb-brand {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sb-tb-brand span { color: var(--brass); }
+.sb-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 24; /* çekmecenin hemen altı */
+  background: rgba(4, 8, 12, 0.72);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+@media (max-width: 879px) {
+  .sb-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 15;
+  }
+  .sb-nav {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    height: auto;
+    width: 272px;
+    max-width: 84vw;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 14px 0 40px rgba(0, 0, 0, 0.5);
+  }
+  .sb-app.sb-open .sb-nav { transform: translateX(0); }
+  .sb-app.sb-open .sb-scrim { opacity: 1; pointer-events: auto; }
+}
+
 /* ── Ana yerleşim ── */
-main { max-width: 720px; margin: 0 auto; padding: 16px; }
+main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 .view-hint { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
 
 /* ── Oyuncu kartları (dengeleme) ── */
@@ -159,7 +276,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 /* ── Yapışkan aksiyon barı ── */
 .action-bar {
   position: sticky;
-  bottom: calc(64px + env(safe-area-inset-bottom));
+  bottom: calc(10px + env(safe-area-inset-bottom)); /* alt çubuk kalktı (GÖREV 17): küçük nefes payı yeter */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1877,46 +1994,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .ch-empty-note, .ch-err-detail, .ch-err-hint { color: var(--muted); font-size: 13px; }
 .ch-err-hint { margin-top: 6px; }
 
-/* ── Alt sekme çubuğu ── */
-.tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 10;
-}
-/* 6 sekme (GÖREV 17: META artık kendi sekmesi) 320px'de bile TEK SATIRDA ve
-   KIRPILMADAN durmalı. Çözüm etiketi kısaltmak DEĞİL (kısaltma i18n borcudur),
-   tipografiyi sekme genişliğine BAĞLAMAKTIR: bir sekme her zaman 100vw/6 ≈
-   16.67vw olduğundan punto da vw'den türetilir ve clamp ile 9.5px…12px arasına
-   kapatılır — basamaklı media query yerine sürekli ölçek, aradaki her genişlikte
-   de doğru. Yatay dolgu ve harf aralığı ölçekle birlikte kapanır; en dar
-   ekranda kazanılan ~3px, en uzun etiketin ("SIRALAMA" / "BALANCE") payıdır.
-   Alt sınır 9.5px, GÖVDE FONTU İÇİN seçildi: Bahnschrift yalnız Windows'ta
-   var, telefonda system-ui'ye düşülür ve ölçüler ~%10 genişler — sınır dar
-   fontla değil, o geniş halle doğrulandı. Ölçümler README'de. */
-.tab {
-  flex: 1;
-  min-width: 0;
-  min-height: 56px;
-  padding: 0 2px;
-  font-family: var(--display);
-  font-size: clamp(9.5px, 2.8vw, 12px);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: var(--muted);
-  border-top: 2px solid transparent;
-}
-.tab.active { color: var(--brass); border-top-color: var(--brass); }
-@media (max-width: 460px) { .tab { padding: 0 1px; letter-spacing: 0.01em; } }
-@media (max-width: 360px) { .tab { padding: 0; letter-spacing: 0; } }
-
 /* ── Modal ── */
 .modal-backdrop {
   position: fixed;
@@ -1972,7 +2049,7 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 
 /* ── Geniş ekran ── */
 @media (min-width: 768px) {
-  main { padding: 24px; }
+  main { padding: 24px 24px 48px; }
   .roster-grid { grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); }
 }
 
