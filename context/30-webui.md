@@ -3,7 +3,12 @@
 Yazma izni: yalnız `webui/`. React/bundler/build zinciri ÖNERME (CLAUDE.md karar #5).
 
 ## Dosyalar
-- `index.html` — tüm görünümlerin iskeleti (tek sayfa, sekmeler).
+- `index.html` — tüm görünümlerin iskeleti (tek sayfa). GÖREV 17'den beri gezinme
+  SOL PANELDİR (alt sekme çubuğu YOK): `#sb-app` flex kabuğu → `#sb-nav` (aside;
+  marka + düz `.sb-item` listesi + alt blokta `#btn-lang`/`#btn-key`) + `#sb-scrim` +
+  `.sb-content` (mobil `#sb-burger`'lı üst bar + `main`). <880px'te panel çekmecedir
+  (`sb-open`/`body.sb-lock`, scrim/Esc kapatır, basit odak tuzağı app.js'te).
+  Yeni gezinme metinleri `common.nav_aria`/`common.menu_btn`.
 - `app.js` — tüm mantık. Görünümler: Sıralama (leaderboard; ada tık → profil),
   Maçlar (kartlar; "Rolleri düzenle" → PUT /positions; karta tık → maç detayı
   KS1: GLOBAL ölçekli karşılıklı barlar (statın en iyisi %100 + ⭐), koridor payı
@@ -25,7 +30,8 @@ Yazma izni: yalnız `webui/`. React/bundler/build zinciri ÖNERME (CLAUDE.md kar
 ## Konvansiyonlar
 - API çağrıları `X-API-Key` ile; anahtar localStorage'da (modalla girilir), koda gömülmez.
 - Sayı gösterimi 2 ondalık; sıralamayı backend verir, UI yeniden SIRALAMAZ.
-- Yeni sekme AÇMADAN önce ≥320px ölçüm kuralı (GÖREV 4 kararı: sığmazsa mevcut
-  sekmeden girişli detay görünümü).
+- Yeni görünüm eklerken sol panele `.sb-item` satırı eklenir (dikey liste sayı
+  kısıtını gevşetti; yine de mobil çekmecede taşma kontrol edilir). Tarihsel
+  ≥320px alt-çubuk ölçüm kuralı tabbar'la birlikte emekli oldu (GÖREV 17).
 - Doğrulama: worker kendi tarayıcı E2E'sini mock ile yapabilir; canlıya benzer doğrulamayı
   orkestratör scratchpad backend'i + Chrome ile koşar.

@@ -2,13 +2,29 @@
 
 Son güncelleme: 2026-08-16 (orkestratör)
 
-## 2026-08-16: aktif engine `openskill-pl-blend20-v1`
+## 2026-08-16: aktif engine `openskill-pl-blend20-v1` — CANLIDA TAMAM
 - Teoman kararı (simülasyon destekli, CHANGE_REQUESTS 2026-08-16): W/L %20 + perf %80
   (`mu_eff = 0.2*mu + 0.8*(25+20*(P_avg-1))`). blend50 tanımlı kaldı, aktif değil.
 - Testler: rating 156 · backend 251 · collector 479; E2E scratch'te iki evren replay
   determinizmi + leaderboard formülü + eski engine satırlarının korunumu PASS.
-- DEPLOY SONRASI ADIM: canlıda `POST /admin/replay` (tek çağrı iki evreni kurar);
-  replay'e dek herkes nötr görünür (P_avg satırı olmadığından).
+- PR #47 merge + deploy + canlıda `POST /admin/replay` KOŞULDU (Teoman); canlı
+  leaderboard simülasyonun w=0.20 kolonuyla birebir doğrulandı (Konna 7.45 ...).
+
+## 2026-08-16: GÖREV 17 — sol navigasyon (K1 "Sade Ray") CANLIDA
+- new_modules.md'de GÖREV 17 yeniden tanımlandı (frontend rebuild); eski sinerji
+  maddesi artık GÖREV X. Teoman kararları (AskUserQuestion): 4 konsept artifact'ından
+  K1; masaüstünde hep açık sabit panel; düz liste (gruplamaya hazır); dil/API
+  kontrolleri panel altına. PR #49 merge + deploy edildi.
+- webui kabuğu: `#sb-app` / `#sb-nav` / `#sb-scrim` / `#sb-burger`, `sb-` öneki;
+  <880px çekmece + scrim + `body.sb-lock`; `.tab` → `.sb-item`. 2 yeni i18n anahtarı.
+- Deploy sonrası olay: tarayıcı cache'i eski style.css'i tuttu → stilsiz görünüm
+  (sunucu doğruydu, hard refresh çözdü). Kalıcı çözüm PR #52 (statik yanıtlara
+  `Cache-Control: no-cache`, backend 260 test) — AÇIK, merge Teoman'da; merge
+  sonrası 00-ortak test tabanı 260'a güncellenecek. Arkadaşlara bir defalık
+  "bozuk görünürse Ctrl+F5" notu gerekir.
+- Takip (GÖREV 17'den bağımsız, önceden var): Sıralama tablosu ≤~330px'te ~28px
+  taşıyor (EN, rating-sub nowrap); Geçmiş kartlarının takım sütunları (200px×2)
+  ~<410px'te taşıyor.
 
 ## Canlı sistem
 - https://lol.teomanagir.com — K8s/VPS, TLS, günlük yedek. 18+ maç, 14+ oyuncu
@@ -38,7 +54,8 @@ salt-okur türetilmiş; profilde pb- vitrini) · 13 collector sağlık paneli
 profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları) ·
 15 boş slot hatası (global .empty tuzağı, 4. kurban) · 16 Collector Remaster
 (tkinter arayüz `gui.py`/`commands.py`/`updates.py`, sürüm 0.3.0, CI release
-`release.yml`: v* etiketi → exe GitHub Release'e; güncelleme bildirimi bant+link).
+`release.yml`: v* etiketi → exe GitHub Release'e; güncelleme bildirimi bant+link) ·
+17 sol navigasyon paneli (K1 "Sade Ray", PR #49; ayrıntı yukarıdaki bölümde).
 
 ## 2026-08-14/15 diğer işler
 - META sekmesi (M1 tasarımı; `webui/assets/meta/tiers.json` + `deploy/fetch_meta.py`
@@ -56,7 +73,8 @@ profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları) ·
   tek dağıtımda; sonraki sürümlerde pencere kendisi haber verir).
 - Data Dragon patch güncellemesi: `deploy/fetch_ddragon.py` DDRAGON_VERSION +
   redeploy; META verisi: `deploy/fetch_meta.py` → fark → `--write` → commit.
-- new_modules.md'de bekleyen: GÖREV 17 (sinerji formülü — tartışma aşamasında).
+- new_modules.md'de bekleyen: GÖREV X (sinerji seçiminde perf katkısı — tartışma
+  aşamasında; eski "GÖREV 17 sinerji" maddesinin yeni adı).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.
 
 ## Açık işler
