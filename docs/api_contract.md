@@ -417,3 +417,18 @@ mevcut dosyayla FARKI gösterir → yalnız açık onayla (`--write`) dosyaya ya
 commit/PR'lar. Otomatik cron YOK; patch başına elle koşulur. Backend bu veriyi bilmez. Yerel
 geliştirmede varlıklar yoksa web UI YER TUTUCU gösterir (kırık görsel değil) — betik elle de
 koşulabilir. Kaldırılmış/bilinmeyen eşya id'si de yer tutucuya düşer. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).
+
+**Seçim danışmanı verisi (GÖREV 21 — Teoman kararı, aynı yarı otomatik akış):**
+`deploy/fetch_meta.py` AYNI tek OP.GG isteğinden iki dosya üretir/tazeler (fark göster +
+`--write` onayı + Teoman commit'i akışı değişmez; cron YOK; backend bu veriyi bilmez):
+- `webui/assets/meta/tiers.json` şeması GENİŞLER: tier listeleri `[ad]` yerine
+  `[{name, win_rate, pick_rate}]` taşır (oranlar 0-1, 4 ondalık). Geriye uyum: web UI
+  eski düz-string biçimini de okuyabilir (dosya tazelenene dek).
+- `webui/assets/meta/counters.json` (YENİ): `{patch, updated, source, counters:
+  {top|jungle|middle|bottom|utility: {"<DD adı>": [{champion, games,
+  win_rate_against}]}}}`. `win_rate_against` = listelenen `champion`'ın anahtar
+  şampiyona KARŞI winrate'i (0-1; yüksekse iyi counter). Kayıt sayısı kaynak kadardır
+  (şampiyon/rol başına 1-3); adlar champions.json'a karşı doğrulanır, eşleşmeyen atılır.
+- Analiz tamamen İSTEMCİ tarafındadır: bu iki dosya + Data Dragon `champions.json`
+  (sınıf/hasar sezgiselleri için `tags` + `info` alanları eklenir) + `GET /matches`'tan
+  istemcide türetilen grup rozeti. YENİ BACKEND ENDPOINT'İ YOKTUR.
