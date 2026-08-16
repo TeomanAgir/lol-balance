@@ -1,12 +1,14 @@
 ﻿# lol-balance
 
 🇹🇷 Türkçe: [README.tr.md](README.tr.md)
+📖 Oyuncu Rehberi (Türkçe): skorun nasıl hesaplanıyor, adım adım —
+[docs/rating_guide.md](docs/rating_guide.md)
+📖 Player guide (Turkish): how your score is computed, step by step —
+[docs/rating_guide.md](docs/rating_guide_EN.md)
 
 For a friend group's League of Legends 5v5 custom matches: automatic data
 collection from the LCU → rating (OpenSkill-based blend model) → team balancing → web UI.
 
-📖 Player guide (Turkish): how your score is computed, step by step —
-[docs/rating_guide.md](docs/rating_guide.md)
 
 ## Components
 
