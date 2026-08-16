@@ -1,0 +1,4624 @@
+{
+  "patch": "16.16",
+  "updated": "2026-08-17",
+  "source": "op.gg (global, platinum_plus)",
+  "counters": {
+    "top": {
+      "Garen": [
+        {
+          "champion": "Quinn",
+          "games": 449,
+          "win_rate_against": 0.5679
+        },
+        {
+          "champion": "Kayle",
+          "games": 1845,
+          "win_rate_against": 0.5398
+        },
+        {
+          "champion": "Camille",
+          "games": 2287,
+          "win_rate_against": 0.533
+        }
+      ],
+      "Gangplank": [
+        {
+          "champion": "Zac",
+          "games": 244,
+          "win_rate_against": 0.5615
+        },
+        {
+          "champion": "Kled",
+          "games": 976,
+          "win_rate_against": 0.5574
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 1001,
+          "win_rate_against": 0.5395
+        }
+      ],
+      "Gragas": [
+        {
+          "champion": "Poppy",
+          "games": 122,
+          "win_rate_against": 0.623
+        },
+        {
+          "champion": "Zac",
+          "games": 71,
+          "win_rate_against": 0.6056
+        },
+        {
+          "champion": "Kled",
+          "games": 225,
+          "win_rate_against": 0.5733
+        }
+      ],
+      "Gwen": [
+        {
+          "champion": "Singed",
+          "games": 540,
+          "win_rate_against": 0.587
+        },
+        {
+          "champion": "Master Yi",
+          "games": 145,
+          "win_rate_against": 0.5724
+        },
+        {
+          "champion": "Warwick",
+          "games": 425,
+          "win_rate_against": 0.5671
+        }
+      ],
+      "Gnar": [
+        {
+          "champion": "Quinn",
+          "games": 167,
+          "win_rate_against": 0.5749
+        },
+        {
+          "champion": "Nasus",
+          "games": 2025,
+          "win_rate_against": 0.564
+        },
+        {
+          "champion": "Malphite",
+          "games": 2065,
+          "win_rate_against": 0.5627
+        }
+      ],
+      "Nasus": [
+        {
+          "champion": "Garen",
+          "games": 6577,
+          "win_rate_against": 0.5247
+        },
+        {
+          "champion": "Anivia",
+          "games": 554,
+          "win_rate_against": 0.5181
+        },
+        {
+          "champion": "Urgot",
+          "games": 1602,
+          "win_rate_against": 0.5119
+        }
+      ],
+      "Darius": [
+        {
+          "champion": "Malzahar",
+          "games": 217,
+          "win_rate_against": 0.553
+        },
+        {
+          "champion": "Quinn",
+          "games": 435,
+          "win_rate_against": 0.5494
+        },
+        {
+          "champion": "Wukong",
+          "games": 873,
+          "win_rate_against": 0.5441
+        }
+      ],
+      "Ryze": [
+        {
+          "champion": "Irelia",
+          "games": 181,
+          "win_rate_against": 0.6077
+        },
+        {
+          "champion": "Akali",
+          "games": 127,
+          "win_rate_against": 0.5984
+        },
+        {
+          "champion": "Tryndamere",
+          "games": 102,
+          "win_rate_against": 0.598
+        }
+      ],
+      "Rumble": [
+        {
+          "champion": "Swain",
+          "games": 66,
+          "win_rate_against": 0.6818
+        },
+        {
+          "champion": "Anivia",
+          "games": 84,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Shen",
+          "games": 323,
+          "win_rate_against": 0.5789
+        }
+      ],
+      "Renekton": [
+        {
+          "champion": "Varus",
+          "games": 223,
+          "win_rate_against": 0.5605
+        },
+        {
+          "champion": "Illaoi",
+          "games": 1278,
+          "win_rate_against": 0.5579
+        },
+        {
+          "champion": "Nasus",
+          "games": 2751,
+          "win_rate_against": 0.5573
+        }
+      ],
+      "Riven": [
+        {
+          "champion": "Singed",
+          "games": 368,
+          "win_rate_against": 0.5788
+        },
+        {
+          "champion": "Malphite",
+          "games": 899,
+          "win_rate_against": 0.5751
+        },
+        {
+          "champion": "Poppy",
+          "games": 362,
+          "win_rate_against": 0.5746
+        }
+      ],
+      "Master Yi": [
+        {
+          "champion": "Tryndamere",
+          "games": 159,
+          "win_rate_against": 0.6415
+        },
+        {
+          "champion": "Sett",
+          "games": 200,
+          "win_rate_against": 0.64
+        },
+        {
+          "champion": "Camille",
+          "games": 117,
+          "win_rate_against": 0.6325
+        }
+      ],
+      "Malzahar": [
+        {
+          "champion": "Kled",
+          "games": 33,
+          "win_rate_against": 0.697
+        },
+        {
+          "champion": "Singed",
+          "games": 76,
+          "win_rate_against": 0.6316
+        },
+        {
+          "champion": "Nasus",
+          "games": 247,
+          "win_rate_against": 0.6113
+        }
+      ],
+      "Malphite": [
+        {
+          "champion": "Udyr",
+          "games": 159,
+          "win_rate_against": 0.5849
+        },
+        {
+          "champion": "Ornn",
+          "games": 1150,
+          "win_rate_against": 0.573
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 714,
+          "win_rate_against": 0.57
+        }
+      ],
+      "Mordekaiser": [
+        {
+          "champion": "Varus",
+          "games": 229,
+          "win_rate_against": 0.559
+        },
+        {
+          "champion": "Warwick",
+          "games": 851,
+          "win_rate_against": 0.5488
+        },
+        {
+          "champion": "Kayle",
+          "games": 666,
+          "win_rate_against": 0.548
+        }
+      ],
+      "Dr. Mundo": [
+        {
+          "champion": "Gwen",
+          "games": 1350,
+          "win_rate_against": 0.5815
+        },
+        {
+          "champion": "Udyr",
+          "games": 143,
+          "win_rate_against": 0.5804
+        },
+        {
+          "champion": "Nasus",
+          "games": 2580,
+          "win_rate_against": 0.5597
+        }
+      ],
+      "Varus": [
+        {
+          "champion": "Olaf",
+          "games": 202,
+          "win_rate_against": 0.6139
+        },
+        {
+          "champion": "Malzahar",
+          "games": 33,
+          "win_rate_against": 0.6061
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 99,
+          "win_rate_against": 0.596
+        }
+      ],
+      "Vayne": [
+        {
+          "champion": "Teemo",
+          "games": 1378,
+          "win_rate_against": 0.5951
+        },
+        {
+          "champion": "Malphite",
+          "games": 2005,
+          "win_rate_against": 0.582
+        },
+        {
+          "champion": "Quinn",
+          "games": 155,
+          "win_rate_against": 0.5806
+        }
+      ],
+      "Volibear": [
+        {
+          "champion": "Singed",
+          "games": 425,
+          "win_rate_against": 0.5694
+        },
+        {
+          "champion": "Jax",
+          "games": 1536,
+          "win_rate_against": 0.5664
+        },
+        {
+          "champion": "Urgot",
+          "games": 562,
+          "win_rate_against": 0.5623
+        }
+      ],
+      "Vladimir": [
+        {
+          "champion": "Nasus",
+          "games": 576,
+          "win_rate_against": 0.6285
+        },
+        {
+          "champion": "Yorick",
+          "games": 201,
+          "win_rate_against": 0.6219
+        },
+        {
+          "champion": "Anivia",
+          "games": 68,
+          "win_rate_against": 0.6176
+        }
+      ],
+      "Poppy": [
+        {
+          "champion": "Kayle",
+          "games": 148,
+          "win_rate_against": 0.6149
+        },
+        {
+          "champion": "Swain",
+          "games": 33,
+          "win_rate_against": 0.6061
+        },
+        {
+          "champion": "Varus",
+          "games": 46,
+          "win_rate_against": 0.587
+        }
+      ],
+      "Sion": [
+        {
+          "champion": "Udyr",
+          "games": 123,
+          "win_rate_against": 0.5854
+        },
+        {
+          "champion": "Zac",
+          "games": 118,
+          "win_rate_against": 0.5847
+        },
+        {
+          "champion": "Kled",
+          "games": 334,
+          "win_rate_against": 0.5778
+        }
+      ],
+      "Sett": [
+        {
+          "champion": "Malzahar",
+          "games": 206,
+          "win_rate_against": 0.6117
+        },
+        {
+          "champion": "Anivia",
+          "games": 210,
+          "win_rate_against": 0.5667
+        },
+        {
+          "champion": "Kennen",
+          "games": 716,
+          "win_rate_against": 0.5461
+        }
+      ],
+      "Shen": [
+        {
+          "champion": "Quinn",
+          "games": 148,
+          "win_rate_against": 0.5811
+        },
+        {
+          "champion": "Zac",
+          "games": 125,
+          "win_rate_against": 0.568
+        },
+        {
+          "champion": "Swain",
+          "games": 159,
+          "win_rate_against": 0.566
+        }
+      ],
+      "Swain": [
+        {
+          "champion": "Gragas",
+          "games": 57,
+          "win_rate_against": 0.614
+        },
+        {
+          "champion": "Fiora",
+          "games": 75,
+          "win_rate_against": 0.5867
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 67,
+          "win_rate_against": 0.5821
+        }
+      ],
+      "Singed": [
+        {
+          "champion": "Anivia",
+          "games": 98,
+          "win_rate_against": 0.6327
+        },
+        {
+          "champion": "Swain",
+          "games": 71,
+          "win_rate_against": 0.5634
+        },
+        {
+          "champion": "Urgot",
+          "games": 470,
+          "win_rate_against": 0.5532
+        }
+      ],
+      "Akali": [
+        {
+          "champion": "Warwick",
+          "games": 202,
+          "win_rate_against": 0.599
+        },
+        {
+          "champion": "Kled",
+          "games": 229,
+          "win_rate_against": 0.5808
+        },
+        {
+          "champion": "Illaoi",
+          "games": 301,
+          "win_rate_against": 0.5748
+        }
+      ],
+      "Aatrox": [
+        {
+          "champion": "Singed",
+          "games": 964,
+          "win_rate_against": 0.5467
+        },
+        {
+          "champion": "Udyr",
+          "games": 188,
+          "win_rate_against": 0.5426
+        },
+        {
+          "champion": "Warwick",
+          "games": 690,
+          "win_rate_against": 0.5406
+        }
+      ],
+      "Ambessa": [
+        {
+          "champion": "Warwick",
+          "games": 559,
+          "win_rate_against": 0.6029
+        },
+        {
+          "champion": "Kennen",
+          "games": 400,
+          "win_rate_against": 0.595
+        },
+        {
+          "champion": "Anivia",
+          "games": 156,
+          "win_rate_against": 0.5769
+        }
+      ],
+      "Anivia": [
+        {
+          "champion": "Heimerdinger",
+          "games": 83,
+          "win_rate_against": 0.6265
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 66,
+          "win_rate_against": 0.6061
+        },
+        {
+          "champion": "Kayle",
+          "games": 85,
+          "win_rate_against": 0.6
+        }
+      ],
+      "Yasuo": [
+        {
+          "champion": "Olaf",
+          "games": 432,
+          "win_rate_against": 0.5949
+        },
+        {
+          "champion": "Warwick",
+          "games": 218,
+          "win_rate_against": 0.5872
+        },
+        {
+          "champion": "Singed",
+          "games": 406,
+          "win_rate_against": 0.5739
+        }
+      ],
+      "Wukong": [
+        {
+          "champion": "Master Yi",
+          "games": 40,
+          "win_rate_against": 0.7
+        },
+        {
+          "champion": "Zac",
+          "games": 38,
+          "win_rate_against": 0.6053
+        },
+        {
+          "champion": "Mordekaiser",
+          "games": 294,
+          "win_rate_against": 0.5782
+        }
+      ],
+      "Ornn": [
+        {
+          "champion": "Kayle",
+          "games": 525,
+          "win_rate_against": 0.5448
+        },
+        {
+          "champion": "Camille",
+          "games": 686,
+          "win_rate_against": 0.5335
+        },
+        {
+          "champion": "Tryndamere",
+          "games": 587,
+          "win_rate_against": 0.5281
+        }
+      ],
+      "Olaf": [
+        {
+          "champion": "Tryndamere",
+          "games": 767,
+          "win_rate_against": 0.5554
+        },
+        {
+          "champion": "Illaoi",
+          "games": 535,
+          "win_rate_against": 0.5514
+        },
+        {
+          "champion": "Fiora",
+          "games": 587,
+          "win_rate_against": 0.5468
+        }
+      ],
+      "Yone": [
+        {
+          "champion": "Wukong",
+          "games": 428,
+          "win_rate_against": 0.5794
+        },
+        {
+          "champion": "Sett",
+          "games": 2659,
+          "win_rate_against": 0.5408
+        },
+        {
+          "champion": "Fiora",
+          "games": 1675,
+          "win_rate_against": 0.5385
+        }
+      ],
+      "Yorick": [
+        {
+          "champion": "Yone",
+          "games": 2295,
+          "win_rate_against": 0.5699
+        },
+        {
+          "champion": "Warwick",
+          "games": 467,
+          "win_rate_against": 0.5567
+        },
+        {
+          "champion": "Nasus",
+          "games": 2381,
+          "win_rate_against": 0.554
+        }
+      ],
+      "Udyr": [
+        {
+          "champion": "Gragas",
+          "games": 62,
+          "win_rate_against": 0.6452
+        },
+        {
+          "champion": "Wukong",
+          "games": 32,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Ornn",
+          "games": 108,
+          "win_rate_against": 0.6019
+        }
+      ],
+      "Urgot": [
+        {
+          "champion": "Anivia",
+          "games": 93,
+          "win_rate_against": 0.5806
+        },
+        {
+          "champion": "Heimerdinger",
+          "games": 237,
+          "win_rate_against": 0.5485
+        },
+        {
+          "champion": "Warwick",
+          "games": 243,
+          "win_rate_against": 0.5473
+        }
+      ],
+      "Warwick": [
+        {
+          "champion": "Swain",
+          "games": 41,
+          "win_rate_against": 0.7317
+        },
+        {
+          "champion": "Riven",
+          "games": 189,
+          "win_rate_against": 0.5608
+        },
+        {
+          "champion": "Zac",
+          "games": 54,
+          "win_rate_against": 0.5556
+        }
+      ],
+      "Irelia": [
+        {
+          "champion": "Shen",
+          "games": 631,
+          "win_rate_against": 0.58
+        },
+        {
+          "champion": "Malphite",
+          "games": 1452,
+          "win_rate_against": 0.5744
+        },
+        {
+          "champion": "Nasus",
+          "games": 1438,
+          "win_rate_against": 0.5723
+        }
+      ],
+      "Illaoi": [
+        {
+          "champion": "Kayle",
+          "games": 527,
+          "win_rate_against": 0.5863
+        },
+        {
+          "champion": "Ryze",
+          "games": 105,
+          "win_rate_against": 0.581
+        },
+        {
+          "champion": "Anivia",
+          "games": 96,
+          "win_rate_against": 0.5729
+        }
+      ],
+      "Zac": [
+        {
+          "champion": "Urgot",
+          "games": 70,
+          "win_rate_against": 0.6429
+        },
+        {
+          "champion": "Kayle",
+          "games": 55,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Vayne",
+          "games": 111,
+          "win_rate_against": 0.5676
+        }
+      ],
+      "Zaahen": [
+        {
+          "champion": "Singed",
+          "games": 459,
+          "win_rate_against": 0.5882
+        },
+        {
+          "champion": "Teemo",
+          "games": 784,
+          "win_rate_against": 0.5689
+        },
+        {
+          "champion": "Warwick",
+          "games": 276,
+          "win_rate_against": 0.5688
+        }
+      ],
+      "Jax": [
+        {
+          "champion": "Anivia",
+          "games": 164,
+          "win_rate_against": 0.5732
+        },
+        {
+          "champion": "Singed",
+          "games": 834,
+          "win_rate_against": 0.5731
+        },
+        {
+          "champion": "Heimerdinger",
+          "games": 447,
+          "win_rate_against": 0.5705
+        }
+      ],
+      "Jayce": [
+        {
+          "champion": "Quinn",
+          "games": 363,
+          "win_rate_against": 0.5868
+        },
+        {
+          "champion": "Camille",
+          "games": 924,
+          "win_rate_against": 0.5758
+        },
+        {
+          "champion": "Zaahen",
+          "games": 776,
+          "win_rate_against": 0.5722
+        }
+      ],
+      "Cho'Gath": [
+        {
+          "champion": "Udyr",
+          "games": 73,
+          "win_rate_against": 0.6027
+        },
+        {
+          "champion": "Warwick",
+          "games": 208,
+          "win_rate_against": 0.5673
+        },
+        {
+          "champion": "Zaahen",
+          "games": 508,
+          "win_rate_against": 0.563
+        }
+      ],
+      "Camille": [
+        {
+          "champion": "Zac",
+          "games": 104,
+          "win_rate_against": 0.5769
+        },
+        {
+          "champion": "Warwick",
+          "games": 379,
+          "win_rate_against": 0.5752
+        },
+        {
+          "champion": "Swain",
+          "games": 122,
+          "win_rate_against": 0.5738
+        }
+      ],
+      "Kennen": [
+        {
+          "champion": "Nasus",
+          "games": 1017,
+          "win_rate_against": 0.5988
+        },
+        {
+          "champion": "Sion",
+          "games": 379,
+          "win_rate_against": 0.5884
+        },
+        {
+          "champion": "Olaf",
+          "games": 416,
+          "win_rate_against": 0.5673
+        }
+      ],
+      "Kayle": [
+        {
+          "champion": "Ryze",
+          "games": 75,
+          "win_rate_against": 0.5733
+        },
+        {
+          "champion": "Malphite",
+          "games": 937,
+          "win_rate_against": 0.5688
+        },
+        {
+          "champion": "Nasus",
+          "games": 1493,
+          "win_rate_against": 0.5385
+        }
+      ],
+      "Quinn": [
+        {
+          "champion": "Illaoi",
+          "games": 93,
+          "win_rate_against": 0.6237
+        },
+        {
+          "champion": "Nasus",
+          "games": 344,
+          "win_rate_against": 0.5959
+        },
+        {
+          "champion": "Warwick",
+          "games": 69,
+          "win_rate_against": 0.5942
+        }
+      ],
+      "K'Sante": [
+        {
+          "champion": "Anivia",
+          "games": 129,
+          "win_rate_against": 0.6047
+        },
+        {
+          "champion": "Singed",
+          "games": 523,
+          "win_rate_against": 0.6042
+        },
+        {
+          "champion": "Kayle",
+          "games": 621,
+          "win_rate_against": 0.5942
+        }
+      ],
+      "Kled": [
+        {
+          "champion": "Poppy",
+          "games": 116,
+          "win_rate_against": 0.5862
+        },
+        {
+          "champion": "Zac",
+          "games": 65,
+          "win_rate_against": 0.5846
+        },
+        {
+          "champion": "Heimerdinger",
+          "games": 147,
+          "win_rate_against": 0.5578
+        }
+      ],
+      "Tahm Kench": [
+        {
+          "champion": "Malzahar",
+          "games": 67,
+          "win_rate_against": 0.597
+        },
+        {
+          "champion": "Singed",
+          "games": 227,
+          "win_rate_against": 0.5947
+        },
+        {
+          "champion": "Heimerdinger",
+          "games": 156,
+          "win_rate_against": 0.5897
+        }
+      ],
+      "Trundle": [
+        {
+          "champion": "Anivia",
+          "games": 34,
+          "win_rate_against": 0.6176
+        },
+        {
+          "champion": "Vladimir",
+          "games": 58,
+          "win_rate_against": 0.6034
+        },
+        {
+          "champion": "Singed",
+          "games": 223,
+          "win_rate_against": 0.6009
+        }
+      ],
+      "Tryndamere": [
+        {
+          "champion": "Singed",
+          "games": 538,
+          "win_rate_against": 0.5613
+        },
+        {
+          "champion": "Nasus",
+          "games": 1891,
+          "win_rate_against": 0.5595
+        },
+        {
+          "champion": "Malphite",
+          "games": 2119,
+          "win_rate_against": 0.5507
+        }
+      ],
+      "Teemo": [
+        {
+          "champion": "Olaf",
+          "games": 1491,
+          "win_rate_against": 0.5547
+        },
+        {
+          "champion": "Anivia",
+          "games": 243,
+          "win_rate_against": 0.5473
+        },
+        {
+          "champion": "Yasuo",
+          "games": 1179,
+          "win_rate_against": 0.5386
+        }
+      ],
+      "Pantheon": [
+        {
+          "champion": "Udyr",
+          "games": 94,
+          "win_rate_against": 0.5745
+        },
+        {
+          "champion": "Swain",
+          "games": 103,
+          "win_rate_against": 0.5728
+        },
+        {
+          "champion": "Singed",
+          "games": 355,
+          "win_rate_against": 0.5577
+        }
+      ],
+      "Fiora": [
+        {
+          "champion": "Kayle",
+          "games": 549,
+          "win_rate_against": 0.5811
+        },
+        {
+          "champion": "Heimerdinger",
+          "games": 292,
+          "win_rate_against": 0.5788
+        },
+        {
+          "champion": "Ryze",
+          "games": 141,
+          "win_rate_against": 0.5745
+        }
+      ],
+      "Heimerdinger": [
+        {
+          "champion": "Zac",
+          "games": 54,
+          "win_rate_against": 0.5741
+        },
+        {
+          "champion": "Yasuo",
+          "games": 480,
+          "win_rate_against": 0.5708
+        },
+        {
+          "champion": "Poppy",
+          "games": 63,
+          "win_rate_against": 0.5556
+        }
+      ]
+    },
+    "jungle": {
+      "Gragas": [
+        {
+          "champion": "Volibear",
+          "games": 31,
+          "win_rate_against": 0.7097
+        },
+        {
+          "champion": "Nunu & Willump",
+          "games": 65,
+          "win_rate_against": 0.6154
+        },
+        {
+          "champion": "Pantheon",
+          "games": 38,
+          "win_rate_against": 0.5789
+        }
+      ],
+      "Graves": [
+        {
+          "champion": "Fizz",
+          "games": 585,
+          "win_rate_against": 0.5504
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 439,
+          "win_rate_against": 0.5467
+        },
+        {
+          "champion": "Zyra",
+          "games": 962,
+          "win_rate_against": 0.5405
+        }
+      ],
+      "Gwen": [
+        {
+          "champion": "Trundle",
+          "games": 46,
+          "win_rate_against": 0.587
+        },
+        {
+          "champion": "Fizz",
+          "games": 46,
+          "win_rate_against": 0.587
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 46,
+          "win_rate_against": 0.5652
+        }
+      ],
+      "Nasus": [
+        {
+          "champion": "Zyra",
+          "games": 77,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Taliyah",
+          "games": 60,
+          "win_rate_against": 0.6167
+        },
+        {
+          "champion": "Gragas",
+          "games": 41,
+          "win_rate_against": 0.6098
+        }
+      ],
+      "Naafiri": [
+        {
+          "champion": "Nocturne",
+          "games": 2441,
+          "win_rate_against": 0.576
+        },
+        {
+          "champion": "Nunu & Willump",
+          "games": 469,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 520,
+          "win_rate_against": 0.5635
+        }
+      ],
+      "Nocturne": [
+        {
+          "champion": "Zac",
+          "games": 1318,
+          "win_rate_against": 0.5326
+        },
+        {
+          "champion": "Wukong",
+          "games": 2999,
+          "win_rate_against": 0.5315
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 308,
+          "win_rate_against": 0.5292
+        }
+      ],
+      "Nunu & Willump": [
+        {
+          "champion": "Zyra",
+          "games": 109,
+          "win_rate_against": 0.5688
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 277,
+          "win_rate_against": 0.5632
+        },
+        {
+          "champion": "Jax",
+          "games": 214,
+          "win_rate_against": 0.5607
+        }
+      ],
+      "Nidalee": [
+        {
+          "champion": "Volibear",
+          "games": 94,
+          "win_rate_against": 0.5957
+        },
+        {
+          "champion": "Warwick",
+          "games": 454,
+          "win_rate_against": 0.5881
+        },
+        {
+          "champion": "Ivern",
+          "games": 135,
+          "win_rate_against": 0.5778
+        }
+      ],
+      "Darius": [
+        {
+          "champion": "Maokai",
+          "games": 41,
+          "win_rate_against": 0.6585
+        },
+        {
+          "champion": "Taliyah",
+          "games": 32,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Fizz",
+          "games": 34,
+          "win_rate_against": 0.5882
+        }
+      ],
+      "Diana": [
+        {
+          "champion": "Teemo",
+          "games": 138,
+          "win_rate_against": 0.6014
+        },
+        {
+          "champion": "Shyvana",
+          "games": 1015,
+          "win_rate_against": 0.5823
+        },
+        {
+          "champion": "Rammus",
+          "games": 303,
+          "win_rate_against": 0.5776
+        }
+      ],
+      "Rammus": [
+        {
+          "champion": "Gragas",
+          "games": 47,
+          "win_rate_against": 0.6383
+        },
+        {
+          "champion": "Malphite",
+          "games": 74,
+          "win_rate_against": 0.6216
+        },
+        {
+          "champion": "Darius",
+          "games": 97,
+          "win_rate_against": 0.6082
+        }
+      ],
+      "Rek'Sai": [
+        {
+          "champion": "Quinn",
+          "games": 79,
+          "win_rate_against": 0.6835
+        },
+        {
+          "champion": "Gragas",
+          "games": 43,
+          "win_rate_against": 0.6279
+        },
+        {
+          "champion": "Karthus",
+          "games": 95,
+          "win_rate_against": 0.6211
+        }
+      ],
+      "Rengar": [
+        {
+          "champion": "Malphite",
+          "games": 217,
+          "win_rate_against": 0.6728
+        },
+        {
+          "champion": "Rammus",
+          "games": 474,
+          "win_rate_against": 0.6076
+        },
+        {
+          "champion": "Trundle",
+          "games": 161,
+          "win_rate_against": 0.5963
+        }
+      ],
+      "Locke": [
+        {
+          "champion": "Aatrox",
+          "games": 125,
+          "win_rate_against": 0.672
+        },
+        {
+          "champion": "Teemo",
+          "games": 69,
+          "win_rate_against": 0.6522
+        },
+        {
+          "champion": "Shyvana",
+          "games": 436,
+          "win_rate_against": 0.6353
+        }
+      ],
+      "Lee Sin": [
+        {
+          "champion": "Skarner",
+          "games": 1150,
+          "win_rate_against": 0.5383
+        },
+        {
+          "champion": "Briar",
+          "games": 3641,
+          "win_rate_against": 0.5361
+        },
+        {
+          "champion": "Quinn",
+          "games": 950,
+          "win_rate_against": 0.5347
+        }
+      ],
+      "Lillia": [
+        {
+          "champion": "Ivern",
+          "games": 241,
+          "win_rate_against": 0.5726
+        },
+        {
+          "champion": "Gragas",
+          "games": 115,
+          "win_rate_against": 0.5652
+        },
+        {
+          "champion": "Fizz",
+          "games": 161,
+          "win_rate_against": 0.5466
+        }
+      ],
+      "Master Yi": [
+        {
+          "champion": "Evelynn",
+          "games": 784,
+          "win_rate_against": 0.574
+        },
+        {
+          "champion": "Wukong",
+          "games": 2001,
+          "win_rate_against": 0.5682
+        },
+        {
+          "champion": "Rammus",
+          "games": 1607,
+          "win_rate_against": 0.5607
+        }
+      ],
+      "Maokai": [
+        {
+          "champion": "Volibear",
+          "games": 36,
+          "win_rate_against": 0.6111
+        },
+        {
+          "champion": "Gwen",
+          "games": 40,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Nunu & Willump",
+          "games": 73,
+          "win_rate_against": 0.589
+        }
+      ],
+      "Malphite": [
+        {
+          "champion": "Nunu & Willump",
+          "games": 76,
+          "win_rate_against": 0.6447
+        },
+        {
+          "champion": "Lillia",
+          "games": 197,
+          "win_rate_against": 0.6193
+        },
+        {
+          "champion": "Fizz",
+          "games": 38,
+          "win_rate_against": 0.6053
+        }
+      ],
+      "Dr. Mundo": [
+        {
+          "champion": "Nasus",
+          "games": 70,
+          "win_rate_against": 0.6429
+        },
+        {
+          "champion": "Aatrox",
+          "games": 64,
+          "win_rate_against": 0.5938
+        },
+        {
+          "champion": "Udyr",
+          "games": 70,
+          "win_rate_against": 0.5857
+        }
+      ],
+      "Vi": [
+        {
+          "champion": "Darius",
+          "games": 286,
+          "win_rate_against": 0.5524
+        },
+        {
+          "champion": "Maokai",
+          "games": 187,
+          "win_rate_against": 0.5508
+        },
+        {
+          "champion": "Rammus",
+          "games": 492,
+          "win_rate_against": 0.5488
+        }
+      ],
+      "Bel'Veth": [
+        {
+          "champion": "Zyra",
+          "games": 249,
+          "win_rate_against": 0.5823
+        },
+        {
+          "champion": "Trundle",
+          "games": 195,
+          "win_rate_against": 0.5795
+        },
+        {
+          "champion": "Jax",
+          "games": 793,
+          "win_rate_against": 0.5536
+        }
+      ],
+      "Volibear": [
+        {
+          "champion": "Trundle",
+          "games": 48,
+          "win_rate_against": 0.6042
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 42,
+          "win_rate_against": 0.5952
+        },
+        {
+          "champion": "Ivern",
+          "games": 70,
+          "win_rate_against": 0.5714
+        }
+      ],
+      "Briar": [
+        {
+          "champion": "Cho'Gath",
+          "games": 146,
+          "win_rate_against": 0.5685
+        },
+        {
+          "champion": "Taliyah",
+          "games": 251,
+          "win_rate_against": 0.5618
+        },
+        {
+          "champion": "Zyra",
+          "games": 286,
+          "win_rate_against": 0.542
+        }
+      ],
+      "Viego": [
+        {
+          "champion": "Rammus",
+          "games": 1372,
+          "win_rate_against": 0.6028
+        },
+        {
+          "champion": "Malphite",
+          "games": 600,
+          "win_rate_against": 0.5533
+        },
+        {
+          "champion": "Sejuani",
+          "games": 1411,
+          "win_rate_against": 0.5528
+        }
+      ],
+      "Poppy": [
+        {
+          "champion": "Skarner",
+          "games": 37,
+          "win_rate_against": 0.6486
+        },
+        {
+          "champion": "Master Yi",
+          "games": 135,
+          "win_rate_against": 0.6222
+        },
+        {
+          "champion": "Udyr",
+          "games": 66,
+          "win_rate_against": 0.6212
+        }
+      ],
+      "Sylas": [
+        {
+          "champion": "Ivern",
+          "games": 359,
+          "win_rate_against": 0.5933
+        },
+        {
+          "champion": "Poppy",
+          "games": 201,
+          "win_rate_against": 0.5522
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 219,
+          "win_rate_against": 0.5479
+        }
+      ],
+      "Shaco": [
+        {
+          "champion": "Poppy",
+          "games": 119,
+          "win_rate_against": 0.5462
+        },
+        {
+          "champion": "Rek'Sai",
+          "games": 349,
+          "win_rate_against": 0.5415
+        },
+        {
+          "champion": "Skarner",
+          "games": 334,
+          "win_rate_against": 0.5329
+        }
+      ],
+      "Sejuani": [
+        {
+          "champion": "Trundle",
+          "games": 183,
+          "win_rate_against": 0.5738
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 62,
+          "win_rate_against": 0.5645
+        },
+        {
+          "champion": "Lillia",
+          "games": 606,
+          "win_rate_against": 0.5627
+        }
+      ],
+      "Shyvana": [
+        {
+          "champion": "Sylas",
+          "games": 2591,
+          "win_rate_against": 0.5646
+        },
+        {
+          "champion": "Trundle",
+          "games": 285,
+          "win_rate_against": 0.5404
+        },
+        {
+          "champion": "Nidalee",
+          "games": 686,
+          "win_rate_against": 0.5292
+        }
+      ],
+      "Skarner": [
+        {
+          "champion": "Fizz",
+          "games": 56,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Pantheon",
+          "games": 79,
+          "win_rate_against": 0.6203
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 32,
+          "win_rate_against": 0.5938
+        }
+      ],
+      "Xin Zhao": [
+        {
+          "champion": "Volibear",
+          "games": 188,
+          "win_rate_against": 0.6064
+        },
+        {
+          "champion": "Zyra",
+          "games": 180,
+          "win_rate_against": 0.5778
+        },
+        {
+          "champion": "Gragas",
+          "games": 111,
+          "win_rate_against": 0.5766
+        }
+      ],
+      "Amumu": [
+        {
+          "champion": "Taliyah",
+          "games": 75,
+          "win_rate_against": 0.6267
+        },
+        {
+          "champion": "Aatrox",
+          "games": 202,
+          "win_rate_against": 0.5644
+        },
+        {
+          "champion": "Volibear",
+          "games": 203,
+          "win_rate_against": 0.5616
+        }
+      ],
+      "Ivern": [
+        {
+          "champion": "Maokai",
+          "games": 36,
+          "win_rate_against": 0.5833
+        },
+        {
+          "champion": "Fizz",
+          "games": 50,
+          "win_rate_against": 0.58
+        },
+        {
+          "champion": "Elise",
+          "games": 110,
+          "win_rate_against": 0.5727
+        }
+      ],
+      "Aatrox": [
+        {
+          "champion": "Ivern",
+          "games": 99,
+          "win_rate_against": 0.5859
+        },
+        {
+          "champion": "Fizz",
+          "games": 50,
+          "win_rate_against": 0.56
+        },
+        {
+          "champion": "Gwen",
+          "games": 107,
+          "win_rate_against": 0.5421
+        }
+      ],
+      "Ambessa": [
+        {
+          "champion": "Ivern",
+          "games": 65,
+          "win_rate_against": 0.6923
+        },
+        {
+          "champion": "Teemo",
+          "games": 38,
+          "win_rate_against": 0.6842
+        },
+        {
+          "champion": "Evelynn",
+          "games": 105,
+          "win_rate_against": 0.6
+        }
+      ],
+      "Ekko": [
+        {
+          "champion": "Maokai",
+          "games": 115,
+          "win_rate_against": 0.5652
+        },
+        {
+          "champion": "Ivern",
+          "games": 251,
+          "win_rate_against": 0.5578
+        },
+        {
+          "champion": "Teemo",
+          "games": 164,
+          "win_rate_against": 0.5488
+        }
+      ],
+      "Elise": [
+        {
+          "champion": "Maokai",
+          "games": 45,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 44,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Malphite",
+          "games": 82,
+          "win_rate_against": 0.5976
+        }
+      ],
+      "Wukong": [
+        {
+          "champion": "Maokai",
+          "games": 207,
+          "win_rate_against": 0.5411
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 208,
+          "win_rate_against": 0.5337
+        },
+        {
+          "champion": "Darius",
+          "games": 317,
+          "win_rate_against": 0.5268
+        }
+      ],
+      "Udyr": [
+        {
+          "champion": "Teemo",
+          "games": 102,
+          "win_rate_against": 0.598
+        },
+        {
+          "champion": "Malphite",
+          "games": 104,
+          "win_rate_against": 0.5577
+        },
+        {
+          "champion": "Briar",
+          "games": 785,
+          "win_rate_against": 0.5465
+        }
+      ],
+      "Warwick": [
+        {
+          "champion": "Gragas",
+          "games": 138,
+          "win_rate_against": 0.5507
+        },
+        {
+          "champion": "Rammus",
+          "games": 450,
+          "win_rate_against": 0.5467
+        },
+        {
+          "champion": "Trundle",
+          "games": 155,
+          "win_rate_against": 0.5355
+        }
+      ],
+      "Evelynn": [
+        {
+          "champion": "Cho'Gath",
+          "games": 72,
+          "win_rate_against": 0.5972
+        },
+        {
+          "champion": "Rammus",
+          "games": 217,
+          "win_rate_against": 0.5806
+        },
+        {
+          "champion": "Teemo",
+          "games": 126,
+          "win_rate_against": 0.5635
+        }
+      ],
+      "Jarvan IV": [
+        {
+          "champion": "Maokai",
+          "games": 188,
+          "win_rate_against": 0.5426
+        },
+        {
+          "champion": "Briar",
+          "games": 1720,
+          "win_rate_against": 0.5314
+        },
+        {
+          "champion": "Amumu",
+          "games": 819,
+          "win_rate_against": 0.5299
+        }
+      ],
+      "Zyra": [
+        {
+          "champion": "Dr. Mundo",
+          "games": 44,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Evelynn",
+          "games": 104,
+          "win_rate_against": 0.6058
+        },
+        {
+          "champion": "Sejuani",
+          "games": 85,
+          "win_rate_against": 0.5882
+        }
+      ],
+      "Zac": [
+        {
+          "champion": "Quinn",
+          "games": 205,
+          "win_rate_against": 0.5805
+        },
+        {
+          "champion": "Warwick",
+          "games": 654,
+          "win_rate_against": 0.552
+        },
+        {
+          "champion": "Shyvana",
+          "games": 1002,
+          "win_rate_against": 0.5469
+        }
+      ],
+      "Jax": [
+        {
+          "champion": "Cho'Gath",
+          "games": 58,
+          "win_rate_against": 0.6379
+        },
+        {
+          "champion": "Poppy",
+          "games": 54,
+          "win_rate_against": 0.5926
+        },
+        {
+          "champion": "Ivern",
+          "games": 91,
+          "win_rate_against": 0.5604
+        }
+      ],
+      "Zed": [
+        {
+          "champion": "Dr. Mundo",
+          "games": 76,
+          "win_rate_against": 0.6711
+        },
+        {
+          "champion": "Ambessa",
+          "games": 112,
+          "win_rate_against": 0.6071
+        },
+        {
+          "champion": "Rammus",
+          "games": 220,
+          "win_rate_against": 0.6
+        }
+      ],
+      "Jayce": [
+        {
+          "champion": "Trundle",
+          "games": 50,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Shaco",
+          "games": 333,
+          "win_rate_against": 0.5976
+        },
+        {
+          "champion": "Rammus",
+          "games": 141,
+          "win_rate_against": 0.5887
+        }
+      ],
+      "Cho'Gath": [
+        {
+          "champion": "Trundle",
+          "games": 34,
+          "win_rate_against": 0.6471
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 71,
+          "win_rate_against": 0.6338
+        },
+        {
+          "champion": "Rek'Sai",
+          "games": 40,
+          "win_rate_against": 0.625
+        }
+      ],
+      "Karthus": [
+        {
+          "champion": "Ambessa",
+          "games": 68,
+          "win_rate_against": 0.6618
+        },
+        {
+          "champion": "Aatrox",
+          "games": 108,
+          "win_rate_against": 0.6296
+        },
+        {
+          "champion": "Rammus",
+          "games": 122,
+          "win_rate_against": 0.623
+        }
+      ],
+      "Kha'Zix": [
+        {
+          "champion": "Shaco",
+          "games": 1695,
+          "win_rate_against": 0.5522
+        },
+        {
+          "champion": "Skarner",
+          "games": 406,
+          "win_rate_against": 0.5517
+        },
+        {
+          "champion": "Elise",
+          "games": 638,
+          "win_rate_against": 0.5502
+        }
+      ],
+      "Kayn": [
+        {
+          "champion": "Ivern",
+          "games": 626,
+          "win_rate_against": 0.5399
+        },
+        {
+          "champion": "Poppy",
+          "games": 345,
+          "win_rate_against": 0.5304
+        },
+        {
+          "champion": "Jarvan IV",
+          "games": 2931,
+          "win_rate_against": 0.5278
+        }
+      ],
+      "Quinn": [
+        {
+          "champion": "Rammus",
+          "games": 156,
+          "win_rate_against": 0.6603
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 48,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Amumu",
+          "games": 159,
+          "win_rate_against": 0.6164
+        }
+      ],
+      "Qiyana": [
+        {
+          "champion": "Maokai",
+          "games": 88,
+          "win_rate_against": 0.6818
+        },
+        {
+          "champion": "Darius",
+          "games": 120,
+          "win_rate_against": 0.6167
+        },
+        {
+          "champion": "Gragas",
+          "games": 99,
+          "win_rate_against": 0.6162
+        }
+      ],
+      "Kindred": [
+        {
+          "champion": "Rammus",
+          "games": 247,
+          "win_rate_against": 0.583
+        },
+        {
+          "champion": "Cho'Gath",
+          "games": 68,
+          "win_rate_against": 0.5735
+        },
+        {
+          "champion": "Darius",
+          "games": 130,
+          "win_rate_against": 0.5692
+        }
+      ],
+      "Talon": [
+        {
+          "champion": "Cho'Gath",
+          "games": 110,
+          "win_rate_against": 0.5909
+        },
+        {
+          "champion": "Dr. Mundo",
+          "games": 212,
+          "win_rate_against": 0.5519
+        },
+        {
+          "champion": "Poppy",
+          "games": 176,
+          "win_rate_against": 0.5511
+        }
+      ],
+      "Taliyah": [
+        {
+          "champion": "Rammus",
+          "games": 69,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Volibear",
+          "games": 31,
+          "win_rate_against": 0.6452
+        },
+        {
+          "champion": "Maokai",
+          "games": 33,
+          "win_rate_against": 0.6061
+        }
+      ],
+      "Trundle": [
+        {
+          "champion": "Sylas",
+          "games": 225,
+          "win_rate_against": 0.5867
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 73,
+          "win_rate_against": 0.5616
+        },
+        {
+          "champion": "Zac",
+          "games": 151,
+          "win_rate_against": 0.5563
+        }
+      ],
+      "Teemo": [
+        {
+          "champion": "Darius",
+          "games": 50,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Nunu & Willump",
+          "games": 97,
+          "win_rate_against": 0.5979
+        },
+        {
+          "champion": "Malphite",
+          "games": 52,
+          "win_rate_against": 0.5962
+        }
+      ],
+      "Pantheon": [
+        {
+          "champion": "Nunu & Willump",
+          "games": 97,
+          "win_rate_against": 0.6598
+        },
+        {
+          "champion": "Teemo",
+          "games": 45,
+          "win_rate_against": 0.6444
+        },
+        {
+          "champion": "Zyra",
+          "games": 41,
+          "win_rate_against": 0.6341
+        }
+      ],
+      "Fiddlesticks": [
+        {
+          "champion": "Zyra",
+          "games": 87,
+          "win_rate_against": 0.5632
+        },
+        {
+          "champion": "Rammus",
+          "games": 218,
+          "win_rate_against": 0.555
+        },
+        {
+          "champion": "Fizz",
+          "games": 87,
+          "win_rate_against": 0.5517
+        }
+      ],
+      "Fizz": [
+        {
+          "champion": "Rammus",
+          "games": 47,
+          "win_rate_against": 0.6809
+        },
+        {
+          "champion": "Elise",
+          "games": 72,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Rek'Sai",
+          "games": 40,
+          "win_rate_against": 0.625
+        }
+      ],
+      "Hecarim": [
+        {
+          "champion": "Ivern",
+          "games": 327,
+          "win_rate_against": 0.5749
+        },
+        {
+          "champion": "Darius",
+          "games": 301,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Trundle",
+          "games": 181,
+          "win_rate_against": 0.5635
+        }
+      ]
+    },
+    "middle": {
+      "Garen": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 45,
+          "win_rate_against": 0.6444
+        },
+        {
+          "champion": "Twisted Fate",
+          "games": 138,
+          "win_rate_against": 0.6159
+        },
+        {
+          "champion": "Annie",
+          "games": 57,
+          "win_rate_against": 0.614
+        }
+      ],
+      "Galio": [
+        {
+          "champion": "Vel'Koz",
+          "games": 228,
+          "win_rate_against": 0.6096
+        },
+        {
+          "champion": "Riven",
+          "games": 105,
+          "win_rate_against": 0.6095
+        },
+        {
+          "champion": "Ziggs",
+          "games": 177,
+          "win_rate_against": 0.5763
+        }
+      ],
+      "Gangplank": [
+        {
+          "champion": "Malphite",
+          "games": 37,
+          "win_rate_against": 0.6757
+        },
+        {
+          "champion": "Ryze",
+          "games": 111,
+          "win_rate_against": 0.6216
+        },
+        {
+          "champion": "Brand",
+          "games": 30,
+          "win_rate_against": 0.6
+        }
+      ],
+      "Gwen": [
+        {
+          "champion": "Riven",
+          "games": 79,
+          "win_rate_against": 0.6456
+        },
+        {
+          "champion": "Pantheon",
+          "games": 68,
+          "win_rate_against": 0.5882
+        },
+        {
+          "champion": "Vel'Koz",
+          "games": 71,
+          "win_rate_against": 0.5634
+        }
+      ],
+      "Nasus": [
+        {
+          "champion": "Vel'Koz",
+          "games": 88,
+          "win_rate_against": 0.6136
+        },
+        {
+          "champion": "Brand",
+          "games": 67,
+          "win_rate_against": 0.597
+        },
+        {
+          "champion": "Pantheon",
+          "games": 65,
+          "win_rate_against": 0.5846
+        }
+      ],
+      "Naafiri": [
+        {
+          "champion": "Garen",
+          "games": 63,
+          "win_rate_against": 0.6349
+        },
+        {
+          "champion": "Sion",
+          "games": 79,
+          "win_rate_against": 0.6076
+        },
+        {
+          "champion": "Nasus",
+          "games": 127,
+          "win_rate_against": 0.5748
+        }
+      ],
+      "Diana": [
+        {
+          "champion": "Nasus",
+          "games": 236,
+          "win_rate_against": 0.5763
+        },
+        {
+          "champion": "Riven",
+          "games": 92,
+          "win_rate_against": 0.5761
+        },
+        {
+          "champion": "Kassadin",
+          "games": 471,
+          "win_rate_against": 0.5563
+        }
+      ],
+      "Ryze": [
+        {
+          "champion": "Garen",
+          "games": 88,
+          "win_rate_against": 0.5909
+        },
+        {
+          "champion": "Gwen",
+          "games": 259,
+          "win_rate_against": 0.5792
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 388,
+          "win_rate_against": 0.5747
+        }
+      ],
+      "Lux": [
+        {
+          "champion": "Ziggs",
+          "games": 237,
+          "win_rate_against": 0.5316
+        },
+        {
+          "champion": "Xerath",
+          "games": 1637,
+          "win_rate_against": 0.529
+        },
+        {
+          "champion": "Gwen",
+          "games": 278,
+          "win_rate_against": 0.5288
+        }
+      ],
+      "Locke": [
+        {
+          "champion": "Garen",
+          "games": 297,
+          "win_rate_against": 0.6061
+        },
+        {
+          "champion": "Gwen",
+          "games": 578,
+          "win_rate_against": 0.5761
+        },
+        {
+          "champion": "Akali",
+          "games": 3237,
+          "win_rate_against": 0.5573
+        }
+      ],
+      "LeBlanc": [
+        {
+          "champion": "Naafiri",
+          "games": 482,
+          "win_rate_against": 0.5871
+        },
+        {
+          "champion": "Malzahar",
+          "games": 1855,
+          "win_rate_against": 0.5628
+        },
+        {
+          "champion": "Twisted Fate",
+          "games": 1315,
+          "win_rate_against": 0.5544
+        }
+      ],
+      "Riven": [
+        {
+          "champion": "Cassiopeia",
+          "games": 52,
+          "win_rate_against": 0.6346
+        },
+        {
+          "champion": "Vel'Koz",
+          "games": 31,
+          "win_rate_against": 0.6129
+        },
+        {
+          "champion": "Vex",
+          "games": 77,
+          "win_rate_against": 0.5974
+        }
+      ],
+      "Lissandra": [
+        {
+          "champion": "Smolder",
+          "games": 115,
+          "win_rate_against": 0.5652
+        },
+        {
+          "champion": "Brand",
+          "games": 232,
+          "win_rate_against": 0.5474
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 424,
+          "win_rate_against": 0.5377
+        }
+      ],
+      "Malzahar": [
+        {
+          "champion": "Riven",
+          "games": 186,
+          "win_rate_against": 0.5591
+        },
+        {
+          "champion": "Nasus",
+          "games": 508,
+          "win_rate_against": 0.5571
+        },
+        {
+          "champion": "Swain",
+          "games": 327,
+          "win_rate_against": 0.5474
+        }
+      ],
+      "Malphite": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 63,
+          "win_rate_against": 0.6984
+        },
+        {
+          "champion": "Sylas",
+          "games": 465,
+          "win_rate_against": 0.6473
+        },
+        {
+          "champion": "Lux",
+          "games": 156,
+          "win_rate_against": 0.6346
+        }
+      ],
+      "Mel": [
+        {
+          "champion": "Sion",
+          "games": 77,
+          "win_rate_against": 0.6623
+        },
+        {
+          "champion": "Xerath",
+          "games": 884,
+          "win_rate_against": 0.6267
+        },
+        {
+          "champion": "Cassiopeia",
+          "games": 233,
+          "win_rate_against": 0.6137
+        }
+      ],
+      "Veigar": [
+        {
+          "champion": "Ziggs",
+          "games": 277,
+          "win_rate_against": 0.5523
+        },
+        {
+          "champion": "Gwen",
+          "games": 459,
+          "win_rate_against": 0.5403
+        },
+        {
+          "champion": "Zed",
+          "games": 2256,
+          "win_rate_against": 0.5319
+        }
+      ],
+      "Vex": [
+        {
+          "champion": "Twisted Fate",
+          "games": 808,
+          "win_rate_against": 0.5582
+        },
+        {
+          "champion": "Nasus",
+          "games": 193,
+          "win_rate_against": 0.5544
+        },
+        {
+          "champion": "Sion",
+          "games": 108,
+          "win_rate_against": 0.5463
+        }
+      ],
+      "Vel'Koz": [
+        {
+          "champion": "Naafiri",
+          "games": 97,
+          "win_rate_against": 0.5773
+        },
+        {
+          "champion": "Zoe",
+          "games": 144,
+          "win_rate_against": 0.5764
+        },
+        {
+          "champion": "Brand",
+          "games": 47,
+          "win_rate_against": 0.5532
+        }
+      ],
+      "Brand": [
+        {
+          "champion": "Gwen",
+          "games": 75,
+          "win_rate_against": 0.6267
+        },
+        {
+          "champion": "Fizz",
+          "games": 267,
+          "win_rate_against": 0.6105
+        },
+        {
+          "champion": "Akshan",
+          "games": 83,
+          "win_rate_against": 0.6024
+        }
+      ],
+      "Vladimir": [
+        {
+          "champion": "Nasus",
+          "games": 348,
+          "win_rate_against": 0.6149
+        },
+        {
+          "champion": "Brand",
+          "games": 199,
+          "win_rate_against": 0.5829
+        },
+        {
+          "champion": "Ziggs",
+          "games": 136,
+          "win_rate_against": 0.5735
+        }
+      ],
+      "Viktor": [
+        {
+          "champion": "Vel'Koz",
+          "games": 676,
+          "win_rate_against": 0.537
+        },
+        {
+          "champion": "Nasus",
+          "games": 738,
+          "win_rate_against": 0.5352
+        },
+        {
+          "champion": "Xerath",
+          "games": 4149,
+          "win_rate_against": 0.5346
+        }
+      ],
+      "Sion": [
+        {
+          "champion": "Nasus",
+          "games": 56,
+          "win_rate_against": 0.6607
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 81,
+          "win_rate_against": 0.6296
+        },
+        {
+          "champion": "Gwen",
+          "games": 45,
+          "win_rate_against": 0.6222
+        }
+      ],
+      "Sylas": [
+        {
+          "champion": "Riven",
+          "games": 229,
+          "win_rate_against": 0.5677
+        },
+        {
+          "champion": "Vex",
+          "games": 1443,
+          "win_rate_against": 0.5648
+        },
+        {
+          "champion": "Gwen",
+          "games": 586,
+          "win_rate_against": 0.5614
+        }
+      ],
+      "Smolder": [
+        {
+          "champion": "Vel'Koz",
+          "games": 30,
+          "win_rate_against": 0.7667
+        },
+        {
+          "champion": "Akshan",
+          "games": 54,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Fizz",
+          "games": 128,
+          "win_rate_against": 0.6562
+        }
+      ],
+      "Swain": [
+        {
+          "champion": "Brand",
+          "games": 40,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Fizz",
+          "games": 239,
+          "win_rate_against": 0.5607
+        },
+        {
+          "champion": "Jayce",
+          "games": 33,
+          "win_rate_against": 0.5455
+        }
+      ],
+      "Syndra": [
+        {
+          "champion": "Nasus",
+          "games": 709,
+          "win_rate_against": 0.5882
+        },
+        {
+          "champion": "Fizz",
+          "games": 3712,
+          "win_rate_against": 0.5493
+        },
+        {
+          "champion": "Gwen",
+          "games": 600,
+          "win_rate_against": 0.545
+        }
+      ],
+      "Ahri": [
+        {
+          "champion": "Vex",
+          "games": 1742,
+          "win_rate_against": 0.5166
+        },
+        {
+          "champion": "Veigar",
+          "games": 3014,
+          "win_rate_against": 0.5133
+        },
+        {
+          "champion": "Lux",
+          "games": 2754,
+          "win_rate_against": 0.5102
+        }
+      ],
+      "Aurelion Sol": [
+        {
+          "champion": "Ziggs",
+          "games": 63,
+          "win_rate_against": 0.6349
+        },
+        {
+          "champion": "Pantheon",
+          "games": 59,
+          "win_rate_against": 0.6102
+        },
+        {
+          "champion": "Riven",
+          "games": 47,
+          "win_rate_against": 0.5957
+        }
+      ],
+      "Azir": [
+        {
+          "champion": "Xerath",
+          "games": 696,
+          "win_rate_against": 0.5948
+        },
+        {
+          "champion": "Hwei",
+          "games": 599,
+          "win_rate_against": 0.5927
+        },
+        {
+          "champion": "Nasus",
+          "games": 172,
+          "win_rate_against": 0.5872
+        }
+      ],
+      "Akali": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 454,
+          "win_rate_against": 0.5595
+        },
+        {
+          "champion": "Vex",
+          "games": 1354,
+          "win_rate_against": 0.5554
+        },
+        {
+          "champion": "Annie",
+          "games": 630,
+          "win_rate_against": 0.5476
+        }
+      ],
+      "Akshan": [
+        {
+          "champion": "Nasus",
+          "games": 142,
+          "win_rate_against": 0.5845
+        },
+        {
+          "champion": "Vex",
+          "games": 437,
+          "win_rate_against": 0.5698
+        },
+        {
+          "champion": "Yasuo",
+          "games": 909,
+          "win_rate_against": 0.5622
+        }
+      ],
+      "Annie": [
+        {
+          "champion": "Malphite",
+          "games": 70,
+          "win_rate_against": 0.5857
+        },
+        {
+          "champion": "Gwen",
+          "games": 141,
+          "win_rate_against": 0.5603
+        },
+        {
+          "champion": "Riven",
+          "games": 43,
+          "win_rate_against": 0.5581
+        }
+      ],
+      "Anivia": [
+        {
+          "champion": "Garen",
+          "games": 74,
+          "win_rate_against": 0.5676
+        },
+        {
+          "champion": "Xerath",
+          "games": 814,
+          "win_rate_against": 0.5639
+        },
+        {
+          "champion": "Naafiri",
+          "games": 250,
+          "win_rate_against": 0.552
+        }
+      ],
+      "Yasuo": [
+        {
+          "champion": "Annie",
+          "games": 1245,
+          "win_rate_against": 0.5735
+        },
+        {
+          "champion": "Vex",
+          "games": 2147,
+          "win_rate_against": 0.5654
+        },
+        {
+          "champion": "Taliyah",
+          "games": 797,
+          "win_rate_against": 0.5621
+        }
+      ],
+      "Ekko": [
+        {
+          "champion": "Nasus",
+          "games": 259,
+          "win_rate_against": 0.5598
+        },
+        {
+          "champion": "Jayce",
+          "games": 130,
+          "win_rate_against": 0.5538
+        },
+        {
+          "champion": "Sylas",
+          "games": 1588,
+          "win_rate_against": 0.5372
+        }
+      ],
+      "Aurora": [
+        {
+          "champion": "Lissandra",
+          "games": 599,
+          "win_rate_against": 0.5442
+        },
+        {
+          "champion": "Twisted Fate",
+          "games": 650,
+          "win_rate_against": 0.54
+        },
+        {
+          "champion": "Vex",
+          "games": 326,
+          "win_rate_against": 0.5399
+        }
+      ],
+      "Orianna": [
+        {
+          "champion": "Sion",
+          "games": 106,
+          "win_rate_against": 0.5849
+        },
+        {
+          "champion": "Ziggs",
+          "games": 152,
+          "win_rate_against": 0.5789
+        },
+        {
+          "champion": "Nasus",
+          "games": 227,
+          "win_rate_against": 0.5771
+        }
+      ],
+      "Yone": [
+        {
+          "champion": "Annie",
+          "games": 860,
+          "win_rate_against": 0.5837
+        },
+        {
+          "champion": "Vex",
+          "games": 1335,
+          "win_rate_against": 0.5768
+        },
+        {
+          "champion": "Akshan",
+          "games": 861,
+          "win_rate_against": 0.5587
+        }
+      ],
+      "Irelia": [
+        {
+          "champion": "Sion",
+          "games": 82,
+          "win_rate_against": 0.5976
+        },
+        {
+          "champion": "Vex",
+          "games": 541,
+          "win_rate_against": 0.5896
+        },
+        {
+          "champion": "Malphite",
+          "games": 241,
+          "win_rate_against": 0.5851
+        }
+      ],
+      "Zed": [
+        {
+          "champion": "Nasus",
+          "games": 935,
+          "win_rate_against": 0.5904
+        },
+        {
+          "champion": "Garen",
+          "games": 448,
+          "win_rate_against": 0.5536
+        },
+        {
+          "champion": "Gangplank",
+          "games": 444,
+          "win_rate_against": 0.5473
+        }
+      ],
+      "Xerath": [
+        {
+          "champion": "Gwen",
+          "games": 291,
+          "win_rate_against": 0.6014
+        },
+        {
+          "champion": "Nasus",
+          "games": 329,
+          "win_rate_against": 0.5441
+        },
+        {
+          "champion": "Riven",
+          "games": 143,
+          "win_rate_against": 0.5385
+        }
+      ],
+      "Jayce": [
+        {
+          "champion": "Vel'Koz",
+          "games": 36,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Pantheon",
+          "games": 37,
+          "win_rate_against": 0.6486
+        },
+        {
+          "champion": "Nasus",
+          "games": 72,
+          "win_rate_against": 0.6111
+        }
+      ],
+      "Zoe": [
+        {
+          "champion": "Nasus",
+          "games": 168,
+          "win_rate_against": 0.6369
+        },
+        {
+          "champion": "Malphite",
+          "games": 76,
+          "win_rate_against": 0.5658
+        },
+        {
+          "champion": "Swain",
+          "games": 93,
+          "win_rate_against": 0.5591
+        }
+      ],
+      "Ziggs": [
+        {
+          "champion": "Nasus",
+          "games": 39,
+          "win_rate_against": 0.6154
+        },
+        {
+          "champion": "LeBlanc",
+          "games": 187,
+          "win_rate_against": 0.615
+        },
+        {
+          "champion": "Kassadin",
+          "games": 101,
+          "win_rate_against": 0.5842
+        }
+      ],
+      "Kassadin": [
+        {
+          "champion": "Nasus",
+          "games": 290,
+          "win_rate_against": 0.6448
+        },
+        {
+          "champion": "Gwen",
+          "games": 254,
+          "win_rate_against": 0.5748
+        },
+        {
+          "champion": "Gangplank",
+          "games": 146,
+          "win_rate_against": 0.5685
+        }
+      ],
+      "Cassiopeia": [
+        {
+          "champion": "Garen",
+          "games": 54,
+          "win_rate_against": 0.6296
+        },
+        {
+          "champion": "Brand",
+          "games": 79,
+          "win_rate_against": 0.5949
+        },
+        {
+          "champion": "Naafiri",
+          "games": 146,
+          "win_rate_against": 0.5685
+        }
+      ],
+      "Katarina": [
+        {
+          "champion": "Nasus",
+          "games": 736,
+          "win_rate_against": 0.5707
+        },
+        {
+          "champion": "Brand",
+          "games": 285,
+          "win_rate_against": 0.5474
+        },
+        {
+          "champion": "Vex",
+          "games": 1850,
+          "win_rate_against": 0.5416
+        }
+      ],
+      "Qiyana": [
+        {
+          "champion": "Nasus",
+          "games": 132,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Gwen",
+          "games": 154,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Swain",
+          "games": 93,
+          "win_rate_against": 0.6344
+        }
+      ],
+      "Talon": [
+        {
+          "champion": "Brand",
+          "games": 78,
+          "win_rate_against": 0.641
+        },
+        {
+          "champion": "Swain",
+          "games": 85,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Jayce",
+          "games": 67,
+          "win_rate_against": 0.597
+        }
+      ],
+      "Taliyah": [
+        {
+          "champion": "Pantheon",
+          "games": 57,
+          "win_rate_against": 0.5965
+        },
+        {
+          "champion": "Gwen",
+          "games": 91,
+          "win_rate_against": 0.5934
+        },
+        {
+          "champion": "Katarina",
+          "games": 386,
+          "win_rate_against": 0.5829
+        }
+      ],
+      "Tristana": [
+        {
+          "champion": "Ziggs",
+          "games": 53,
+          "win_rate_against": 0.6792
+        },
+        {
+          "champion": "Pantheon",
+          "games": 47,
+          "win_rate_against": 0.6383
+        },
+        {
+          "champion": "Nasus",
+          "games": 96,
+          "win_rate_against": 0.625
+        }
+      ],
+      "Twisted Fate": [
+        {
+          "champion": "Vel'Koz",
+          "games": 265,
+          "win_rate_against": 0.5811
+        },
+        {
+          "champion": "Swain",
+          "games": 219,
+          "win_rate_against": 0.5799
+        },
+        {
+          "champion": "Sion",
+          "games": 207,
+          "win_rate_against": 0.5507
+        }
+      ],
+      "Pantheon": [
+        {
+          "champion": "Ziggs",
+          "games": 32,
+          "win_rate_against": 0.625
+        },
+        {
+          "champion": "Sion",
+          "games": 47,
+          "win_rate_against": 0.5957
+        },
+        {
+          "champion": "Malzahar",
+          "games": 204,
+          "win_rate_against": 0.5735
+        }
+      ],
+      "Fizz": [
+        {
+          "champion": "Pantheon",
+          "games": 495,
+          "win_rate_against": 0.5495
+        },
+        {
+          "champion": "Nasus",
+          "games": 562,
+          "win_rate_against": 0.548
+        },
+        {
+          "champion": "Jayce",
+          "games": 244,
+          "win_rate_against": 0.5328
+        }
+      ],
+      "Hwei": [
+        {
+          "champion": "Fizz",
+          "games": 1392,
+          "win_rate_against": 0.5417
+        },
+        {
+          "champion": "Malphite",
+          "games": 139,
+          "win_rate_against": 0.5396
+        },
+        {
+          "champion": "Brand",
+          "games": 204,
+          "win_rate_against": 0.5392
+        }
+      ]
+    },
+    "bottom": {
+      "Nilah": [
+        {
+          "champion": "Vladimir",
+          "games": 30,
+          "win_rate_against": 0.7
+        },
+        {
+          "champion": "Seraphine",
+          "games": 125,
+          "win_rate_against": 0.616
+        },
+        {
+          "champion": "Swain",
+          "games": 79,
+          "win_rate_against": 0.5949
+        }
+      ],
+      "Draven": [
+        {
+          "champion": "Swain",
+          "games": 228,
+          "win_rate_against": 0.6184
+        },
+        {
+          "champion": "Hwei",
+          "games": 346,
+          "win_rate_against": 0.5694
+        },
+        {
+          "champion": "Veigar",
+          "games": 597,
+          "win_rate_against": 0.5678
+        }
+      ],
+      "Lux": [
+        {
+          "champion": "Senna",
+          "games": 87,
+          "win_rate_against": 0.6552
+        },
+        {
+          "champion": "Swain",
+          "games": 78,
+          "win_rate_against": 0.6026
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 54,
+          "win_rate_against": 0.5926
+        }
+      ],
+      "Lucian": [
+        {
+          "champion": "Seraphine",
+          "games": 1123,
+          "win_rate_against": 0.5788
+        },
+        {
+          "champion": "Veigar",
+          "games": 1029,
+          "win_rate_against": 0.5442
+        },
+        {
+          "champion": "Lux",
+          "games": 492,
+          "win_rate_against": 0.5427
+        }
+      ],
+      "Mel": [
+        {
+          "champion": "Hwei",
+          "games": 227,
+          "win_rate_against": 0.5991
+        },
+        {
+          "champion": "Katarina",
+          "games": 148,
+          "win_rate_against": 0.5878
+        },
+        {
+          "champion": "Viktor",
+          "games": 758,
+          "win_rate_against": 0.5871
+        }
+      ],
+      "Miss Fortune": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 212,
+          "win_rate_against": 0.5708
+        },
+        {
+          "champion": "Katarina",
+          "games": 444,
+          "win_rate_against": 0.5676
+        },
+        {
+          "champion": "Senna",
+          "games": 770,
+          "win_rate_against": 0.5662
+        }
+      ],
+      "Varus": [
+        {
+          "champion": "Xerath",
+          "games": 381,
+          "win_rate_against": 0.6115
+        },
+        {
+          "champion": "Seraphine",
+          "games": 276,
+          "win_rate_against": 0.5942
+        },
+        {
+          "champion": "Viktor",
+          "games": 599,
+          "win_rate_against": 0.5893
+        }
+      ],
+      "Veigar": [
+        {
+          "champion": "Swain",
+          "games": 168,
+          "win_rate_against": 0.5952
+        },
+        {
+          "champion": "Katarina",
+          "games": 172,
+          "win_rate_against": 0.564
+        },
+        {
+          "champion": "Brand",
+          "games": 172,
+          "win_rate_against": 0.564
+        }
+      ],
+      "Vayne": [
+        {
+          "champion": "Nilah",
+          "games": 447,
+          "win_rate_against": 0.5593
+        },
+        {
+          "champion": "Seraphine",
+          "games": 687,
+          "win_rate_against": 0.5531
+        },
+        {
+          "champion": "Vel'Koz",
+          "games": 190,
+          "win_rate_against": 0.5526
+        }
+      ],
+      "Vel'Koz": [
+        {
+          "champion": "Brand",
+          "games": 41,
+          "win_rate_against": 0.6098
+        },
+        {
+          "champion": "Nilah",
+          "games": 39,
+          "win_rate_against": 0.5897
+        },
+        {
+          "champion": "Vladimir",
+          "games": 40,
+          "win_rate_against": 0.55
+        }
+      ],
+      "Brand": [
+        {
+          "champion": "Hwei",
+          "games": 90,
+          "win_rate_against": 0.6111
+        },
+        {
+          "champion": "Ziggs",
+          "games": 203,
+          "win_rate_against": 0.5517
+        },
+        {
+          "champion": "Samira",
+          "games": 225,
+          "win_rate_against": 0.5511
+        }
+      ],
+      "Vladimir": [
+        {
+          "champion": "Senna",
+          "games": 60,
+          "win_rate_against": 0.7
+        },
+        {
+          "champion": "Ashe",
+          "games": 212,
+          "win_rate_against": 0.5896
+        },
+        {
+          "champion": "Swain",
+          "games": 45,
+          "win_rate_against": 0.5778
+        }
+      ],
+      "Viktor": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 175,
+          "win_rate_against": 0.56
+        },
+        {
+          "champion": "Lux",
+          "games": 341,
+          "win_rate_against": 0.5367
+        },
+        {
+          "champion": "Hwei",
+          "games": 488,
+          "win_rate_against": 0.5348
+        }
+      ],
+      "Samira": [
+        {
+          "champion": "Vel'Koz",
+          "games": 152,
+          "win_rate_against": 0.6053
+        },
+        {
+          "champion": "Veigar",
+          "games": 711,
+          "win_rate_against": 0.5963
+        },
+        {
+          "champion": "Kog'Maw",
+          "games": 513,
+          "win_rate_against": 0.577
+        }
+      ],
+      "Senna": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 71,
+          "win_rate_against": 0.6338
+        },
+        {
+          "champion": "Hwei",
+          "games": 125,
+          "win_rate_against": 0.568
+        },
+        {
+          "champion": "Syndra",
+          "games": 235,
+          "win_rate_against": 0.5532
+        }
+      ],
+      "Seraphine": [
+        {
+          "champion": "Brand",
+          "games": 128,
+          "win_rate_against": 0.5391
+        },
+        {
+          "champion": "Katarina",
+          "games": 159,
+          "win_rate_against": 0.5346
+        },
+        {
+          "champion": "Zeri",
+          "games": 428,
+          "win_rate_against": 0.5187
+        }
+      ],
+      "Smolder": [
+        {
+          "champion": "Vladimir",
+          "games": 163,
+          "win_rate_against": 0.589
+        },
+        {
+          "champion": "Katarina",
+          "games": 251,
+          "win_rate_against": 0.5418
+        },
+        {
+          "champion": "Jinx",
+          "games": 3891,
+          "win_rate_against": 0.5392
+        }
+      ],
+      "Swain": [
+        {
+          "champion": "Vel'Koz",
+          "games": 49,
+          "win_rate_against": 0.5918
+        },
+        {
+          "champion": "Zeri",
+          "games": 238,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Hwei",
+          "games": 120,
+          "win_rate_against": 0.55
+        }
+      ],
+      "Sivir": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 134,
+          "win_rate_against": 0.5672
+        },
+        {
+          "champion": "Zeri",
+          "games": 982,
+          "win_rate_against": 0.5672
+        },
+        {
+          "champion": "Twitch",
+          "games": 1149,
+          "win_rate_against": 0.5344
+        }
+      ],
+      "Syndra": [
+        {
+          "champion": "Vel'Koz",
+          "games": 168,
+          "win_rate_against": 0.5952
+        },
+        {
+          "champion": "Katarina",
+          "games": 252,
+          "win_rate_against": 0.5833
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 115,
+          "win_rate_against": 0.5826
+        }
+      ],
+      "Aurelion Sol": [
+        {
+          "champion": "Vladimir",
+          "games": 35,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Zeri",
+          "games": 139,
+          "win_rate_against": 0.5755
+        },
+        {
+          "champion": "Katarina",
+          "games": 40,
+          "win_rate_against": 0.55
+        }
+      ],
+      "Aphelios": [
+        {
+          "champion": "Lux",
+          "games": 249,
+          "win_rate_against": 0.5823
+        },
+        {
+          "champion": "Swain",
+          "games": 290,
+          "win_rate_against": 0.5552
+        },
+        {
+          "champion": "Hwei",
+          "games": 314,
+          "win_rate_against": 0.551
+        }
+      ],
+      "Ashe": [
+        {
+          "champion": "Vel'Koz",
+          "games": 224,
+          "win_rate_against": 0.5848
+        },
+        {
+          "champion": "Xerath",
+          "games": 897,
+          "win_rate_against": 0.5396
+        },
+        {
+          "champion": "Aurelion Sol",
+          "games": 190,
+          "win_rate_against": 0.5316
+        }
+      ],
+      "Yasuo": [
+        {
+          "champion": "Nilah",
+          "games": 247,
+          "win_rate_against": 0.5911
+        },
+        {
+          "champion": "Vladimir",
+          "games": 113,
+          "win_rate_against": 0.5752
+        },
+        {
+          "champion": "Senna",
+          "games": 252,
+          "win_rate_against": 0.5595
+        }
+      ],
+      "Yunara": [
+        {
+          "champion": "Vel'Koz",
+          "games": 268,
+          "win_rate_against": 0.6007
+        },
+        {
+          "champion": "Hwei",
+          "games": 462,
+          "win_rate_against": 0.5628
+        },
+        {
+          "champion": "Swain",
+          "games": 391,
+          "win_rate_against": 0.5524
+        }
+      ],
+      "Ezreal": [
+        {
+          "champion": "Katarina",
+          "games": 719,
+          "win_rate_against": 0.5814
+        },
+        {
+          "champion": "Zeri",
+          "games": 2855,
+          "win_rate_against": 0.572
+        },
+        {
+          "champion": "Sivir",
+          "games": 4098,
+          "win_rate_against": 0.5659
+        }
+      ],
+      "Xayah": [
+        {
+          "champion": "Xerath",
+          "games": 514,
+          "win_rate_against": 0.5525
+        },
+        {
+          "champion": "Seraphine",
+          "games": 538,
+          "win_rate_against": 0.5353
+        },
+        {
+          "champion": "Jinx",
+          "games": 3241,
+          "win_rate_against": 0.5261
+        }
+      ],
+      "Xerath": [
+        {
+          "champion": "Katarina",
+          "games": 151,
+          "win_rate_against": 0.5828
+        },
+        {
+          "champion": "Vayne",
+          "games": 602,
+          "win_rate_against": 0.5432
+        },
+        {
+          "champion": "Kalista",
+          "games": 290,
+          "win_rate_against": 0.5379
+        }
+      ],
+      "Zeri": [
+        {
+          "champion": "Vel'Koz",
+          "games": 163,
+          "win_rate_against": 0.6074
+        },
+        {
+          "champion": "Lux",
+          "games": 205,
+          "win_rate_against": 0.5366
+        },
+        {
+          "champion": "Hwei",
+          "games": 269,
+          "win_rate_against": 0.5279
+        }
+      ],
+      "Ziggs": [
+        {
+          "champion": "Hwei",
+          "games": 363,
+          "win_rate_against": 0.5317
+        },
+        {
+          "champion": "Zeri",
+          "games": 668,
+          "win_rate_against": 0.5284
+        },
+        {
+          "champion": "Vladimir",
+          "games": 146,
+          "win_rate_against": 0.5274
+        }
+      ],
+      "Jhin": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 535,
+          "win_rate_against": 0.5607
+        },
+        {
+          "champion": "Nilah",
+          "games": 836,
+          "win_rate_against": 0.5478
+        },
+        {
+          "champion": "Brand",
+          "games": 745,
+          "win_rate_against": 0.545
+        }
+      ],
+      "Jinx": [
+        {
+          "champion": "Hwei",
+          "games": 999,
+          "win_rate_against": 0.5395
+        },
+        {
+          "champion": "Twitch",
+          "games": 5071,
+          "win_rate_against": 0.5269
+        },
+        {
+          "champion": "Vel'Koz",
+          "games": 422,
+          "win_rate_against": 0.5166
+        }
+      ],
+      "Kai'Sa": [
+        {
+          "champion": "Nilah",
+          "games": 1582,
+          "win_rate_against": 0.5556
+        },
+        {
+          "champion": "Swain",
+          "games": 1646,
+          "win_rate_against": 0.5456
+        },
+        {
+          "champion": "Kog'Maw",
+          "games": 2507,
+          "win_rate_against": 0.5425
+        }
+      ],
+      "Katarina": [
+        {
+          "champion": "Brand",
+          "games": 46,
+          "win_rate_against": 0.587
+        },
+        {
+          "champion": "Tristana",
+          "games": 430,
+          "win_rate_against": 0.5837
+        },
+        {
+          "champion": "Vayne",
+          "games": 313,
+          "win_rate_against": 0.5655
+        }
+      ],
+      "Kalista": [
+        {
+          "champion": "Senna",
+          "games": 172,
+          "win_rate_against": 0.6279
+        },
+        {
+          "champion": "Kog'Maw",
+          "games": 222,
+          "win_rate_against": 0.5811
+        },
+        {
+          "champion": "Nilah",
+          "games": 124,
+          "win_rate_against": 0.5726
+        }
+      ],
+      "Caitlyn": [
+        {
+          "champion": "Xerath",
+          "games": 2889,
+          "win_rate_against": 0.5677
+        },
+        {
+          "champion": "Nilah",
+          "games": 887,
+          "win_rate_against": 0.5614
+        },
+        {
+          "champion": "Brand",
+          "games": 841,
+          "win_rate_against": 0.5589
+        }
+      ],
+      "Kog'Maw": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 55,
+          "win_rate_against": 0.6364
+        },
+        {
+          "champion": "Seraphine",
+          "games": 217,
+          "win_rate_against": 0.5668
+        },
+        {
+          "champion": "Hwei",
+          "games": 159,
+          "win_rate_against": 0.566
+        }
+      ],
+      "Corki": [
+        {
+          "champion": "Aurelion Sol",
+          "games": 53,
+          "win_rate_against": 0.6226
+        },
+        {
+          "champion": "Senna",
+          "games": 147,
+          "win_rate_against": 0.619
+        },
+        {
+          "champion": "Vladimir",
+          "games": 62,
+          "win_rate_against": 0.5968
+        }
+      ],
+      "Tristana": [
+        {
+          "champion": "Brand",
+          "games": 383,
+          "win_rate_against": 0.5379
+        },
+        {
+          "champion": "Veigar",
+          "games": 1142,
+          "win_rate_against": 0.5236
+        },
+        {
+          "champion": "Jinx",
+          "games": 6420,
+          "win_rate_against": 0.5167
+        }
+      ],
+      "Twitch": [
+        {
+          "champion": "Nilah",
+          "games": 532,
+          "win_rate_against": 0.5733
+        },
+        {
+          "champion": "Yasuo",
+          "games": 696,
+          "win_rate_against": 0.5618
+        },
+        {
+          "champion": "Swain",
+          "games": 338,
+          "win_rate_against": 0.5473
+        }
+      ],
+      "Hwei": [
+        {
+          "champion": "Corki",
+          "games": 115,
+          "win_rate_against": 0.5913
+        },
+        {
+          "champion": "Xerath",
+          "games": 258,
+          "win_rate_against": 0.5465
+        },
+        {
+          "champion": "Lux",
+          "games": 110,
+          "win_rate_against": 0.5364
+        }
+      ]
+    },
+    "utility": {
+      "Galio": [
+        {
+          "champion": "Amumu",
+          "games": 55,
+          "win_rate_against": 0.6545
+        },
+        {
+          "champion": "Hwei",
+          "games": 67,
+          "win_rate_against": 0.6269
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 206,
+          "win_rate_against": 0.5971
+        }
+      ],
+      "Nami": [
+        {
+          "champion": "Thresh",
+          "games": 6948,
+          "win_rate_against": 0.5286
+        },
+        {
+          "champion": "Taric",
+          "games": 632,
+          "win_rate_against": 0.5253
+        },
+        {
+          "champion": "Zilean",
+          "games": 1847,
+          "win_rate_against": 0.523
+        }
+      ],
+      "Nautilus": [
+        {
+          "champion": "Renata Glasc",
+          "games": 697,
+          "win_rate_against": 0.5538
+        },
+        {
+          "champion": "Rell",
+          "games": 3410,
+          "win_rate_against": 0.5519
+        },
+        {
+          "champion": "Taric",
+          "games": 1059,
+          "win_rate_against": 0.5505
+        }
+      ],
+      "Neeko": [
+        {
+          "champion": "Renata Glasc",
+          "games": 83,
+          "win_rate_against": 0.6145
+        },
+        {
+          "champion": "Galio",
+          "games": 147,
+          "win_rate_against": 0.6122
+        },
+        {
+          "champion": "Hwei",
+          "games": 73,
+          "win_rate_against": 0.6027
+        }
+      ],
+      "Rakan": [
+        {
+          "champion": "Neeko",
+          "games": 377,
+          "win_rate_against": 0.5411
+        },
+        {
+          "champion": "Taric",
+          "games": 272,
+          "win_rate_against": 0.5404
+        },
+        {
+          "champion": "Veigar",
+          "games": 110,
+          "win_rate_against": 0.5364
+        }
+      ],
+      "Lux": [
+        {
+          "champion": "Fiddlesticks",
+          "games": 251,
+          "win_rate_against": 0.5498
+        },
+        {
+          "champion": "Rell",
+          "games": 1327,
+          "win_rate_against": 0.5396
+        },
+        {
+          "champion": "Soraka",
+          "games": 2153,
+          "win_rate_against": 0.5351
+        }
+      ],
+      "Renata Glasc": [
+        {
+          "champion": "Janna",
+          "games": 210,
+          "win_rate_against": 0.5619
+        },
+        {
+          "champion": "Sona",
+          "games": 186,
+          "win_rate_against": 0.5591
+        },
+        {
+          "champion": "Milio",
+          "games": 392,
+          "win_rate_against": 0.5587
+        }
+      ],
+      "Leona": [
+        {
+          "champion": "Janna",
+          "games": 2307,
+          "win_rate_against": 0.5189
+        },
+        {
+          "champion": "Morgana",
+          "games": 3666,
+          "win_rate_against": 0.5125
+        },
+        {
+          "champion": "Seraphine",
+          "games": 3562,
+          "win_rate_against": 0.5115
+        }
+      ],
+      "Rell": [
+        {
+          "champion": "Amumu",
+          "games": 136,
+          "win_rate_against": 0.5441
+        },
+        {
+          "champion": "Zilean",
+          "games": 672,
+          "win_rate_against": 0.5417
+        },
+        {
+          "champion": "Zyra",
+          "games": 547,
+          "win_rate_against": 0.5302
+        }
+      ],
+      "Lulu": [
+        {
+          "champion": "Elise",
+          "games": 314,
+          "win_rate_against": 0.5605
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 336,
+          "win_rate_against": 0.5417
+        },
+        {
+          "champion": "Taric",
+          "games": 737,
+          "win_rate_against": 0.5346
+        }
+      ],
+      "LeBlanc": [
+        {
+          "champion": "Shen",
+          "games": 101,
+          "win_rate_against": 0.6436
+        },
+        {
+          "champion": "Elise",
+          "games": 45,
+          "win_rate_against": 0.6222
+        },
+        {
+          "champion": "Teemo",
+          "games": 46,
+          "win_rate_against": 0.6087
+        }
+      ],
+      "Maokai": [
+        {
+          "champion": "Amumu",
+          "games": 58,
+          "win_rate_against": 0.6207
+        },
+        {
+          "champion": "Taric",
+          "games": 147,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Twitch",
+          "games": 50,
+          "win_rate_against": 0.54
+        }
+      ],
+      "Mel": [
+        {
+          "champion": "Taric",
+          "games": 86,
+          "win_rate_against": 0.7093
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 47,
+          "win_rate_against": 0.6596
+        },
+        {
+          "champion": "Shen",
+          "games": 146,
+          "win_rate_against": 0.6507
+        }
+      ],
+      "Morgana": [
+        {
+          "champion": "Milio",
+          "games": 1915,
+          "win_rate_against": 0.541
+        },
+        {
+          "champion": "Zilean",
+          "games": 875,
+          "win_rate_against": 0.5383
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 782,
+          "win_rate_against": 0.5358
+        }
+      ],
+      "Milio": [
+        {
+          "champion": "Blitzcrank",
+          "games": 2245,
+          "win_rate_against": 0.5345
+        },
+        {
+          "champion": "Thresh",
+          "games": 4827,
+          "win_rate_against": 0.5301
+        },
+        {
+          "champion": "Braum",
+          "games": 1538,
+          "win_rate_against": 0.5267
+        }
+      ],
+      "Bard": [
+        {
+          "champion": "Elise",
+          "games": 293,
+          "win_rate_against": 0.5563
+        },
+        {
+          "champion": "Zilean",
+          "games": 1004,
+          "win_rate_against": 0.5518
+        },
+        {
+          "champion": "Amumu",
+          "games": 194,
+          "win_rate_against": 0.5515
+        }
+      ],
+      "Veigar": [
+        {
+          "champion": "Soraka",
+          "games": 141,
+          "win_rate_against": 0.6241
+        },
+        {
+          "champion": "Nami",
+          "games": 291,
+          "win_rate_against": 0.622
+        },
+        {
+          "champion": "Tahm Kench",
+          "games": 89,
+          "win_rate_against": 0.6067
+        }
+      ],
+      "Vel'Koz": [
+        {
+          "champion": "Zyra",
+          "games": 556,
+          "win_rate_against": 0.554
+        },
+        {
+          "champion": "Zilean",
+          "games": 555,
+          "win_rate_against": 0.5441
+        },
+        {
+          "champion": "Maokai",
+          "games": 315,
+          "win_rate_against": 0.5397
+        }
+      ],
+      "Braum": [
+        {
+          "champion": "Senna",
+          "games": 1346,
+          "win_rate_against": 0.5446
+        },
+        {
+          "champion": "Rakan",
+          "games": 999,
+          "win_rate_against": 0.5355
+        },
+        {
+          "champion": "Galio",
+          "games": 302,
+          "win_rate_against": 0.5331
+        }
+      ],
+      "Brand": [
+        {
+          "champion": "Poppy",
+          "games": 404,
+          "win_rate_against": 0.5718
+        },
+        {
+          "champion": "Sona",
+          "games": 472,
+          "win_rate_against": 0.5636
+        },
+        {
+          "champion": "Xerath",
+          "games": 779,
+          "win_rate_against": 0.5507
+        }
+      ],
+      "Blitzcrank": [
+        {
+          "champion": "Rakan",
+          "games": 1331,
+          "win_rate_against": 0.5635
+        },
+        {
+          "champion": "Leona",
+          "games": 3330,
+          "win_rate_against": 0.5381
+        },
+        {
+          "champion": "Braum",
+          "games": 1709,
+          "win_rate_against": 0.529
+        }
+      ],
+      "Poppy": [
+        {
+          "champion": "Galio",
+          "games": 223,
+          "win_rate_against": 0.5426
+        },
+        {
+          "champion": "Zyra",
+          "games": 311,
+          "win_rate_against": 0.5402
+        },
+        {
+          "champion": "Amumu",
+          "games": 106,
+          "win_rate_against": 0.5377
+        }
+      ],
+      "Sylas": [
+        {
+          "champion": "Taric",
+          "games": 96,
+          "win_rate_against": 0.6771
+        },
+        {
+          "champion": "Poppy",
+          "games": 351,
+          "win_rate_against": 0.6296
+        },
+        {
+          "champion": "Elise",
+          "games": 49,
+          "win_rate_against": 0.6122
+        }
+      ],
+      "Shaco": [
+        {
+          "champion": "Jarvan IV",
+          "games": 58,
+          "win_rate_against": 0.6034
+        },
+        {
+          "champion": "Janna",
+          "games": 307,
+          "win_rate_against": 0.5831
+        },
+        {
+          "champion": "Sona",
+          "games": 251,
+          "win_rate_against": 0.5777
+        }
+      ],
+      "Senna": [
+        {
+          "champion": "Elise",
+          "games": 203,
+          "win_rate_against": 0.5517
+        },
+        {
+          "champion": "Amumu",
+          "games": 209,
+          "win_rate_against": 0.5502
+        },
+        {
+          "champion": "Blitzcrank",
+          "games": 2097,
+          "win_rate_against": 0.5265
+        }
+      ],
+      "Seraphine": [
+        {
+          "champion": "Bard",
+          "games": 2375,
+          "win_rate_against": 0.5259
+        },
+        {
+          "champion": "Sona",
+          "games": 1745,
+          "win_rate_against": 0.5221
+        },
+        {
+          "champion": "Milio",
+          "games": 3723,
+          "win_rate_against": 0.5179
+        }
+      ],
+      "Sona": [
+        {
+          "champion": "Thresh",
+          "games": 2147,
+          "win_rate_against": 0.5356
+        },
+        {
+          "champion": "Taric",
+          "games": 225,
+          "win_rate_against": 0.5289
+        },
+        {
+          "champion": "Amumu",
+          "games": 93,
+          "win_rate_against": 0.5269
+        }
+      ],
+      "Soraka": [
+        {
+          "champion": "Elise",
+          "games": 166,
+          "win_rate_against": 0.5542
+        },
+        {
+          "champion": "LeBlanc",
+          "games": 183,
+          "win_rate_against": 0.541
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 153,
+          "win_rate_against": 0.5359
+        }
+      ],
+      "Shen": [
+        {
+          "champion": "Fiddlesticks",
+          "games": 65,
+          "win_rate_against": 0.5846
+        },
+        {
+          "champion": "Rell",
+          "games": 603,
+          "win_rate_against": 0.5589
+        },
+        {
+          "champion": "Senna",
+          "games": 669,
+          "win_rate_against": 0.5501
+        }
+      ],
+      "Swain": [
+        {
+          "champion": "Taric",
+          "games": 215,
+          "win_rate_against": 0.5907
+        },
+        {
+          "champion": "Janna",
+          "games": 576,
+          "win_rate_against": 0.5885
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 98,
+          "win_rate_against": 0.5714
+        }
+      ],
+      "Thresh": [
+        {
+          "champion": "Jarvan IV",
+          "games": 462,
+          "win_rate_against": 0.5238
+        },
+        {
+          "champion": "Taric",
+          "games": 1377,
+          "win_rate_against": 0.512
+        },
+        {
+          "champion": "Rell",
+          "games": 3517,
+          "win_rate_against": 0.5087
+        }
+      ],
+      "Amumu": [
+        {
+          "champion": "Taric",
+          "games": 45,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Shaco",
+          "games": 67,
+          "win_rate_against": 0.597
+        },
+        {
+          "champion": "Morgana",
+          "games": 166,
+          "win_rate_against": 0.5843
+        }
+      ],
+      "Alistar": [
+        {
+          "champion": "Vel'Koz",
+          "games": 613,
+          "win_rate_against": 0.5595
+        },
+        {
+          "champion": "Taric",
+          "games": 474,
+          "win_rate_against": 0.5485
+        },
+        {
+          "champion": "Janna",
+          "games": 1022,
+          "win_rate_against": 0.5313
+        }
+      ],
+      "Ashe": [
+        {
+          "champion": "LeBlanc",
+          "games": 34,
+          "win_rate_against": 0.6765
+        },
+        {
+          "champion": "Camille",
+          "games": 178,
+          "win_rate_against": 0.618
+        },
+        {
+          "champion": "Vel'Koz",
+          "games": 185,
+          "win_rate_against": 0.6162
+        }
+      ],
+      "Elise": [
+        {
+          "champion": "Renata Glasc",
+          "games": 42,
+          "win_rate_against": 0.619
+        },
+        {
+          "champion": "Galio",
+          "games": 68,
+          "win_rate_against": 0.6029
+        },
+        {
+          "champion": "Zyra",
+          "games": 69,
+          "win_rate_against": 0.5942
+        }
+      ],
+      "Yuumi": [
+        {
+          "champion": "Fiddlesticks",
+          "games": 192,
+          "win_rate_against": 0.5938
+        },
+        {
+          "champion": "Braum",
+          "games": 999,
+          "win_rate_against": 0.5836
+        },
+        {
+          "champion": "Leona",
+          "games": 2561,
+          "win_rate_against": 0.5666
+        }
+      ],
+      "Jarvan IV": [
+        {
+          "champion": "Galio",
+          "games": 36,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Maokai",
+          "games": 41,
+          "win_rate_against": 0.6585
+        },
+        {
+          "champion": "Soraka",
+          "games": 131,
+          "win_rate_against": 0.6183
+        }
+      ],
+      "Zyra": [
+        {
+          "champion": "Fiddlesticks",
+          "games": 84,
+          "win_rate_against": 0.5833
+        },
+        {
+          "champion": "Galio",
+          "games": 254,
+          "win_rate_against": 0.5394
+        },
+        {
+          "champion": "Soraka",
+          "games": 883,
+          "win_rate_against": 0.5311
+        }
+      ],
+      "Janna": [
+        {
+          "champion": "Jarvan IV",
+          "games": 92,
+          "win_rate_against": 0.5326
+        },
+        {
+          "champion": "Soraka",
+          "games": 1227,
+          "win_rate_against": 0.5232
+        },
+        {
+          "champion": "Thresh",
+          "games": 3306,
+          "win_rate_against": 0.5188
+        }
+      ],
+      "Xerath": [
+        {
+          "champion": "Taric",
+          "games": 168,
+          "win_rate_against": 0.5595
+        },
+        {
+          "champion": "Poppy",
+          "games": 405,
+          "win_rate_against": 0.558
+        },
+        {
+          "champion": "Blitzcrank",
+          "games": 1562,
+          "win_rate_against": 0.5531
+        }
+      ],
+      "Zoe": [
+        {
+          "champion": "Fiddlesticks",
+          "games": 31,
+          "win_rate_against": 0.7419
+        },
+        {
+          "champion": "Renata Glasc",
+          "games": 30,
+          "win_rate_against": 0.6667
+        },
+        {
+          "champion": "Zyra",
+          "games": 127,
+          "win_rate_against": 0.6378
+        }
+      ],
+      "Zilean": [
+        {
+          "champion": "Taric",
+          "games": 216,
+          "win_rate_against": 0.5602
+        },
+        {
+          "champion": "LeBlanc",
+          "games": 146,
+          "win_rate_against": 0.5342
+        },
+        {
+          "champion": "Galio",
+          "games": 240,
+          "win_rate_against": 0.525
+        }
+      ],
+      "Karma": [
+        {
+          "champion": "Amumu",
+          "games": 196,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Fiddlesticks",
+          "games": 196,
+          "win_rate_against": 0.551
+        },
+        {
+          "champion": "Zoe",
+          "games": 309,
+          "win_rate_against": 0.5405
+        }
+      ],
+      "Camille": [
+        {
+          "champion": "Janna",
+          "games": 1035,
+          "win_rate_against": 0.6087
+        },
+        {
+          "champion": "Rakan",
+          "games": 893,
+          "win_rate_against": 0.5969
+        },
+        {
+          "champion": "Rell",
+          "games": 1042,
+          "win_rate_against": 0.596
+        }
+      ],
+      "Taric": [
+        {
+          "champion": "Neeko",
+          "games": 115,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Hwei",
+          "games": 42,
+          "win_rate_against": 0.5714
+        },
+        {
+          "champion": "Janna",
+          "games": 389,
+          "win_rate_against": 0.545
+        }
+      ],
+      "Tahm Kench": [
+        {
+          "champion": "Taric",
+          "games": 209,
+          "win_rate_against": 0.5885
+        },
+        {
+          "champion": "Braum",
+          "games": 639,
+          "win_rate_against": 0.5806
+        },
+        {
+          "champion": "Sona",
+          "games": 407,
+          "win_rate_against": 0.5627
+        }
+      ],
+      "Twitch": [
+        {
+          "champion": "Sona",
+          "games": 58,
+          "win_rate_against": 0.6897
+        },
+        {
+          "champion": "Zilean",
+          "games": 77,
+          "win_rate_against": 0.6753
+        },
+        {
+          "champion": "Neeko",
+          "games": 43,
+          "win_rate_against": 0.6744
+        }
+      ],
+      "Teemo": [
+        {
+          "champion": "Sona",
+          "games": 91,
+          "win_rate_against": 0.6044
+        },
+        {
+          "champion": "Poppy",
+          "games": 91,
+          "win_rate_against": 0.6044
+        },
+        {
+          "champion": "Milio",
+          "games": 200,
+          "win_rate_against": 0.58
+        }
+      ],
+      "Pyke": [
+        {
+          "champion": "Amumu",
+          "games": 260,
+          "win_rate_against": 0.5692
+        },
+        {
+          "champion": "Teemo",
+          "games": 276,
+          "win_rate_against": 0.5688
+        },
+        {
+          "champion": "Maokai",
+          "games": 1107,
+          "win_rate_against": 0.5528
+        }
+      ],
+      "Pantheon": [
+        {
+          "champion": "Taric",
+          "games": 405,
+          "win_rate_against": 0.5877
+        },
+        {
+          "champion": "Renata Glasc",
+          "games": 257,
+          "win_rate_against": 0.5642
+        },
+        {
+          "champion": "Rakan",
+          "games": 887,
+          "win_rate_against": 0.5536
+        }
+      ],
+      "Fiddlesticks": [
+        {
+          "champion": "Zilean",
+          "games": 110,
+          "win_rate_against": 0.6
+        },
+        {
+          "champion": "Sona",
+          "games": 92,
+          "win_rate_against": 0.5978
+        },
+        {
+          "champion": "Janna",
+          "games": 134,
+          "win_rate_against": 0.5896
+        }
+      ],
+      "Hwei": [
+        {
+          "champion": "Renata Glasc",
+          "games": 33,
+          "win_rate_against": 0.697
+        },
+        {
+          "champion": "Shaco",
+          "games": 52,
+          "win_rate_against": 0.6346
+        },
+        {
+          "champion": "Poppy",
+          "games": 73,
+          "win_rate_against": 0.6027
+        }
+      ]
+    }
+  }
+}
