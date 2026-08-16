@@ -1,6 +1,7 @@
 ﻿# lol-balance
 
 🇹🇷 Türkçe: [README.tr.md](README.tr.md)
+
 📖 Oyuncu Rehberi (Türkçe): skorun nasıl hesaplanıyor, adım adım —
 [docs/rating_guide.md](docs/rating_guide.md)
 📖 Player guide (Turkish): how your score is computed, step by step —
