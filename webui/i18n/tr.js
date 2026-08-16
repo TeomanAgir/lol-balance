@@ -10,6 +10,8 @@ window.I18N_DICTS.tr = {
   "common.lang_btn_title": "İngilizce'ye geç",
   "common.key_btn": "Anahtar",
   "common.key_btn_title": "API anahtarını değiştir",
+  "common.nav_aria": "Ana gezinme",
+  "common.menu_btn": "Menüyü aç",
   "common.tab_balance": "Dengele",
   "common.tab_leaderboard": "Sıralama",
   "common.tab_highlights": "Enler",
