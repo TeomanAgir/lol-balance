@@ -1,5 +1,7 @@
 # Skorun Nasıl Hesaplanıyor? — Oyuncu Rehberi
 
+> 🇬🇧 English: [rating_guide_EN.md](rating_guide_EN.md)
+>
 > Bu rehber oyuncular içindir; teknik tanım değildir. Bağlayıcı spesifikasyon
 > `docs/rating_contract.md`'dedir (aktif engine: `openskill-pl-blend20-v1`).
 
