@@ -18,20 +18,27 @@
      Masaüstünde (≥880px) panel hep açık sabit sütundur; mobilde soldan kayan
      çekmece (üst bardaki hamburger açar, scrim/Esc kapatır — app.js "Sol
      gezinme kabuğu" bloğu). Sekme seti ve data-view mekanizması alt çubuk
-     dönemindekiyle birebir aynıdır; liste DÜZDÜR, ileride grup başlığı
-     gerekirse .sb-list içine .sb-gap ayracı + başlık eklenerek büyür. -->
+     dönemindekiyle birebir aynıdır; liste GRUPLANDI (GÖREV 22): .sb-group
+     başlığı + ardından .sb-item'lar, gruplar arası .sb-gap ayracı. SSS/Sağlık
+     listenin sonunda grupsuz (yalnız üstlerinde ayraç var, başlık yok). -->
 <div id="sb-app" class="sb-app">
 
 <aside id="sb-nav" class="sb-nav" data-i18n-aria-label="common.nav_aria">
   <div class="sb-brand">LoL <span>Balance</span></div>
   <nav class="sb-list">
+    <div class="sb-group" data-i18n="common.nav_group_room"></div>
     <button class="sb-item active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
-    <button class="sb-item"        data-view="pick"        type="button" data-i18n="common.tab_pick"></button>
-    <button class="sb-item"        data-view="matchup"     type="button" data-i18n="common.tab_matchup"></button>
     <button class="sb-item"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
     <button class="sb-item"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
     <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
+
+    <div class="sb-gap" aria-hidden="true"></div>
+    <div class="sb-group" data-i18n="common.nav_group_champselect"></div>
     <button class="sb-item"        data-view="meta"        type="button" data-i18n="common.tab_meta"></button>
+    <button class="sb-item"        data-view="matchup"     type="button" data-i18n="common.tab_matchup"></button>
+    <button class="sb-item"        data-view="pick"        type="button" data-i18n="common.tab_pick"></button>
+
+    <div class="sb-gap" aria-hidden="true"></div>
     <button class="sb-item"        data-view="faq"         type="button" data-i18n="common.tab_faq"></button>
     <button class="sb-item"        data-view="health"      type="button" data-i18n="common.tab_health"></button>
   </nav>
@@ -82,11 +89,20 @@
 
     <div id="suggestions" class="suggestions"></div>
 
+    <!-- RULET sonuç kartları (GÖREV 23): içerik app.js renderRoulette() ile kurulur.
+         Sayfa açılışında GET /roulette/current doluysa aktif oturum da burada görünür. -->
+    <div id="roulette-box" class="rlt-box" aria-live="polite"></div>
+
     <div class="action-bar">
       <!-- İçerik JS'te kurulur: updatePickCounter() → "{n}/10 seçildi" -->
       <div id="pick-counter" class="pick-counter"></div>
-      <button id="btn-balance" class="btn-primary" type="button"
-              data-i18n="balance.balance_btn" disabled></button>
+      <!-- RULET! (GÖREV 23) DENGELE ile aynı seçim kuralına bağlıdır: tam 10 seçili -->
+      <div class="ab-btns">
+        <button id="btn-roulette" class="btn-roulette" type="button"
+                data-i18n="roulette.btn" data-i18n-title="roulette.btn_title" disabled></button>
+        <button id="btn-balance" class="btn-primary" type="button"
+                data-i18n="balance.balance_btn" disabled></button>
+      </div>
     </div>
   </section>
 

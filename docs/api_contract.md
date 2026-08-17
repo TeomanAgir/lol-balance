@@ -130,7 +130,7 @@ Kurallar (salt-okur GÖSTERİM katmanı; rating'e etkisi yok; yalnız valid maç
 determinizm: `POST /admin/replay` sonrası yanıt aynı kalmalıdır):
 - Yalnız `count > 0` rozetler döner; sıra SABİT katalog sırası: `mvp, vision, damage,
   cs_per_min, gold, deathless, comeback, win_streak_5, bench_3, versatile,
-  veteran_10, veteran_25, veteran_50`. Bilinmeyen oyuncu → `404`; rozetsiz oyuncuda
+  veteran_10, veteran_25, veteran_50, roulette_complete, roulette_winner, gambler`. Bilinmeyen oyuncu → `404`; rozetsiz oyuncuda
   `badges: []`. `last_match_id` = rozeti son kazandıran maç (blok rozetlerinde bloğun
   son maçı, eşik rozetlerinde eşiği tamamlayan maç).
 - **mvp** (GÖREV 12): maç başına, KAZANAN takımın aktif engine `rating_history`
@@ -158,6 +158,15 @@ determinizm: `POST /admin/replay` sonrası yanıt aynı kalmalıdır):
 - **versatile**: 5 rolün hepsinde (position; NULL sayılmaz) ≥1 valid maç — tek seferlik.
 - **veteran_10 / veteran_25 / veteran_50**: valid maç sayısı eşikleri — her biri tek
   seferlik, bağımsız (50 maçlıda üçü de görünür).
+- **roulette_complete / roulette_winner / gambler (GÖREV 23):** Katalogdaki TEK istisna
+  olarak `status='roulette'` maçlardan türetilir (rulet maçları valid süzgeçli diğer TÜM
+  rozetlerin zaten dışındadır). Kaynak: maça bağlı rulet oturumunun atamaları (bkz. "Rulet").
+  **roulette_complete**: oyuncuya atanan 2 eşyanın İKİSİ DE o maçın final envanterinde
+  (`items` alanı; karşılaştırma KÜME bazlıdır — sıra/yinelenme önemsiz; `items` NULL ise
+  doğrulanamaz → rozet yok). **roulette_winner**: complete koşulu + oyuncunun takımı
+  `winner_team`. **gambler**: oyuncunun roulette_winner sayısı `>= 5` — tek seferlik,
+  `last_match_id` = 5.'yi tamamlayan maç. Kronoloji replay sort-key'iyle aynıdır;
+  determinizm kuralı (replay sonrası aynı yanıt) bu üçü için de geçerlidir.
 - Rozet adları/açıklamaları backend'de TUTULMAZ (yanıt yalnız `key` taşır); çeviri
   web UI i18n sözlüklerindedir (i18n_contract kuralı).
 
@@ -286,6 +295,20 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
 ```
 - `stats` alanları nullable (ingest_contract ile tutarlı). `items` nullable: NULL =
   "bilinmiyor" (eski exe/eski maç), `[]` = "bilgi var, boş" (GÖREV 14).
+- `status` üç değerlidir (GÖREV 23): `valid | void | roulette`. `roulette` maç rating'e
+  girmez (`rating_change: null`) ve valid süzgeçli tüm gösterim istatistiklerinin
+  dışındadır; geçmişte görünür.
+- `roulette` alanı (GÖREV 23, liste + detay aynı şekil): maça bağlı rulet oturumu yoksa
+  `null`; varsa:
+  ```json
+  "roulette": {"session_id": 5, "assignments": [
+    {"player_id": 1, "champion": "Aatrox", "position": "TOP",
+     "item_ids": [3031, 3026], "bought": true, "won": true}
+  ]}
+  ```
+  `bought` = atanan 2 eşyanın ikisi de final envanterde (küme bazlı; `items` NULL ise
+  `null` = doğrulanamadı). `won` = `bought == true` VE oyuncunun takımı `winner_team`
+  (bought null/false iken `false`). Rozet tanımlarıyla birebir aynı mantık (§2).
 - `rating_change` **nullable**: maç `void` ise veya bu maç için rating satırı yoksa `null` gelir.
   Rating değişimi düz alan olarak DEĞİL, bu iç nesnede taşınır — `null`, "rating'e girmedi"
   durumunu ifade edebilmek için gereklidir.
@@ -347,6 +370,53 @@ Body: {"player_ids": [10 farklı id], "top_n": 3}
   "Dengeleme" kuralları; ayrım uzayı çifti ayıran 70 ayrım, atama araması takım
   başına kalan 4 rolün 24 permütasyonu). Sıralama/quality tanımı değişmez.
 
+## 4.5 Rulet (GÖREV 23 — eğlence modu)
+
+Rastgele seçim (takım, rol, şampiyon, oyuncu başına 2 tamamlanmış eşya) İSTEMCİ
+tarafındadır: web UI, vendored `webui/assets/ddragon/` verisinden seçer (eşya havuzu =
+items.json'da `completed: true` bayraklılar, bkz. §8; şampiyon havuzu = champions.json).
+Backend eşya/şampiyon meta verisi BİLMEZ (mevcut ilke): atamayı yalnız saklar, şeklen
+doğrular ve maçla eşler.
+
+```
+POST /roulette
+Body: {
+  "assignments": [
+    {"player_id": 1, "team": 100, "position": "TOP",
+     "champion": "Aatrox", "item_ids": [3031, 3026]},
+    "... tam 10 kayıt ..."
+  ]
+}
+→ 201 {"session_id": 5, "created_at": "2026-08-17T19:00:00Z"}
+
+GET /roulette/current
+→ 200 {"session": null}  |  {"session": {"session_id": 5, "created_at": "...",
+                                          "assignments": ["POST gövdesindeki 10 kayıt"]}}
+
+POST /matches/{id}/roulette/unlink
+→ 200 {"status": "valid", "matches_replayed": 19, "role_matches_replayed": 19}
+```
+
+Kurallar:
+- **POST /roulette doğrulaması** (aksi `422`, Türkçe detail): tam 10 kayıt; `player_id`'ler
+  farklı ve mevcut; takımlar 5/5; her takımda 5 rolün her biri tam 1 kez; `champion` boş
+  olmayan string ve 10 kayıtta birbirinden farklı; `item_ids` tam 2 farklı pozitif int
+  (backend "tamamlanmış eşya" kontrolü YAPMAZ — havuz süzgeci istemcidedir, ham id saklanır).
+- **Tek açık oturum:** başarılı POST, o anda `open` durumdaki TÜM oturumları `cancelled`
+  yapar (arkadaş grubu tek lobi; en fazla 1 açık oturum değişmezi).
+- **Otomatik eşleşme (ingest'te):** duplicate olmayan VE auto-void olmayan yeni maçta,
+  açık oturum varsa VE `created_at` son 24 saat içindeyse VE maçın 10 `player_id` kümesi
+  oturumunkiyle birebir aynıysa → maç `status='roulette'` yazılır, oturum `linked` olur
+  (`match_id` bağlanır). Koşullar sağlanmazsa oturum açık kalır. Rulet maçı HİÇBİR rating
+  evrenine girmez (incremental de auto-replay de koşmaz); ingest yanıt şekli DEĞİŞMEZ.
+  Auto-void (duration_s < 300) önceliklidir: remake maç `void` olur, oturum AÇIK kalır
+  (maç yeniden oynanabilir).
+- **Unlink (yanlış otomatik eşleşme):** maç `roulette` değilse `409`, bilinmeyen maç
+  `404`. Başarıda maç `valid` olur, oturum `cancelled` olur ve HER İKİ evren auto-replay
+  koşar (maç rating'e girer — sıra-dışı ingest replay'iyle aynı mekanizma).
+- Rozet türetimi §2 "Rozetler", maç yanıtındaki `roulette` alanı §3'tedir. Ters yönde
+  manuel bağlama (valid → roulette) YOKTUR (bilinçli minimalizm; gerekirse ayrı karar).
+
 ## 5. Rating yönetimi
 ```
 POST /admin/replay                 → HER İKİ evreni yeniden kurar: ana rating_history +
@@ -397,8 +467,14 @@ Backend, `webui/` dizinindeki dosyaları `/` altından servis eder (FastAPI Stat
 görselleri ve adları Riot Data Dragon'dan DEPLOY imajı kurulurken indirilir; canlı sitede
 tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui/assets/ddragon/`):
 - `manifest.json` — `{"version": "16.16.1"}` (sabitlenmiş patch; güncelleme = sürümü değiştir + redeploy)
-- `items.json` — `{"<item_id>": {"name_tr", "name_en", "desc_tr", "desc_en", "tags": ["Trinket", ...]}}`
-  (Data Dragon `item.json` tr_TR + en_US'ten üretilir; `desc_*` düz metin, HTML etiketleri temizlenir)
+- `items.json` — `{"<item_id>": {"name_tr", "name_en", "desc_tr", "desc_en", "tags": ["Trinket", ...],
+  "completed": true|false}}`
+  (Data Dragon `item.json` tr_TR + en_US'ten üretilir; `desc_*` düz metin, HTML etiketleri temizlenir).
+  `completed` (GÖREV 23): "tamamlanmış eşya" bayrağı — SR'da satın alınabilir, başka eşyaya
+  DÖNÜŞMEYEN (`into` yok), bileşenlerden ÜRETİLEN (`from` var) eşyalar; trinket/tüketilebilir/bot
+  eşyaları hariç. Kesin sezgisel `fetch_ddragon.py`'dedir; kabul ölçütü: klasik efsanevi
+  eşyalar (ör. 3031 Ebedi Kılıç, 3026 Koruyucu Melek) `true`, bileşen/tüketilebilir/trinket/
+  botlar `false`. Rulet eşya havuzu = `completed: true` olanlar (istemci süzer).
 - `champions.json` — `{"<championName>": {"icon": "champion/<Name>.png"}}` (ad eşleşmesi
   participants.champion string'iyle)
 - `item/<id>.png`, `champion/<Name>.png` — ikonlar

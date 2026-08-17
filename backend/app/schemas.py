@@ -296,6 +296,58 @@ class ItemsUpdateResponse(BaseModel):
     updated: int
 
 
+class RouletteAssignmentIn(BaseModel):
+    # api_contract §4.5 (GÖREV 23): tip/enum kontrolü burada; sayısal/küme
+    # kuralları (10 kayıt, 5/5 takım, rol/champion benzersizliği, item_ids
+    # tam 2 farklı pozitif int) services/roulette.validate_assignments'tadır
+    # (detail Türkçe ve tek-string olsun diye pydantic'e bırakılmaz).
+    model_config = ConfigDict(extra="ignore")
+
+    player_id: int
+    team: Literal[100, 200]
+    position: Position
+    champion: str
+    item_ids: Any = None
+
+
+class RouletteCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    assignments: list[RouletteAssignmentIn]
+
+
+class RouletteCreateResponse(BaseModel):
+    session_id: int
+    created_at: str
+
+
+class RouletteAssignmentOut(BaseModel):
+    # GET /roulette/current: POST gövdesindeki 10 kayıt aynen döner.
+    player_id: int
+    team: Literal[100, 200]
+    position: Position
+    champion: str
+    item_ids: list[int]
+
+
+class RouletteSessionOut(BaseModel):
+    session_id: int
+    created_at: str
+    assignments: list[RouletteAssignmentOut]
+
+
+class RouletteCurrentResponse(BaseModel):
+    # Açık oturum yoksa {"session": null} (api_contract §4.5).
+    session: Optional[RouletteSessionOut]
+
+
+class RouletteUnlinkResponse(BaseModel):
+    # api_contract §4.5: başarıda maç valid olur ve HER İKİ evren replay koşar.
+    status: Literal["valid"]
+    matches_replayed: int
+    role_matches_replayed: int
+
+
 class BalanceRequest(BaseModel):
     player_ids: list[int]
     top_n: int = 3

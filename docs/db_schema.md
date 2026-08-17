@@ -39,7 +39,10 @@ CREATE TABLE matches (
     duration_s      INTEGER,
     winner_team     INTEGER NOT NULL CHECK (winner_team IN (100, 200)),
     status          TEXT NOT NULL DEFAULT 'valid'
-                    CHECK (status IN ('valid','void')),  -- void: remake/erken ff → rating'e girmez
+                    CHECK (status IN ('valid','void','roulette')),
+                    -- void: remake/erken ff → rating'e girmez
+                    -- roulette (migration 0006): rulet eğlence maçı → rating + valid
+                    -- süzgeçli tüm istatistiklerin dışında, geçmişte görünür
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -126,9 +129,43 @@ ALTER TABLE matches ADD COLUMN client_id TEXT;
 ALTER TABLE match_participants ADD COLUMN items_json TEXT;  -- ör. '[6697,6676,3036]'
 ```
 
+-- ── GÖREV 23 (migration 0006) ──────────────────────────────────────────────
+-- Rulet eğlence modu (bkz. api_contract "Rulet"). Oturum + oyuncu başına atama.
+-- matches.status CHECK'i ('valid','void','roulette') olarak GENİŞLETİLİR — SQLite'ta
+-- CHECK değişikliği tablo yeniden kurma (rebuild + veri taşıma) gerektirir;
+-- ingest_events'e dokunulmaz (immutable ilkesi korunur).
+```sql
+CREATE TABLE roulette_sessions (
+    id         INTEGER PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    status     TEXT NOT NULL DEFAULT 'open'
+               CHECK (status IN ('open','linked','cancelled')),
+    match_id   INTEGER UNIQUE REFERENCES matches(id)  -- yalnız linked'te dolu
+);
+
+CREATE TABLE roulette_assignments (
+    id            INTEGER PRIMARY KEY,
+    session_id    INTEGER NOT NULL REFERENCES roulette_sessions(id),
+    player_id     INTEGER NOT NULL REFERENCES players(id),
+    team          INTEGER NOT NULL CHECK (team IN (100, 200)),
+    position      TEXT NOT NULL
+                  CHECK (position IN ('TOP','JUNGLE','MIDDLE','BOTTOM','UTILITY')),
+    champion      TEXT NOT NULL,
+    item_ids_json TEXT NOT NULL,                      -- ör. '[3031,3026]' — tam 2 eleman
+    UNIQUE (session_id, player_id)
+);
+```
+
 ## Kenar durumlar
 - **Remake / erken bitiş:** backend, `duration_s < 300` olan maçları otomatik `void` işaretler; `void` maçlar veri olarak saklanır ama rating replay'ine girmez.
 - **Yeni oyuncu:** Misafir/üye ayrımı YOKTUR. Payload'daki puuid `players`'ta yoksa backend önce riot_id ile (case-insensitive) puuid'i NULL olan bir kayıt arar — bulursa puuid'i o kayda bağlar (manuel eklenen oyuncunun ilk maçı senaryosu). Bulamazsa yeni oyuncu oluşturur (display_name = riot_id'nin GameName kısmı). Aynı kişi için asla iki player satırı oluşmaz. Oyuncu havuzu ~13-14 kişi; maç günü hazır bulunanlar web UI'daki roster listesinden seçilir.
 - **Aynı maçın tekrar gönderimi:** `source_game_id` UNIQUE ihlali → backend 200 + `duplicate: true` döner (bkz. api_contract).
 - **Rol evrenine giriş (GÖREV 0):** valid bir maç rol evrenine yalnızca 10 katılımcının 10'unda da position dolu VE her takımda 5 farklı rol tam 1'er kez varsa girer (rating_contract "Rol Rating Evreni" §3). Uygun olmayan maç `role_rating_history`'de hiç satır üretmez.
+- **Rulet maçı (GÖREV 23):** `status='roulette'` maç, `status='valid'` süzgeci kullanan
+  HER sorgunun (rating replay/incremental, current_ratings view'ları, profil/rozet/enler/
+  nemesis istatistikleri) dışında otomatik kalır. Rulet rozetleri `roulette_sessions`
+  (status='linked') + maç verisinden türetilir. Unlink: maç `valid`'e döner, oturum
+  `cancelled`, iki evren auto-replay. Aynı anda en fazla 1 `open` oturum (yeni POST
+  öncekileri iptal eder). Auto-void kuralı ruletten önceliklidir (remake → void, oturum
+  açık kalır).
 - **Faz 2 için rezerv:** pair-synergy terimleri ayrı tabloda tutulacak (`pair_terms(player_a, player_b, engine_version, weight, ...)`); şimdi OLUŞTURULMAZ, sadece isim rezerve edilmiştir.
