@@ -1032,12 +1032,24 @@
   // Rakip biliniyorsa: gerçek counter kayıtları (win_rate_against yüksekten,
   // yalnız ≥%50) ÖNCE, ardından tier dolgusu ~DECK büyüklüğüne tamamlar.
   // Kayıttaki/tierdeki aynı ad iki kez düşmez (taken kümesi rakibi de kapsar).
+  // Doğrudan (counterRecords) + ters yön (reverseCounterRecords) kayıtları
+  // BİRLEŞTİRİLİR: aynı ad iki kaynakta da geçerse doğrudan kayıt kazanır,
+  // birleşik liste win_rate_against azalana sıralanır.
   function moCounterItems(tiers, counters, roleKey, enemyName) {
     const taken = new Set([enemyName.toLowerCase()]);
     const out = [];
     if (counters) {
-      window.PickAdvisor.counterRecords(counters, roleKey, enemyName)
-        .filter(r => r.win_rate_against >= 0.5)
+      const direct = window.PickAdvisor.counterRecords(counters, roleKey, enemyName)
+        .filter(r => r.win_rate_against >= 0.5);
+      const reverse = window.PickAdvisor.reverseCounterRecords(counters, roleKey, enemyName)
+        .filter(r => r.win_rate_against >= 0.5);
+      const merged = new Map(); // ad(lower) -> kayıt; doğrudan önce eklenir → kazanır
+      direct.forEach(r => merged.set(r.champion.toLowerCase(), r));
+      reverse.forEach(r => {
+        const key = r.champion.toLowerCase();
+        if (!merged.has(key)) merged.set(key, r);
+      });
+      [...merged.values()]
         .sort((a, b) => b.win_rate_against - a.win_rate_against)
         .forEach(r => {
           const key = r.champion.toLowerCase();
