@@ -35,6 +35,7 @@
     historyRange: "all",        // grafikteki zaman aralığı: PH_RANGES anahtarı (istemci tarafı)
     histOpen: null,             // grafikte popup'ı açık olan noktanın match_id'si
     backStack: [],              // profil ⇄ maç detayı geri zinciri (bkz. pushBack)
+    pick: null,                 // Seçim danışmanı girişleri (GÖREV 21; ensurePickState kurar)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -351,7 +352,7 @@
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, profile: loadProfile,
     matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
-    faq: loadFaq, faqdetail: loadFaqDetail,
+    faq: loadFaq, faqdetail: loadFaqDetail, pick: loadPick,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -384,6 +385,9 @@
 
   function showView(name, forceReload = false) {
     currentView = name;
+    // Görünüm-bazlı genişlik istisnası (GÖREV 21): Seçim ekranı iki sütunlu
+    // analiz paneli için 1080px kullanır, diğer görünümler 720px'te kalır.
+    $("#main").classList.toggle("pa-wide", name === "pick");
     syncFaqHash(name);
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
@@ -553,6 +557,422 @@
       box.appendChild(card);
     });
     box.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ── 1c) Seçim danışmanı (GÖREV 21, tasarım S3 "Analiz Paneli") ──
+  // Sol yarı: iki kompakt giriş listesi (Takımım / Karşı Takım) + "Analizi
+  // tazele". Sağ yarı: AD/AP denge çubukları + eksik/tehdit rozetleri + gerekçe
+  // rozetli öneri kartları. Analiz MOTORU ayrı modüldedir (advisor.js,
+  // window.PickAdvisor): saf fonksiyon, metinsiz — rozet TANIMLAYICILARI döner,
+  // görünen metni burada i18n kurar. Veri katmanı:
+  //   - tiers.json fetchMeta() ile ORTAK (META sekmesiyle aynı önbellek);
+  //     yeni şema {name, win_rate, pick_rate} + eski düz-string ikisi de okunur.
+  //   - counters.json ayrı fetch (aynı desen: API değil, X-API-Key yok,
+  //     USE_MOCK yolundan geçmez, asla reject etmez).
+  //   - champions.json tags/info: dd- katmanının zaten çektiği sözlükten okunur
+  //     (paralel veri işi alanları ekler; yoksa kompozisyon sinyali atlanır).
+  //   - Grup rozeti GET /matches'tan İSTEMCİDE sayılır (yeni endpoint YOK) ve
+  //     öneri SIRASINI ETKİLEMEZ (Teoman kararı — yalnız bilgi rozeti).
+  // Mock modunda tiers/counters/tags-info window.MOCK_ADVISOR'dan gelir.
+  // Her seçim değişikliği analizi canlı tazeler; "Analizi tazele" düğmesi
+  // ayrıca grup verisini (GET /matches) yeniden çeker.
+  const PA_COUNTERS_URL = "assets/meta/counters.json";
+  let paCountersPromise = null;
+
+  function fetchCounters() {
+    if (paCountersPromise) return paCountersPromise;
+    paCountersPromise = window.fetch(PA_COUNTERS_URL)
+      .then(r => {
+        if (!r.ok) return { err: { kind: "http", status: r.status } };
+        return r.json().then(
+          d => (d && typeof d === "object" && d.counters && typeof d.counters === "object"
+            ? { data: d } : { err: { kind: "shape" } }),
+          () => ({ err: { kind: "shape" } }));
+      })
+      .catch(() => ({ err: { kind: "network" } }));
+    return paCountersPromise;
+  }
+
+  // Grup verisi: valid maç örneklemi + şampiyon×oyuncu W-L endeksi. Uç düşerse
+  // sinyal sessizce atlanır (rozetler çıkmaz, ekranın kalanı çalışır).
+  let paGroupPromise = null;
+  function paGroup() {
+    if (!paGroupPromise) {
+      paGroupPromise = api("/matches?limit=200")
+        .then(list => ({
+          index: window.PickAdvisor.buildGroupIndex(list),
+          sample: Array.isArray(list) ? list.filter(m => m && m.status === "valid").length : null,
+        }))
+        .catch(() => ({ index: {}, sample: null }));
+    }
+    return paGroupPromise;
+  }
+
+  let paData = null; // {tiers, counters, group, sample, champInfo, names}
+
+  // Girişler görünüm değişse de kalır (in-memory): ilk açılışta satır i kanonik
+  // rol i'yi alır; karşı tarafta rol "Bilinmiyor"a (null) çevrilebilir.
+  function ensurePickState() {
+    if (!state.pick) {
+      state.pick = {
+        mine: ROLES.map(r => ({ champ: null, role: r })),
+        enemy: ROLES.map(r => ({ champ: null, role: r })),
+        me: null,
+      };
+    }
+    return state.pick;
+  }
+
+  // Şampiyon meta sözlüğü: DD champions.json girdileri (tags/info paralel veri
+  // işiyle gelir). Mock modunda MOCK_ADVISOR.champ_info tags'siz girdileri doldurur.
+  function paChampInfo() {
+    const out = {};
+    if (DD.champs) Object.keys(DD.champs).forEach(k => { out[k] = DD.champs[k]; });
+    const mock = CONFIG.USE_MOCK && window.MOCK_ADVISOR ? window.MOCK_ADVISOR.champ_info : null;
+    if (mock) Object.keys(mock).forEach(k => {
+      const cur = out[k];
+      if (!cur || !Array.isArray(cur.tags)) out[k] = Object.assign({}, cur, mock[k]);
+    });
+    return out;
+  }
+
+  // Otomatik tamamlama adları: DD sözlüğü ∪ tier listeleri. İkisi de yoksa boş
+  // liste kalır → seçici SERBEST METİN girişi gibi davranır (varlık yokluğunda
+  // yer tutucu metin girişi — görev tanımındaki düşüş yolu).
+  function paNames(tiers) {
+    const set = new Set();
+    if (DD.champs) Object.keys(DD.champs).forEach(n => set.add(n));
+    if (tiers && typeof tiers === "object") Object.keys(tiers).forEach(rk => {
+      const cell = tiers[rk];
+      if (!cell || typeof cell !== "object") return;
+      ["S", "A", "B"].forEach(tier => {
+        (Array.isArray(cell[tier]) ? cell[tier] : []).forEach(x => {
+          const name = typeof x === "string" ? x
+            : x && typeof x === "object" && typeof x.name === "string" ? x.name : "";
+          if (name.trim()) set.add(name.trim());
+        });
+      });
+    });
+    return [...set].sort((a, b) => a.localeCompare(b, "en"));
+  }
+
+  // Serbest metni bilinen ada çözer (büyük/küçük harf duyarsız); bilinmeyen ad
+  // OLDUĞU GİBİ kabul edilir (sinyalsiz kalır, portresi yer tutucuya düşer).
+  function paCanonName(text) {
+    const q = String(text || "").trim();
+    if (!q) return null;
+    const ln = q.toLowerCase();
+    const hit = paData && paData.names.find(n => n.toLowerCase() === ln);
+    return hit || q;
+  }
+
+  const paPortHtml = (champ) =>
+    ddIconHtml(champ ? champIconSrc(champ) : null, champPh(champ), "champ");
+
+  function paRoleOpts(side, cur) {
+    const opts = ROLES.map(r =>
+      `<option value="${r}"${cur === r ? " selected" : ""}>${roleName(r)}</option>`);
+    if (side === "enemy")
+      opts.push(`<option value=""${cur == null ? " selected" : ""}>${t("pick.role_unknown")}</option>`);
+    return opts.join("");
+  }
+
+  function paRowHtml(side, i, row) {
+    const meHtml = side === "mine"
+      ? `<label class="pa-me"><input type="radio" name="pa-me"${state.pick.me === i ? " checked" : ""}
+           aria-label="${esc(t("pick.me_aria", { n: i + 1 }))}"><span>${t("pick.me")}</span></label>`
+      : "";
+    return `<div class="pa-row${side === "mine" && state.pick.me === i ? " mine" : ""}"
+          data-side="${side}" data-i="${i}">
+        <span class="pa-port">${paPortHtml(row.champ)}</span>
+        <span class="pa-pickbox">
+          <input class="pa-input" type="text" value="${esc(row.champ || "")}"
+                 placeholder="${esc(t("pick.champ_placeholder"))}"
+                 aria-label="${esc(t(side === "mine" ? "pick.my_champ_aria" : "pick.enemy_champ_aria", { n: i + 1 }))}"
+                 autocomplete="off" spellcheck="false">
+          <ul class="pa-list" hidden></ul>
+        </span>
+        <select class="pa-role"
+                aria-label="${esc(t(side === "mine" ? "pick.my_role_aria" : "pick.enemy_role_aria", { n: i + 1 }))}">${paRoleOpts(side, row.role)}</select>
+        ${meHtml}
+      </div>`;
+  }
+
+  function bindPickRow(rowEl) {
+    const side = rowEl.dataset.side, idx = Number(rowEl.dataset.i);
+    const row = state.pick[side === "mine" ? "mine" : "enemy"][idx];
+    const input = rowEl.querySelector(".pa-input");
+    const list = rowEl.querySelector(".pa-list");
+    const port = rowEl.querySelector(".pa-port");
+    let active = -1; // klavyeyle gezilen öneri
+
+    const closeList = () => { list.hidden = true; list.innerHTML = ""; active = -1; };
+    const commit = (name) => {
+      const canon = paCanonName(name);
+      row.champ = canon;
+      input.value = canon || "";
+      port.innerHTML = paPortHtml(canon);
+      ddBindImages(port);
+      closeList();
+      renderAnalysis();
+    };
+    const openList = () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q || !paData || !paData.names.length) { closeList(); return; }
+      const starts = [], contains = [];
+      for (const n of paData.names) {
+        const ln = n.toLowerCase();
+        if (ln.startsWith(q)) starts.push(n);
+        else if (ln.indexOf(q) !== -1) contains.push(n);
+        if (starts.length >= 8) break;
+      }
+      const found = starts.concat(contains).slice(0, 8);
+      if (!found.length) { closeList(); return; }
+      list.innerHTML = found.map(n =>
+        `<li><button type="button" class="pa-opt" data-name="${esc(n)}">${paPortHtml(n)}<span>${esc(n)}</span></button></li>`).join("");
+      ddBindImages(list);
+      list.hidden = false;
+      active = -1;
+      // mousedown: input blur'undan ÖNCE koşar (click olsaydı blur ile yarışırdı).
+      list.querySelectorAll(".pa-opt").forEach(btn =>
+        btn.addEventListener("mousedown", (e) => { e.preventDefault(); commit(btn.dataset.name); }));
+    };
+    input.addEventListener("input", openList);
+    input.addEventListener("keydown", (e) => {
+      const opts = list.querySelectorAll(".pa-opt");
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (list.hidden || !opts.length) return;
+        e.preventDefault();
+        active = e.key === "ArrowDown"
+          ? (active + 1) % opts.length : (active - 1 + opts.length) % opts.length;
+        opts.forEach((o, j) => o.classList.toggle("on", j === active));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!list.hidden && opts.length) commit(opts[active === -1 ? 0 : active].dataset.name);
+        else commit(input.value);
+      } else if (e.key === "Escape") {
+        closeList();
+      }
+    });
+    input.addEventListener("blur", () => {
+      // Kısa gecikme: liste öğesinin mousedown commit'i önce koşabilsin.
+      setTimeout(() => {
+        if (!input.isConnected) return;
+        closeList();
+        if (input.value.trim() !== (row.champ || "")) commit(input.value);
+      }, 120);
+    });
+    rowEl.querySelector(".pa-role").addEventListener("change", (e) => {
+      row.role = e.target.value || null;
+      renderAnalysis();
+    });
+    const me = rowEl.querySelector('input[type="radio"]');
+    if (me) me.addEventListener("change", () => {
+      state.pick.me = idx;
+      $("#pick-body").querySelectorAll('.pa-row[data-side="mine"]').forEach(r =>
+        r.classList.toggle("mine", Number(r.dataset.i) === state.pick.me));
+      renderAnalysis();
+    });
+  }
+
+  function renderPickShell() {
+    const box = $("#pick-body");
+    const rows = (side, arr) => arr.map((row, i) => paRowHtml(side, i, row)).join("");
+    box.innerHTML =
+      `<div class="pa-left">
+         <section class="pa-panel">
+           <h2 class="pa-title pa-blue">${t("pick.my_team")}</h2>
+           ${rows("mine", state.pick.mine)}
+         </section>
+         <section class="pa-panel">
+           <h2 class="pa-title pa-red">${t("pick.enemy_team")}</h2>
+           ${rows("enemy", state.pick.enemy)}
+         </section>
+         <button id="pa-refresh" class="btn-primary pa-refresh" type="button">${t("pick.refresh_btn")}</button>
+       </div>
+       <div id="pa-right" class="pa-right"></div>`;
+    ddBindImages(box);
+    box.querySelectorAll(".pa-row").forEach(bindPickRow);
+    $("#pa-refresh").addEventListener("click", async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      btn.textContent = t("balance.calculating");
+      paGroupPromise = null; // grup rozetleri taze /matches sayımıyla yenilensin
+      try {
+        const grp = await paGroup();
+        paData.group = grp.index;
+        paData.sample = grp.sample;
+        renderAnalysis();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t("pick.refresh_btn");
+      }
+    });
+  }
+
+  // ── Seçim: sağ yarım (analiz çıktısı) ─────────────────────────
+  function paTilesHtml(res) {
+    const sample = paData.sample == null ? "—" : paData.sample;
+    return `<div class="pa-tiles">
+        <div class="pa-tile"><div class="pa-tl">${t("pick.tile_role")}</div>
+          <div class="pa-tv">${res.myRole ? esc(roleName(res.myRole)) : "—"}</div>
+          <div class="pa-ts">${t(res.myRole ? "pick.tile_role_sub" : "pick.tile_role_none")}</div></div>
+        <div class="pa-tile"><div class="pa-tl">${t("pick.tile_sugs")}</div>
+          <div class="pa-tv">${res.suggestions.length}</div>
+          <div class="pa-ts">${t(res.counterContext ? "pick.tile_sugs_counter" : "pick.tile_sugs_sub")}</div></div>
+        <div class="pa-tile"><div class="pa-tl">${t("pick.tile_data")}</div>
+          <div class="pa-tv">${sample}</div>
+          <div class="pa-ts">${t("pick.tile_data_sub")}</div></div>
+      </div>`;
+  }
+
+  // Çubukta renk tek başına taşıyıcı değildir: yüzdeler segmentin İÇİNE yazılır
+  // (dar segmentte yazı sığmazsa aria-label aynı bilgiyi yine taşır).
+  function paDmgBar(side, d) {
+    const label = t(side === "us" ? "pick.side_us" : "pick.side_them");
+    if (!d || !d.known) {
+      return `<div class="pa-dmg-row"><span class="pa-dmg-side">${label}</span>
+          <span class="pa-dmg-none">${t("pick.dmg_empty")}</span></div>`;
+    }
+    const aria = label + ": " + t("pick.ad_pct", { n: d.ad_pct }) + " / " + t("pick.ap_pct", { n: d.ap_pct });
+    return `<div class="pa-dmg-row"><span class="pa-dmg-side">${label}</span>
+        <div class="pa-dmg-bar" role="img" aria-label="${esc(aria)}">
+          <span class="pa-seg ad" style="width:${d.ad_pct}%">${d.ad_pct >= 14 ? t("pick.ad_pct", { n: d.ad_pct }) : ""}</span>
+          <span class="pa-seg ap" style="width:${d.ap_pct}%">${d.ap_pct >= 14 ? t("pick.ap_pct", { n: d.ap_pct }) : ""}</span>
+        </div></div>`;
+  }
+
+  function paDamageHtml(res) {
+    const keys = res.gaps.map(g => g.key);
+    const warn = keys.indexOf("ap") !== -1 ? t("pick.dmg_warn_ad")
+      : keys.indexOf("ad") !== -1 ? t("pick.dmg_warn_ap") : "";
+    return `<section class="pa-panel">
+        <h2 class="pa-title">${t("pick.damage_title")}</h2>
+        ${paDmgBar("us", res.damage.us)}
+        ${paDmgBar("them", res.damage.them)}
+        <div class="pa-dmg-caption">
+          <span><i class="pa-dot ad"></i>${t("pick.ad_word")}</span>
+          <span><i class="pa-dot ap"></i>${t("pick.ap_word")}</span>
+        </div>
+        ${warn ? `<p class="pa-warn">${warn}</p>` : ""}
+      </section>`;
+  }
+
+  const PA_GAP_KEY = {
+    ap: "pick.gap_ap", ad: "pick.gap_ad", front: "pick.gap_front", carry: "pick.gap_carry",
+  };
+
+  function paGapsHtml(res) {
+    const badges = res.gaps
+      .filter(g => PA_GAP_KEY[g.key])
+      .map(g => `<span class="pa-badge pa-gapb">${t(PA_GAP_KEY[g.key])}</span>`).join("");
+    const threat = res.threats.length
+      ? `<p class="pa-threat">${t("pick.threat_line", {
+          list: res.threats.map(x =>
+            `<b>${esc(x.name)}</b>` + (x.role ? ` (${esc(roleLabel(x.role))})` : "")).join(" · "),
+        })}</p>`
+      : "";
+    const unknown = res.unknownRoles.length
+      ? `<p class="pa-threat pa-dim">${t("pick.threat_unknown", { names: esc(res.unknownRoles.join(", ")) })}</p>`
+      : "";
+    return `<section class="pa-panel">
+        <h2 class="pa-title">${t("pick.gaps_title")}</h2>
+        ${badges ? `<div class="pa-badges">${badges}</div>` : `<p class="pa-none">${t("pick.gap_none")}</p>`}
+        ${threat}${unknown}
+      </section>`;
+  }
+
+  // Rozet tanımlayıcısı → görünen rozet. kind görsel dili seçer: data = dolu
+  // pirinç kenar, gut = kesikli gri (sezgisel), info = grup bilgi rozeti.
+  function paBadgeHtml(b) {
+    let txt = "";
+    switch (b.type) {
+      case "tier": txt = t("pick.b_tier", { tier: b.params.tier }); break;
+      case "wr": txt = t("pick.b_wr", { n: b.params.n }); break;
+      case "counter": txt = t("pick.b_counter", { name: esc(b.params.name), n: b.params.n }); break;
+      case "classadv": txt = t("pick.b_class"); break;
+      case "gap_ap": txt = t("pick.b_gap_ap"); break;
+      case "gap_ad": txt = t("pick.b_gap_ad"); break;
+      case "gap_front": txt = t("pick.b_gap_front"); break;
+      case "gap_carry": txt = t("pick.b_gap_carry"); break;
+      case "early": txt = t("pick.b_early"); break;
+      case "late": txt = t("pick.b_late"); break;
+      case "group": txt = t("pick.b_group",
+        { name: esc(b.params.name), w: b.params.w, l: b.params.l }); break;
+      default: return ""; // ileri sürüm motoru yeni tip eklerse eski UI sessiz atlar
+    }
+    const cls = b.kind === "gut" ? " gut" : b.kind === "info" ? " grp" : "";
+    return `<span class="pa-badge${cls}">${txt}</span>`;
+  }
+
+  function paSugCard(s) {
+    return `<article class="pa-sug${s.best ? " best" : ""}">
+        ${s.best ? `<span class="pa-best">${t("pick.best_badge")}</span>` : ""}
+        <div class="pa-sug-head">
+          <span class="pa-port lg">${paPortHtml(s.name)}</span>
+          <div><div class="pa-sname">${esc(s.name)}</div>
+            <div class="pa-srole">${esc(roleLabel(s.role))}</div></div>
+        </div>
+        <div class="pa-badges">${s.badges.map(paBadgeHtml).join("")}</div>
+      </article>`;
+  }
+
+  function paSugsHtml(res) {
+    let body;
+    if (!res.myRole) body = `<p class="pa-none">${t("pick.sug_need_me")}</p>`;
+    else if (!res.suggestions.length) body = `<p class="pa-none">${t("pick.sug_no_data")}</p>`;
+    else body = `<div class="pa-deck">${res.suggestions.map(paSugCard).join("")}</div>`;
+    const title = res.myRole
+      ? t("pick.sug_title", { role: roleName(res.myRole) }) : t("pick.sug_title_plain");
+    return `<section class="pa-panel">
+        <div class="pa-sug-head-row">
+          <h2 class="pa-title">${esc(title)}</h2>
+          ${res.suggestions.length ? `<span class="pa-count">${t("pick.sug_count", { n: res.suggestions.length })}</span>` : ""}
+        </div>
+        <p class="pa-legend">${t("pick.legend")}
+          <span><i class="pa-chip"></i>${t("pick.legend_data")}</span>
+          <span><i class="pa-chip gut"></i>${t("pick.legend_gut")}</span></p>
+        ${body}
+      </section>`;
+  }
+
+  // Analiz saf ve ucuzdur: her seçim değişikliğinde yalnız SAĞ yarım yeniden
+  // çizilir (sol listeye dokunulmaz — odak/imleç kaybolmaz).
+  function renderAnalysis() {
+    const boxR = $("#pa-right");
+    if (!boxR || !paData) return;
+    const res = window.PickAdvisor.analyze({
+      mine: state.pick.mine, enemy: state.pick.enemy, myIndex: state.pick.me,
+      champInfo: paData.champInfo, tiers: paData.tiers, counters: paData.counters,
+      group: paData.group,
+    });
+    boxR.innerHTML = paTilesHtml(res) + paDamageHtml(res) + paGapsHtml(res) + paSugsHtml(res);
+    ddBindImages(boxR);
+  }
+
+  async function loadPick() {
+    ensurePickState();
+    const box = $("#pick-body");
+    if (!box.firstChild) box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    await loadAssets();
+    // Veri dosyaları paralel işte üretiliyor olabilir: yokluk/eski şema hata
+    // DEĞİLDİR — eksik sinyal atlanır, mevcut sinyallerle devam edilir.
+    let tiers = null, counters = null;
+    if (CONFIG.USE_MOCK && window.MOCK_ADVISOR) {
+      tiers = window.MOCK_ADVISOR.tiers || null;
+      counters = window.MOCK_ADVISOR.counters || null;
+    } else {
+      const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
+      if (!mRes.err && mRes.data && mRes.data.tiers) tiers = mRes.data.tiers;
+      if (!cRes.err && cRes.data && cRes.data.counters) counters = cRes.data.counters;
+    }
+    const grp = await paGroup();
+    paData = {
+      tiers, counters, group: grp.index, sample: grp.sample,
+      champInfo: paChampInfo(), names: paNames(tiers),
+    };
+    renderPickShell();
+    renderAnalysis();
   }
 
   // ── 2) Leaderboard ────────────────────────────────────────────
@@ -1493,10 +1913,16 @@
 
   // Bir (rol, kademe) hücresinin adları. Şema dışı değerler (sayı, boş dize,
   // eksik anahtar) sessizce elenir: bozuk tek hücre ekranı düşürmez.
+  // GÖREV 21 şema genişlemesi (api_contract §8): tier listeleri düz string YA DA
+  // {name, win_rate, pick_rate} nesnesi taşıyabilir — META ekranı yalnız adı
+  // kullanır, iki biçim de okunur (geriye uyum contract gereği).
   function metaList(tiers, role, tier) {
     const cell = tiers[META_ROLE_KEY[role]];
     const arr = cell && Array.isArray(cell[tier]) ? cell[tier] : [];
-    return arr.filter(x => typeof x === "string" && x.trim() !== "");
+    return arr
+      .map(x => (typeof x === "string" ? x
+        : x && typeof x === "object" && typeof x.name === "string" ? x.name : ""))
+      .filter(x => x.trim() !== "");
   }
 
   // TÜMÜ görünümü: şampiyon EN İYİ kademesinde BİR KEZ görünür, adının altındaki

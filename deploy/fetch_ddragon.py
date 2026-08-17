@@ -92,13 +92,57 @@ def build_champions() -> dict[str, dict]:
     champs: dict[str, dict] = {}
     for dd_key, c in en.items():
         display_name = c.get("name", dd_key)
-        champs[display_name] = {"icon": f"champion/{c['image']['full']}", "dd_key": dd_key}
+        info = c.get("info") or {}
+        champs[display_name] = {
+            "icon": f"champion/{c['image']['full']}",
+            "dd_key": dd_key,
+            "tags": c.get("tags") or [],
+            "info": {
+                "attack": info.get("attack"),
+                "defense": info.get("defense"),
+                "magic": info.get("magic"),
+                "difficulty": info.get("difficulty"),
+            },
+        }
     return champs
 
 
-def main() -> int:
+def champions_output(champions: dict[str, dict]) -> dict[str, dict]:
+    """champions.json'a yazilacak alt kume (dd_key disari sizmaz)."""
+    return {
+        name: {"icon": v["icon"], "tags": v["tags"], "info": v["info"]}
+        for name, v in champions.items()
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    p = argparse.ArgumentParser(
+        description="Data Dragon varliklarini webui/assets/ddragon/ altina indirir."
+    )
+    p.add_argument(
+        "--champions-only", action="store_true",
+        help=(
+            "yalniz champions.json'i tazeler (tags/info alanlari icin); manifest.json, "
+            "items.json ve gorseller DOKUNULMAZ, yeni sampiyon ikonu indirilmez "
+            "(gorsel dizinleri gitignore'lu, build-time vendoring'de tam kurulumla gelir)"
+        ),
+    )
+    args = p.parse_args(argv)
+
     print(f"Data Dragon {DDRAGON_VERSION} -> {OUT}")
     OUT.mkdir(parents=True, exist_ok=True)
+
+    if args.champions_only:
+        champions = build_champions()
+        (OUT / "champions.json").write_text(
+            json.dumps(champions_output(champions), ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        print(f"OK (--champions-only): {len(champions)} sampiyon, champions.json tazelendi "
+              "(manifest/items/gorseller degismedi).")
+        return 0
 
     items = build_items()
     champions = build_champions()
@@ -111,7 +155,7 @@ def main() -> int:
     )
     (OUT / "champions.json").write_text(
         json.dumps(
-            {name: {"icon": v["icon"]} for name, v in champions.items()},
+            champions_output(champions),
             ensure_ascii=False, separators=(",", ":"),
         ),
         encoding="utf-8",

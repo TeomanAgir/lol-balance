@@ -978,4 +978,101 @@
 
     return err(404, "Böyle bir endpoint yok: " + path);
   };
+
+  // ── Seçim danışmanı mock verisi (GÖREV 21) ──
+  // Canlıda bu veriler STATİK DOSYALARDAN gelir (assets/meta/tiers.json +
+  // counters.json + champions.json tags/info — api_contract §8); mock modunda
+  // dosyalar olmayabilir diye makul sahteleri buradan verilir (app.js USE_MOCK
+  // iken doğrudan window.MOCK_ADVISOR okur, fetch yolu hiç koşmaz).
+  // tiers YENİ şemadadır ({name, win_rate, pick_rate}); MIDDLE B kademesi eski
+  // düz-string biçimi taşır → geriye uyum yolu mock'ta da görünür/denenebilir.
+  // Adlar bilerek maç geçmişindeki CHAMPS havuzuyla kesişir: grup rozeti
+  // ("Teoman: 3W-1L") önerilerde gerçekten belirir.
+  window.MOCK_ADVISOR = {
+    tiers: {
+      top: {
+        S: [{ name: "Darius", win_rate: 0.531, pick_rate: 0.082 },
+            { name: "Garen", win_rate: 0.524, pick_rate: 0.071 }],
+        A: [{ name: "Malphite", win_rate: 0.517, pick_rate: 0.055 },
+            { name: "Sett", win_rate: 0.512, pick_rate: 0.049 }],
+        B: [{ name: "Teemo", win_rate: 0.498, pick_rate: 0.038 }],
+      },
+      jungle: {
+        S: [{ name: "Vi", win_rate: 0.528, pick_rate: 0.077 },
+            { name: "Warwick", win_rate: 0.535, pick_rate: 0.064 }],
+        A: [{ name: "Lee Sin", win_rate: 0.489, pick_rate: 0.118 }],
+        B: [{ name: "Master Yi", win_rate: 0.505, pick_rate: 0.042 }],
+      },
+      middle: {
+        S: [{ name: "Ahri", win_rate: 0.521, pick_rate: 0.096 },
+            { name: "Orianna", win_rate: 0.514, pick_rate: 0.058 }],
+        A: [{ name: "Galio", win_rate: 0.526, pick_rate: 0.034 },
+            { name: "Vladimir", win_rate: 0.508, pick_rate: 0.041 }],
+        B: ["Yasuo", "Lux", "Pantheon"],
+      },
+      bottom: {
+        S: [{ name: "Jinx", win_rate: 0.533, pick_rate: 0.124 }],
+        A: [{ name: "Ezreal", win_rate: 0.492, pick_rate: 0.147 },
+            { name: "Ashe", win_rate: 0.515, pick_rate: 0.066 }],
+        B: [{ name: "Caitlyn", win_rate: 0.501, pick_rate: 0.088 }],
+      },
+      utility: {
+        S: [{ name: "Thresh", win_rate: 0.512, pick_rate: 0.101 },
+            { name: "Leona", win_rate: 0.527, pick_rate: 0.079 }],
+        A: [{ name: "Lulu", win_rate: 0.519, pick_rate: 0.062 }],
+        B: [{ name: "Morgana", win_rate: 0.503, pick_rate: 0.057 }],
+      },
+    },
+    counters: {
+      top: {
+        Darius: [{ champion: "Malphite", games: 412, win_rate_against: 0.547 },
+                 { champion: "Teemo", games: 388, win_rate_against: 0.521 }],
+        Garen: [{ champion: "Darius", games: 356, win_rate_against: 0.538 }],
+      },
+      jungle: {
+        "Lee Sin": [{ champion: "Warwick", games: 290, win_rate_against: 0.552 }],
+      },
+      middle: {
+        Yasuo: [{ champion: "Ahri", games: 512, win_rate_against: 0.543 },
+                { champion: "Lux", games: 301, win_rate_against: 0.518 }],
+        // Ters yön senaryosu: Yasuo, Vladimir'in listesinde DÜŞÜK winrate ile
+        // geçer → motor "Vladimir, Yasuo'ya karşı iyi" çıkarımını buradan yapar.
+        Vladimir: [{ champion: "Yasuo", games: 264, win_rate_against: 0.462 }],
+      },
+      bottom: {
+        Jinx: [{ champion: "Caitlyn", games: 433, win_rate_against: 0.529 }],
+      },
+      utility: {
+        Thresh: [{ champion: "Morgana", games: 377, win_rate_against: 0.541 }],
+      },
+    },
+    // champions.json'a paralel veri işinin ekleyeceği tags/info alanlarının
+    // taklidi (DD şeması: tags sınıf listesi, info 0-10 skalası).
+    champ_info: {
+      Ahri: { tags: ["Mage", "Assassin"], info: { attack: 3, defense: 4, magic: 8, difficulty: 5 } },
+      Orianna: { tags: ["Mage", "Support"], info: { attack: 4, defense: 3, magic: 9, difficulty: 7 } },
+      Galio: { tags: ["Tank", "Mage"], info: { attack: 1, defense: 10, magic: 6, difficulty: 5 } },
+      Vladimir: { tags: ["Mage"], info: { attack: 2, defense: 6, magic: 8, difficulty: 7 } },
+      Yasuo: { tags: ["Fighter", "Assassin"], info: { attack: 8, defense: 4, magic: 4, difficulty: 10 } },
+      Lux: { tags: ["Mage", "Support"], info: { attack: 2, defense: 4, magic: 9, difficulty: 5 } },
+      Pantheon: { tags: ["Fighter", "Assassin"], info: { attack: 9, defense: 4, magic: 3, difficulty: 4 } },
+      Darius: { tags: ["Fighter", "Tank"], info: { attack: 9, defense: 5, magic: 1, difficulty: 2 } },
+      Garen: { tags: ["Fighter", "Tank"], info: { attack: 7, defense: 7, magic: 1, difficulty: 5 } },
+      Malphite: { tags: ["Tank", "Fighter"], info: { attack: 5, defense: 9, magic: 7, difficulty: 2 } },
+      Sett: { tags: ["Fighter", "Tank"], info: { attack: 8, defense: 5, magic: 1, difficulty: 2 } },
+      Teemo: { tags: ["Marksman", "Assassin"], info: { attack: 5, defense: 3, magic: 7, difficulty: 6 } },
+      Vi: { tags: ["Fighter", "Assassin"], info: { attack: 8, defense: 5, magic: 3, difficulty: 4 } },
+      Warwick: { tags: ["Fighter", "Tank"], info: { attack: 9, defense: 5, magic: 3, difficulty: 3 } },
+      "Lee Sin": { tags: ["Fighter", "Assassin"], info: { attack: 8, defense: 5, magic: 3, difficulty: 6 } },
+      "Master Yi": { tags: ["Assassin", "Fighter"], info: { attack: 10, defense: 4, magic: 2, difficulty: 4 } },
+      Jinx: { tags: ["Marksman"], info: { attack: 9, defense: 2, magic: 4, difficulty: 6 } },
+      Ezreal: { tags: ["Marksman", "Mage"], info: { attack: 7, defense: 2, magic: 6, difficulty: 7 } },
+      Ashe: { tags: ["Marksman", "Support"], info: { attack: 7, defense: 3, magic: 2, difficulty: 4 } },
+      Caitlyn: { tags: ["Marksman"], info: { attack: 8, defense: 2, magic: 2, difficulty: 6 } },
+      Thresh: { tags: ["Support", "Fighter"], info: { attack: 5, defense: 6, magic: 6, difficulty: 7 } },
+      Leona: { tags: ["Tank", "Support"], info: { attack: 4, defense: 8, magic: 3, difficulty: 4 } },
+      Lulu: { tags: ["Support", "Mage"], info: { attack: 4, defense: 5, magic: 7, difficulty: 5 } },
+      Morgana: { tags: ["Mage", "Support"], info: { attack: 1, defense: 6, magic: 8, difficulty: 1 } },
+    },
+  };
 })();

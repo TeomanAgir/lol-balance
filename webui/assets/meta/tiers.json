@@ -1,205 +1,866 @@
 {
   "patch": "16.16",
-  "updated": "2026-08-15",
+  "updated": "2026-08-17",
   "source": "op.gg (global, platinum_plus)",
   "tiers": {
     "top": {
       "S": [
-        "Nasus",
-        "Garen",
-        "Malphite",
-        "Sett",
-        "Teemo"
+        {
+          "name": "Nasus",
+          "win_rate": 0.5305,
+          "pick_rate": 0.0857
+        },
+        {
+          "name": "Garen",
+          "win_rate": 0.5188,
+          "pick_rate": 0.0742
+        },
+        {
+          "name": "Malphite",
+          "win_rate": 0.514,
+          "pick_rate": 0.0637
+        }
       ],
       "A": [
-        "Darius",
-        "Aatrox",
-        "Yone",
-        "Singed",
-        "Mordekaiser",
-        "Gangplank"
+        {
+          "name": "Sett",
+          "win_rate": 0.5103,
+          "pick_rate": 0.061
+        },
+        {
+          "name": "Teemo",
+          "win_rate": 0.5107,
+          "pick_rate": 0.0507
+        },
+        {
+          "name": "Yone",
+          "win_rate": 0.4985,
+          "pick_rate": 0.0727
+        },
+        {
+          "name": "Darius",
+          "win_rate": 0.4973,
+          "pick_rate": 0.0731
+        },
+        {
+          "name": "Aatrox",
+          "win_rate": 0.5009,
+          "pick_rate": 0.0628
+        },
+        {
+          "name": "Singed",
+          "win_rate": 0.5226,
+          "pick_rate": 0.0242
+        },
+        {
+          "name": "Mordekaiser",
+          "win_rate": 0.4989,
+          "pick_rate": 0.0634
+        },
+        {
+          "name": "Gangplank",
+          "win_rate": 0.5035,
+          "pick_rate": 0.0529
+        }
       ],
       "B": [
-        "Renekton",
-        "Ornn",
-        "Kayle",
-        "Shen",
-        "Dr. Mundo",
-        "Camille",
-        "Jax",
-        "Yorick",
-        "Tryndamere",
-        "Illaoi",
-        "Urgot",
-        "Pantheon",
-        "Warwick",
-        "Olaf",
-        "Vayne",
-        "Gwen"
+        {
+          "name": "Shen",
+          "win_rate": 0.5101,
+          "pick_rate": 0.0348
+        },
+        {
+          "name": "Renekton",
+          "win_rate": 0.4997,
+          "pick_rate": 0.0548
+        },
+        {
+          "name": "Ornn",
+          "win_rate": 0.512,
+          "pick_rate": 0.0307
+        },
+        {
+          "name": "Jax",
+          "win_rate": 0.4941,
+          "pick_rate": 0.0583
+        },
+        {
+          "name": "Camille",
+          "win_rate": 0.5065,
+          "pick_rate": 0.0312
+        },
+        {
+          "name": "Dr. Mundo",
+          "win_rate": 0.5014,
+          "pick_rate": 0.0424
+        },
+        {
+          "name": "Urgot",
+          "win_rate": 0.5113,
+          "pick_rate": 0.0264
+        },
+        {
+          "name": "Illaoi",
+          "win_rate": 0.5085,
+          "pick_rate": 0.0291
+        },
+        {
+          "name": "Kayle",
+          "win_rate": 0.5134,
+          "pick_rate": 0.0236
+        },
+        {
+          "name": "Olaf",
+          "win_rate": 0.5071,
+          "pick_rate": 0.0305
+        },
+        {
+          "name": "Tryndamere",
+          "win_rate": 0.5043,
+          "pick_rate": 0.0346
+        },
+        {
+          "name": "Yorick",
+          "win_rate": 0.4997,
+          "pick_rate": 0.0405
+        },
+        {
+          "name": "Gwen",
+          "win_rate": 0.5051,
+          "pick_rate": 0.03
+        },
+        {
+          "name": "Warwick",
+          "win_rate": 0.5194,
+          "pick_rate": 0.0147
+        }
       ]
     },
     "jungle": {
       "S": [
-        "Wukong",
-        "Nocturne",
-        "Briar",
-        "Warwick",
-        "Graves",
-        "Kayn",
-        "Lee Sin",
-        "Shyvana",
-        "Jarvan IV",
-        "Rammus"
+        {
+          "name": "Nocturne",
+          "win_rate": 0.5171,
+          "pick_rate": 0.0754
+        },
+        {
+          "name": "Wukong",
+          "win_rate": 0.523,
+          "pick_rate": 0.0575
+        },
+        {
+          "name": "Briar",
+          "win_rate": 0.5184,
+          "pick_rate": 0.052
+        },
+        {
+          "name": "Warwick",
+          "win_rate": 0.5246,
+          "pick_rate": 0.0378
+        },
+        {
+          "name": "Graves",
+          "win_rate": 0.499,
+          "pick_rate": 0.1333
+        },
+        {
+          "name": "Shyvana",
+          "win_rate": 0.5164,
+          "pick_rate": 0.0524
+        },
+        {
+          "name": "Kayn",
+          "win_rate": 0.5062,
+          "pick_rate": 0.0818
+        },
+        {
+          "name": "Rammus",
+          "win_rate": 0.5347,
+          "pick_rate": 0.0172
+        },
+        {
+          "name": "Lee Sin",
+          "win_rate": 0.4936,
+          "pick_rate": 0.1279
+        },
+        {
+          "name": "Jarvan IV",
+          "win_rate": 0.5067,
+          "pick_rate": 0.0592
+        }
       ],
       "A": [
-        "Lillia",
-        "Sylas",
-        "Vi",
-        "Viego",
-        "Shaco",
-        "Sejuani",
-        "Zac",
-        "Ekko",
-        "Naafiri"
+        {
+          "name": "Sylas",
+          "win_rate": 0.4997,
+          "pick_rate": 0.0603
+        },
+        {
+          "name": "Shaco",
+          "win_rate": 0.5031,
+          "pick_rate": 0.0492
+        },
+        {
+          "name": "Vi",
+          "win_rate": 0.5015,
+          "pick_rate": 0.0599
+        },
+        {
+          "name": "Viego",
+          "win_rate": 0.4891,
+          "pick_rate": 0.1037
+        },
+        {
+          "name": "Lillia",
+          "win_rate": 0.5098,
+          "pick_rate": 0.0368
+        },
+        {
+          "name": "Sejuani",
+          "win_rate": 0.5197,
+          "pick_rate": 0.02
+        },
+        {
+          "name": "Ekko",
+          "win_rate": 0.5054,
+          "pick_rate": 0.036
+        },
+        {
+          "name": "Zac",
+          "win_rate": 0.5102,
+          "pick_rate": 0.0277
+        },
+        {
+          "name": "Talon",
+          "win_rate": 0.5015,
+          "pick_rate": 0.0404
+        },
+        {
+          "name": "Evelynn",
+          "win_rate": 0.5134,
+          "pick_rate": 0.0223
+        },
+        {
+          "name": "Fiddlesticks",
+          "win_rate": 0.5101,
+          "pick_rate": 0.0237
+        },
+        {
+          "name": "Amumu",
+          "win_rate": 0.5103,
+          "pick_rate": 0.0233
+        },
+        {
+          "name": "Naafiri",
+          "win_rate": 0.496,
+          "pick_rate": 0.0429
+        },
+        {
+          "name": "Udyr",
+          "win_rate": 0.5116,
+          "pick_rate": 0.0204
+        },
+        {
+          "name": "Xin Zhao",
+          "win_rate": 0.5036,
+          "pick_rate": 0.0312
+        },
+        {
+          "name": "Kha'Zix",
+          "win_rate": 0.4928,
+          "pick_rate": 0.0526
+        },
+        {
+          "name": "Master Yi",
+          "win_rate": 0.4885,
+          "pick_rate": 0.0574
+        },
+        {
+          "name": "Hecarim",
+          "win_rate": 0.4968,
+          "pick_rate": 0.0393
+        },
+        {
+          "name": "Bel'Veth",
+          "win_rate": 0.4907,
+          "pick_rate": 0.0472
+        },
+        {
+          "name": "Nunu & Willump",
+          "win_rate": 0.5085,
+          "pick_rate": 0.0186
+        },
+        {
+          "name": "Zyra",
+          "win_rate": 0.5222,
+          "pick_rate": 0.0085
+        },
+        {
+          "name": "Ivern",
+          "win_rate": 0.5184,
+          "pick_rate": 0.0102
+        }
       ],
       "B": [
-        "Amumu",
-        "Xin Zhao",
-        "Evelynn",
-        "Fiddlesticks",
-        "Udyr",
-        "Talon",
-        "Kha'Zix",
-        "Hecarim",
-        "Aatrox",
-        "Bel'Veth",
-        "Master Yi",
-        "Nunu & Willump",
-        "Zyra",
-        "Nasus",
-        "Elise"
+        {
+          "name": "Elise",
+          "win_rate": 0.5076,
+          "pick_rate": 0.0161
+        },
+        {
+          "name": "Aatrox",
+          "win_rate": 0.5085,
+          "pick_rate": 0.0131
+        },
+        {
+          "name": "Gwen",
+          "win_rate": 0.5109,
+          "pick_rate": 0.0119
+        },
+        {
+          "name": "Nidalee",
+          "win_rate": 0.4964,
+          "pick_rate": 0.0256
+        },
+        {
+          "name": "Jax",
+          "win_rate": 0.4964,
+          "pick_rate": 0.021
+        },
+        {
+          "name": "Quinn",
+          "win_rate": 0.507,
+          "pick_rate": 0.0129
+        },
+        {
+          "name": "Nasus",
+          "win_rate": 0.4977,
+          "pick_rate": 0.0167
+        },
+        {
+          "name": "Darius",
+          "win_rate": 0.5097,
+          "pick_rate": 0.0088
+        },
+        {
+          "name": "Trundle",
+          "win_rate": 0.5155,
+          "pick_rate": 0.0066
+        },
+        {
+          "name": "Rek'Sai",
+          "win_rate": 0.5051,
+          "pick_rate": 0.0114
+        },
+        {
+          "name": "Kindred",
+          "win_rate": 0.4917,
+          "pick_rate": 0.0219
+        },
+        {
+          "name": "Diana",
+          "win_rate": 0.4835,
+          "pick_rate": 0.0301
+        },
+        {
+          "name": "Skarner",
+          "win_rate": 0.5021,
+          "pick_rate": 0.0105
+        },
+        {
+          "name": "Fizz",
+          "win_rate": 0.5082,
+          "pick_rate": 0.0064
+        },
+        {
+          "name": "Volibear",
+          "win_rate": 0.4989,
+          "pick_rate": 0.0106
+        },
+        {
+          "name": "Teemo",
+          "win_rate": 0.5004,
+          "pick_rate": 0.008
+        },
+        {
+          "name": "Taliyah",
+          "win_rate": 0.5029,
+          "pick_rate": 0.0077
+        },
+        {
+          "name": "Dr. Mundo",
+          "win_rate": 0.5065,
+          "pick_rate": 0.0061
+        },
+        {
+          "name": "Malphite",
+          "win_rate": 0.496,
+          "pick_rate": 0.0086
+        },
+        {
+          "name": "Cho'Gath",
+          "win_rate": 0.509,
+          "pick_rate": 0.0052
+        },
+        {
+          "name": "Gragas",
+          "win_rate": 0.5033,
+          "pick_rate": 0.0062
+        },
+        {
+          "name": "Zed",
+          "win_rate": 0.4724,
+          "pick_rate": 0.0243
+        },
+        {
+          "name": "Maokai",
+          "win_rate": 0.506,
+          "pick_rate": 0.0052
+        },
+        {
+          "name": "Poppy",
+          "win_rate": 0.5022,
+          "pick_rate": 0.0059
+        }
       ]
     },
     "middle": {
       "S": [
-        "Ahri",
-        "Xerath",
-        "Viktor",
-        "Syndra"
+        {
+          "name": "Ahri",
+          "win_rate": 0.5129,
+          "pick_rate": 0.0954
+        },
+        {
+          "name": "Xerath",
+          "win_rate": 0.5236,
+          "pick_rate": 0.0457
+        },
+        {
+          "name": "Viktor",
+          "win_rate": 0.51,
+          "pick_rate": 0.0914
+        },
+        {
+          "name": "Fizz",
+          "win_rate": 0.5175,
+          "pick_rate": 0.0575
+        },
+        {
+          "name": "Syndra",
+          "win_rate": 0.508,
+          "pick_rate": 0.0815
+        }
       ],
       "A": [
-        "Fizz",
-        "Zed",
-        "Malzahar",
-        "Lissandra",
-        "Katarina",
-        "Vex",
-        "Veigar",
-        "Hwei",
-        "Nasus",
-        "Twisted Fate"
+        {
+          "name": "Malzahar",
+          "win_rate": 0.5101,
+          "pick_rate": 0.0646
+        },
+        {
+          "name": "Zed",
+          "win_rate": 0.4996,
+          "pick_rate": 0.0894
+        },
+        {
+          "name": "Nasus",
+          "win_rate": 0.5395,
+          "pick_rate": 0.0125
+        },
+        {
+          "name": "Lissandra",
+          "win_rate": 0.5141,
+          "pick_rate": 0.0493
+        },
+        {
+          "name": "Vex",
+          "win_rate": 0.523,
+          "pick_rate": 0.0297
+        },
+        {
+          "name": "Katarina",
+          "win_rate": 0.5031,
+          "pick_rate": 0.072
+        },
+        {
+          "name": "Lux",
+          "win_rate": 0.5147,
+          "pick_rate": 0.0398
+        },
+        {
+          "name": "Hwei",
+          "win_rate": 0.5144,
+          "pick_rate": 0.0406
+        },
+        {
+          "name": "Twisted Fate",
+          "win_rate": 0.5111,
+          "pick_rate": 0.0486
+        },
+        {
+          "name": "Veigar",
+          "win_rate": 0.5111,
+          "pick_rate": 0.047
+        }
       ],
       "B": [
-        "Lux",
-        "Sylas",
-        "Gwen",
-        "Locke",
-        "Ekko",
-        "Akali",
-        "Yasuo",
-        "Diana",
-        "Yone",
-        "Vladimir",
-        "LeBlanc",
-        "Galio",
-        "Zoe",
-        "Annie"
+        {
+          "name": "Gwen",
+          "win_rate": 0.5323,
+          "pick_rate": 0.012
+        },
+        {
+          "name": "Sylas",
+          "win_rate": 0.491,
+          "pick_rate": 0.0721
+        },
+        {
+          "name": "Akali",
+          "win_rate": 0.4947,
+          "pick_rate": 0.061
+        },
+        {
+          "name": "Locke",
+          "win_rate": 0.4893,
+          "pick_rate": 0.0597
+        },
+        {
+          "name": "Ekko",
+          "win_rate": 0.5089,
+          "pick_rate": 0.0309
+        },
+        {
+          "name": "Yasuo",
+          "win_rate": 0.4832,
+          "pick_rate": 0.0835
+        },
+        {
+          "name": "Diana",
+          "win_rate": 0.5051,
+          "pick_rate": 0.0336
+        },
+        {
+          "name": "Yone",
+          "win_rate": 0.4863,
+          "pick_rate": 0.068
+        },
+        {
+          "name": "Vladimir",
+          "win_rate": 0.4989,
+          "pick_rate": 0.0379
+        },
+        {
+          "name": "Annie",
+          "win_rate": 0.5143,
+          "pick_rate": 0.0186
+        },
+        {
+          "name": "LeBlanc",
+          "win_rate": 0.496,
+          "pick_rate": 0.0389
+        },
+        {
+          "name": "Zoe",
+          "win_rate": 0.5032,
+          "pick_rate": 0.0254
+        },
+        {
+          "name": "Galio",
+          "win_rate": 0.4921,
+          "pick_rate": 0.0431
+        },
+        {
+          "name": "Kassadin",
+          "win_rate": 0.5015,
+          "pick_rate": 0.0258
+        }
       ]
     },
     "bottom": {
       "S": [
-        "Jinx",
-        "Kai'Sa",
-        "Tristana"
+        {
+          "name": "Jinx",
+          "win_rate": 0.5253,
+          "pick_rate": 0.1233
+        },
+        {
+          "name": "Kai'Sa",
+          "win_rate": 0.4957,
+          "pick_rate": 0.2192
+        },
+        {
+          "name": "Tristana",
+          "win_rate": 0.5157,
+          "pick_rate": 0.0727
+        }
       ],
       "A": [
-        "Caitlyn",
-        "Xayah",
-        "Viktor",
-        "Twitch",
-        "Jhin",
-        "Xerath",
-        "Veigar",
-        "Seraphine",
-        "Zeri",
-        "Ashe",
-        "Miss Fortune",
-        "Vayne"
+        {
+          "name": "Caitlyn",
+          "win_rate": 0.4928,
+          "pick_rate": 0.1643
+        },
+        {
+          "name": "Jhin",
+          "win_rate": 0.4947,
+          "pick_rate": 0.1533
+        },
+        {
+          "name": "Twitch",
+          "win_rate": 0.5155,
+          "pick_rate": 0.0506
+        },
+        {
+          "name": "Xayah",
+          "win_rate": 0.5184,
+          "pick_rate": 0.0444
+        },
+        {
+          "name": "Seraphine",
+          "win_rate": 0.5281,
+          "pick_rate": 0.0205
+        },
+        {
+          "name": "Viktor",
+          "win_rate": 0.5133,
+          "pick_rate": 0.0412
+        },
+        {
+          "name": "Ashe",
+          "win_rate": 0.5057,
+          "pick_rate": 0.0654
+        },
+        {
+          "name": "Zeri",
+          "win_rate": 0.5178,
+          "pick_rate": 0.0349
+        },
+        {
+          "name": "Xerath",
+          "win_rate": 0.5175,
+          "pick_rate": 0.0265
+        },
+        {
+          "name": "Veigar",
+          "win_rate": 0.5224,
+          "pick_rate": 0.0242
+        },
+        {
+          "name": "Miss Fortune",
+          "win_rate": 0.5008,
+          "pick_rate": 0.0783
+        },
+        {
+          "name": "Ziggs",
+          "win_rate": 0.5117,
+          "pick_rate": 0.0358
+        },
+        {
+          "name": "Vayne",
+          "win_rate": 0.503,
+          "pick_rate": 0.0516
+        }
       ],
       "B": [
-        "Ziggs",
-        "Yunara",
-        "Sivir",
-        "Kog'Maw",
-        "Lucian",
-        "Hwei",
-        "Swain",
-        "Smolder",
-        "Senna",
-        "Aphelios",
-        "Samira",
-        "Yasuo",
-        "Nilah",
-        "Vel'Koz",
-        "Syndra",
-        "Draven",
-        "Brand"
+        {
+          "name": "Sivir",
+          "win_rate": 0.5079,
+          "pick_rate": 0.0411
+        },
+        {
+          "name": "Kog'Maw",
+          "win_rate": 0.5236,
+          "pick_rate": 0.0176
+        },
+        {
+          "name": "Swain",
+          "win_rate": 0.5308,
+          "pick_rate": 0.0105
+        },
+        {
+          "name": "Yunara",
+          "win_rate": 0.4989,
+          "pick_rate": 0.0601
+        },
+        {
+          "name": "Hwei",
+          "win_rate": 0.5264,
+          "pick_rate": 0.0128
+        },
+        {
+          "name": "Smolder",
+          "win_rate": 0.5038,
+          "pick_rate": 0.0433
+        },
+        {
+          "name": "Lucian",
+          "win_rate": 0.4887,
+          "pick_rate": 0.0867
+        },
+        {
+          "name": "Samira",
+          "win_rate": 0.5004,
+          "pick_rate": 0.0443
+        },
+        {
+          "name": "Aphelios",
+          "win_rate": 0.5,
+          "pick_rate": 0.044
+        },
+        {
+          "name": "Nilah",
+          "win_rate": 0.5231,
+          "pick_rate": 0.0105
+        }
       ]
     },
     "utility": {
       "S": [
-        "Thresh",
-        "Leona",
-        "Nami",
-        "Lulu",
-        "Nautilus",
-        "Senna",
-        "Seraphine"
+        {
+          "name": "Thresh",
+          "win_rate": 0.5209,
+          "pick_rate": 0.133
+        },
+        {
+          "name": "Leona",
+          "win_rate": 0.5188,
+          "pick_rate": 0.0831
+        },
+        {
+          "name": "Nami",
+          "win_rate": 0.5124,
+          "pick_rate": 0.0792
+        },
+        {
+          "name": "Seraphine",
+          "win_rate": 0.5087,
+          "pick_rate": 0.0804
+        },
+        {
+          "name": "Lulu",
+          "win_rate": 0.5071,
+          "pick_rate": 0.0908
+        },
+        {
+          "name": "Nautilus",
+          "win_rate": 0.5014,
+          "pick_rate": 0.1068
+        },
+        {
+          "name": "Senna",
+          "win_rate": 0.514,
+          "pick_rate": 0.0582
+        }
       ],
       "A": [
-        "Blitzcrank",
-        "Milio",
-        "Braum",
-        "Janna",
-        "Rell",
-        "Soraka",
-        "Lux",
-        "Rakan",
-        "Sona",
-        "Zilean",
-        "Morgana",
-        "Poppy",
-        "Alistar",
-        "Pyke",
-        "Karma"
+        {
+          "name": "Blitzcrank",
+          "win_rate": 0.5099,
+          "pick_rate": 0.0587
+        },
+        {
+          "name": "Milio",
+          "win_rate": 0.5109,
+          "pick_rate": 0.057
+        },
+        {
+          "name": "Braum",
+          "win_rate": 0.5179,
+          "pick_rate": 0.0398
+        },
+        {
+          "name": "Rell",
+          "win_rate": 0.5187,
+          "pick_rate": 0.0367
+        },
+        {
+          "name": "Lux",
+          "win_rate": 0.4973,
+          "pick_rate": 0.0789
+        },
+        {
+          "name": "Soraka",
+          "win_rate": 0.5121,
+          "pick_rate": 0.0451
+        },
+        {
+          "name": "Janna",
+          "win_rate": 0.5173,
+          "pick_rate": 0.0357
+        },
+        {
+          "name": "Morgana",
+          "win_rate": 0.5027,
+          "pick_rate": 0.0525
+        },
+        {
+          "name": "Zilean",
+          "win_rate": 0.5194,
+          "pick_rate": 0.0285
+        },
+        {
+          "name": "Sona",
+          "win_rate": 0.5207,
+          "pick_rate": 0.0272
+        },
+        {
+          "name": "Rakan",
+          "win_rate": 0.5144,
+          "pick_rate": 0.0324
+        },
+        {
+          "name": "Poppy",
+          "win_rate": 0.5168,
+          "pick_rate": 0.0275
+        },
+        {
+          "name": "Alistar",
+          "win_rate": 0.5062,
+          "pick_rate": 0.0423
+        }
       ],
       "B": [
-        "Bard",
-        "Xerath",
-        "Zyra",
-        "Pantheon",
-        "Vel'Koz",
-        "Taric",
-        "Maokai",
-        "Brand",
-        "Tahm Kench",
-        "Galio",
-        "Yuumi",
-        "Swain",
-        "Shen",
-        "Amumu",
-        "Renata Glasc",
-        "Camille"
+        {
+          "name": "Pyke",
+          "win_rate": 0.4871,
+          "pick_rate": 0.0682
+        },
+        {
+          "name": "Karma",
+          "win_rate": 0.4923,
+          "pick_rate": 0.0599
+        },
+        {
+          "name": "Xerath",
+          "win_rate": 0.4985,
+          "pick_rate": 0.0338
+        },
+        {
+          "name": "Bard",
+          "win_rate": 0.4955,
+          "pick_rate": 0.0462
+        },
+        {
+          "name": "Zyra",
+          "win_rate": 0.5061,
+          "pick_rate": 0.0276
+        },
+        {
+          "name": "Vel'Koz",
+          "win_rate": 0.5039,
+          "pick_rate": 0.0297
+        },
+        {
+          "name": "Pantheon",
+          "win_rate": 0.4904,
+          "pick_rate": 0.0468
+        },
+        {
+          "name": "Taric",
+          "win_rate": 0.5225,
+          "pick_rate": 0.0125
+        }
       ]
     }
   }

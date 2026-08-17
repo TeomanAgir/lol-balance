@@ -2104,6 +2104,310 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   white-space: nowrap;
 }
 
+/* ── Seçim danışmanı (GÖREV 21, "pa-"; tasarım S3 "Analiz Paneli") ──
+   Görünüm-bazlı genişlik istisnası: showView main'e .pa-wide basar → yalnız bu
+   görünüm 1080px kullanır (S3 konsepti), diğerleri 197. satırdaki 720px'te kalır.
+   Sol yarı kompakt giriş listeleri, sağ yarı canlı analiz; <880px tek sütun. */
+main.pa-wide { max-width: 1080px; }
+
+.pa-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 14px; align-items: start; }
+.pa-left, .pa-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.pa-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px 14px;
+}
+.pa-title {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.pa-blue { color: var(--blue); }
+.pa-red { color: var(--red); }
+
+/* Kompakt giriş satırı: portre · arama girişi (açılır liste) · rol · BEN */
+.pa-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  border-radius: 6px;
+}
+.pa-row:last-child { border-bottom: none; }
+.pa-row.mine {
+  box-shadow: inset 3px 0 0 var(--brass);
+  background: color-mix(in srgb, var(--brass) 5%, transparent);
+}
+.pa-port {
+  flex: 0 0 26px;
+  display: block;
+  position: relative;
+}
+/* dd- katmanının ölçüsünü kapsayıcı verir (sözleşme): satırda 26px kare */
+.pa-port .dd-ico { width: 26px; height: 26px; border-radius: 6px; }
+.pa-pickbox { position: relative; flex: 1 1 auto; min-width: 0; }
+.pa-input {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pa-input::placeholder { color: var(--muted); font-style: italic; }
+.pa-input:hover { border-color: var(--brass-dim); }
+/* Otomatik tamamlama listesi giriş kutusunun hemen altında yüzer */
+.pa-list {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  max-height: 264px;
+  overflow-y: auto;
+}
+.pa-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+.pa-opt .dd-ico { width: 22px; height: 22px; border-radius: 5px; flex: 0 0 22px; }
+.pa-opt:hover, .pa-opt.on { background: color-mix(in srgb, var(--brass) 12%, transparent); }
+.pa-role {
+  flex: 0 0 92px;
+  min-height: 34px;
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 4px 4px;
+  cursor: pointer;
+}
+.pa-role:hover { border-color: var(--brass-dim); color: var(--text); }
+.pa-me {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--display);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pa-me input { accent-color: var(--brass); width: 13px; height: 13px; cursor: pointer; }
+.pa-row.mine .pa-me { color: var(--brass); }
+.pa-refresh { width: 100%; }
+
+/* Stat karoları */
+.pa-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pa-tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.pa-tl {
+  font-family: var(--display);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pa-tv {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pa-ts { font-size: 11px; color: var(--muted); }
+
+/* AD/AP denge çubuğu — renk tek başına taşıyıcı değil, yüzdeler yazılıdır
+   (dar segmentte yazı gizlenir ama aria-label aynı bilgiyi taşır) */
+.pa-dmg-row {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.pa-dmg-side {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pa-dmg-none { font-size: 12px; color: var(--muted); font-style: italic; }
+.pa-dmg-bar {
+  display: flex;
+  height: 16px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.pa-seg {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pa-seg.ad { background: color-mix(in srgb, var(--brass) 72%, #6b5426); color: #14100a; }
+.pa-seg.ap { background: color-mix(in srgb, var(--blue) 80%, #1d4470); color: #eaf2fb; justify-content: flex-end; }
+.pa-dmg-caption { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin: 2px 0 4px; }
+.pa-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.pa-dot.ad { background: var(--brass); }
+.pa-dot.ap { background: var(--blue); }
+.pa-warn { font-size: 12px; color: var(--brass); margin-top: 6px; }
+
+/* Rozet dili: dolu pirinç = veri, kesikli gri = sezgisel, grp = grup bilgisi.
+   Mockup'taki ayrım AYNEN: veri/sezgisel görsel olarak ayrışır (GÖREV 21). */
+.pa-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.pa-badge {
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  border: 1px solid var(--brass-dim);
+  color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+}
+.pa-badge.gut { border: 1px dashed var(--muted); color: var(--muted); background: transparent; }
+.pa-badge.grp {
+  border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 8%, transparent);
+}
+.pa-badge.pa-gapb {
+  border-color: color-mix(in srgb, var(--red) 55%, var(--line));
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+}
+.pa-threat { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.pa-threat b { color: var(--text); }
+.pa-threat.pa-dim { color: var(--muted); font-style: italic; }
+.pa-none { font-size: 13px; color: var(--muted); }
+
+/* Öneri kartları */
+.pa-sug-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.pa-sug-head-row .pa-title { margin-bottom: 0; }
+.pa-count { font-size: 11px; color: var(--brass-dim); white-space: nowrap; }
+.pa-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 10px;
+}
+.pa-chip {
+  display: inline-block;
+  width: 24px;
+  height: 13px;
+  border-radius: 5px;
+  border: 1px solid var(--brass-dim);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+.pa-chip.gut { border: 1px dashed var(--muted); background: transparent; }
+.pa-deck { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.pa-sug {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.pa-sug.best { border-color: var(--brass); }
+.pa-best {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  background: var(--brass);
+  color: #14100a;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1px 8px;
+  border-radius: 6px;
+}
+.pa-sug-head { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.pa-port.lg { flex: 0 0 44px; }
+.pa-port.lg .dd-ico { width: 44px; height: 44px; border-radius: 9px; }
+.pa-sname {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.pa-srole {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Dar ekran: önce tek sütuna, sonra kart ızgarası da tek sütuna iner.
+   390px'te yatay taşma yok: satır öğeleri esner, rozetler sarar. */
+@media (max-width: 879px) {
+  .pa-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .pa-deck { grid-template-columns: 1fr; }
+  .pa-role { flex-basis: 84px; }
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;
