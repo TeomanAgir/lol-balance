@@ -82,11 +82,20 @@
 
     <div id="suggestions" class="suggestions"></div>
 
+    <!-- RULET sonuç kartları (GÖREV 23): içerik app.js renderRoulette() ile kurulur.
+         Sayfa açılışında GET /roulette/current doluysa aktif oturum da burada görünür. -->
+    <div id="roulette-box" class="rlt-box" aria-live="polite"></div>
+
     <div class="action-bar">
       <!-- İçerik JS'te kurulur: updatePickCounter() → "{n}/10 seçildi" -->
       <div id="pick-counter" class="pick-counter"></div>
-      <button id="btn-balance" class="btn-primary" type="button"
-              data-i18n="balance.balance_btn" disabled></button>
+      <!-- RULET! (GÖREV 23) DENGELE ile aynı seçim kuralına bağlıdır: tam 10 seçili -->
+      <div class="ab-btns">
+        <button id="btn-roulette" class="btn-roulette" type="button"
+                data-i18n="roulette.btn" data-i18n-title="roulette.btn_title" disabled></button>
+        <button id="btn-balance" class="btn-primary" type="button"
+                data-i18n="balance.balance_btn" disabled></button>
+      </div>
     </div>
   </section>
 

@@ -69,6 +69,33 @@ def plain_text(desc: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# GÖREV 23: "tamamlanmış eşya" bayrağı (api_contract §8) — rulet eşya havuzunu
+# web UI bu bayrakla süzer, kesin sezgisel BURADADIR:
+#   * SR'da satın alınabilir: gold.purchasable + inStore != false + maps["11"]
+#   * başka eşyaya DÖNÜŞMEZ (`into` yok) + bileşenlerden ÜRETİLİR (`from` var)
+#   * trinket / tüketilebilir / bot eşyaları hariç (tags)
+#   * şampiyona/müttefike özel eşyalar (Ornn vb.) hariç
+# Kabul ölçütü (contract): 3031 Ebedi Kılıç ve 3026 Koruyucu Melek True;
+# bileşen (from'suz ya da into'lu), tüketilebilir, trinket ve botlar False.
+COMPLETED_EXCLUDED_TAGS = {"Trinket", "Consumable", "Boots"}
+
+
+def is_completed(item: dict) -> bool:
+    gold = item.get("gold") or {}
+    maps = item.get("maps") or {}
+    tags = set(item.get("tags") or [])
+    return bool(
+        gold.get("purchasable")
+        and item.get("inStore", True)
+        and maps.get("11")
+        and not item.get("into")
+        and item.get("from")
+        and not (tags & COMPLETED_EXCLUDED_TAGS)
+        and not item.get("requiredChampion")
+        and not item.get("requiredAlly")
+    )
+
+
 def build_items() -> dict[str, dict]:
     tr = fetch_json(f"{CDN}/data/tr_TR/item.json")["data"]
     en = fetch_json(f"{CDN}/data/en_US/item.json")["data"]
@@ -81,6 +108,7 @@ def build_items() -> dict[str, dict]:
             "desc_tr": plain_text(tr_item.get("plaintext") or tr_item.get("description", "")),
             "desc_en": plain_text(en_item.get("plaintext") or en_item.get("description", "")),
             "tags": en_item.get("tags", []),
+            "completed": is_completed(en_item),
         }
     return items
 

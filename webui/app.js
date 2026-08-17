@@ -37,6 +37,7 @@
     backStack: [],              // profil ⇄ maç detayı geri zinciri (bkz. pushBack)
     pick: null,                 // Seçim danışmanı girişleri (GÖREV 21; ensurePickState kurar)
     matchup: null,               // Eşleşme ekranı seçimleri (GÖREV 21-FIX; ensureMatchupState kurar)
+    roulette: null,             // RULET sonucu (GÖREV 23): {assignments, phase, sessionId, createdAt, detail}
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -435,12 +436,29 @@
       grid.appendChild(card);
     }
     updatePickCounter();
+    // RULET (GÖREV 23): yerel sonuç varsa yeniden çizilir (dil değişimi vb.);
+    // yoksa açık oturum sorulur — uç yoksa/düşerse bölüm sessizce boş kalır
+    // (nemesis'teki desen: eğlence modu dengeleme ekranını asla bloke etmez).
+    renderRoulette();
+    if (!state.roulette) {
+      api("/roulette/current").then(res => {
+        const s = res && res.session;
+        if (s && Array.isArray(s.assignments) && !state.roulette) {
+          state.roulette = {
+            assignments: s.assignments, phase: "current",
+            sessionId: s.session_id, createdAt: s.created_at, detail: "",
+          };
+          if (currentView === "balance") renderRoulette();
+        }
+      }).catch(() => { /* eski backend / ağ hatası: bölüm çizilmez */ });
+    }
   }
 
   function updatePickCounter() {
     const n = state.selected.size;
     $("#pick-counter").innerHTML = `${n}<span>${t("balance.pick_suffix")}</span>`;
     $("#btn-balance").disabled = n !== 10;
+    $("#btn-roulette").disabled = n !== 10;   // RULET de tam 10 seçim ister (GÖREV 23)
     renderNemesisBadge();
   }
 
@@ -559,6 +577,132 @@
     });
     box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ── 1b2) RULET (GÖREV 23 — eğlence modu) ──────────────────────
+  // Rastgele seçim İSTEMCİDEDİR (api_contract §4.5): takımlar 5/5, takım başına
+  // 5 rol 1'er, 10 oyuncuya BİRBİRİNDEN FARKLI şampiyon, oyuncu başına 2 FARKLI
+  // tamamlanmış eşya (items.json'da completed: true — oyuncular arası tekrar
+  // serbest). Havuzlar vendored ddragon verisinden gelir; varlıklar yoksa
+  // açıklayıcı hata gösterilir, uygulama düşmez (dd- katmanının ilkesi).
+  // Backend yalnız saklar ve şeklen doğrular: POST /roulette açık oturumları
+  // iptal edip yenisini açar (en fazla 1 açık oturum değişmezi backend'dedir).
+  function shuffled(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  const completedItemIds = () =>
+    DD.items
+      ? Object.keys(DD.items).filter(id => DD.items[id] && DD.items[id].completed === true)
+      : [];
+
+  // null döner = havuz kurulamadı (varlık yok / yetersiz) → çağıran hata gösterir.
+  function drawRoulette(ids10) {
+    const champPool = DD.champs ? Object.keys(DD.champs) : [];
+    const itemPool = completedItemIds();
+    if (champPool.length < 10 || itemPool.length < 2) return null;
+    const ids = shuffled(ids10);
+    const champs = shuffled(champPool).slice(0, 10);
+    const roles = [shuffled(ROLES), shuffled(ROLES)];
+    return ids.map((pid, i) => ({
+      player_id: pid,
+      team: i < 5 ? 100 : 200,
+      position: roles[i < 5 ? 0 : 1][i % 5],
+      champion: champs[i],
+      item_ids: shuffled(itemPool).slice(0, 2).map(Number),
+    }));
+  }
+
+  const rlItemHtml = (id) =>
+    `<span class="rlt-item">${ddIconHtml(itemIconSrc(id), itemPh(id), "item")}` +
+    `<span class="rlt-item-name">${esc(itemName(id))}</span></span>`;
+
+  // i = kart sırası (giriş animasyonunun kademesi buradan gelir).
+  function rlPlayerCard(a, i) {
+    return `<li class="rlt-card" style="animation-delay:${i * 90}ms">
+        <div class="rlt-top">
+          <span class="rlt-champ">${ddIconHtml(champIconSrc(a.champion), champPh(a.champion), "champ")}</span>
+          <div class="rlt-who">
+            <span class="rlt-name">${esc(playerName(a.player_id))}</span>
+            <span class="rlt-champname">${esc(a.champion)}</span>
+          </div>
+          ${posIconHtml(a.position, roleAbbr(a.position), "rlt-role")}
+        </div>
+        <div class="rlt-items">${a.item_ids.map(rlItemHtml).join("")}</div>
+      </li>`;
+  }
+
+  // Durum satırı ayrı güncellenir: POST yanıtı geldiğinde kartlar yeniden
+  // çizilmez (giriş animasyonu baştan oynamaz), yalnız not değişir.
+  function rlStatus(r) {
+    switch (r.phase) {
+      case "saving": return { cls: "", text: t("roulette.saving") };
+      case "saved": return { cls: "ok", text: t("roulette.saved_note", { id: r.sessionId }) };
+      case "failed": return { cls: "err", text: t("roulette.failed_note", { detail: r.detail }) };
+      default: return {  // "current": sayfa açılışında bulunan açık oturum
+        cls: "",
+        text: t("roulette.current_note", { id: r.sessionId, date: r.createdAt ? fmtDate(r.createdAt) : "—" }),
+      };
+    }
+  }
+
+  function updateRouletteStatus() {
+    const el = $("#rlt-status");
+    if (!el || !state.roulette) return;
+    const st = rlStatus(state.roulette);
+    el.className = "rlt-note" + (st.cls ? " " + st.cls : "");
+    el.textContent = st.text;
+  }
+
+  function renderRoulette() {
+    const box = $("#roulette-box");
+    const r = state.roulette;
+    if (!r) { box.innerHTML = ""; return; }
+    const team = (tn) => {
+      const list = r.assignments.filter(a => a.team === tn)
+        .sort((a, b) => roleOrder(a.position) - roleOrder(b.position));
+      return `<section class="rlt-team ${tn === 100 ? "blue" : "red"}">
+          <h3 class="rlt-team-title">${t(tn === 100 ? "matchdetail.blue_team" : "matchdetail.red_team")}</h3>
+          <ul class="rlt-list">${list.map((a, i) => rlPlayerCard(a, (tn === 200 ? 5 : 0) + i)).join("")}</ul>
+        </section>`;
+    };
+    box.innerHTML =
+      `<div class="rlt-head">
+         <h2 class="sug-title rlt-title">${t("roulette.title")}</h2>
+         <span id="rlt-status"></span>
+       </div>
+       <div class="rlt-teams">${team(100)}${team(200)}</div>
+       <p class="rlt-mission">${t("roulette.mission_note")}</p>`;
+    updateRouletteStatus();
+    ddBindImages(box);
+  }
+
+  $("#btn-roulette").addEventListener("click", async () => {
+    if (state.selected.size !== 10) return;
+    await loadAssets();   // önbellekliyse anında döner; havuzlar buradan okunur
+    const assignments = drawRoulette([...state.selected]);
+    if (!assignments) { toast(t("roulette.err_no_assets"), "warn"); return; }
+    state.roulette = { assignments, phase: "saving", sessionId: null, createdAt: null, detail: "" };
+    renderRoulette();
+    $("#roulette-box").scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      const res = await api("/roulette", { method: "POST", body: { assignments } });
+      state.roulette.phase = "saved";
+      state.roulette.sessionId = res.session_id;
+      state.roulette.createdAt = res.created_at;
+      toast(t("roulette.saved", { id: res.session_id }), "ok");
+    } catch (e) {
+      // 422/ağ hatası: atama ekranda kalır, kaydedilemediği notta ve toast'ta yazar.
+      state.roulette.phase = "failed";
+      state.roulette.detail = e.message;
+      toast(e.message);
+    }
+    updateRouletteStatus();
+  });
 
   // ── 1c) Seçim danışmanı (GÖREV 21, tasarım S3 "Analiz Paneli") ──
   // Sol yarı: iki kompakt giriş listesi (Takımım / Karşı Takım) + "Analizi
@@ -1761,9 +1905,12 @@
   // İkon emoji değil, satır içi SVG'dir (tema rengini currentColor ile alır,
   // platformdan platforma değişmez). Renk tek başına anlam taşımaz: rozet adı
   // her kartçıkta yazılıdır, açıklama da ekran okuyucuya .pb-sr ile verilir.
+  // GÖREV 23: roulette_complete / roulette_winner / gambler katalog sırasının
+  // SONUNDADIR (api_contract §2 — status='roulette' maçlardan türetilen tek üçlü).
   const BADGE_KEYS = [
     "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
     "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+    "roulette_complete", "roulette_winner", "gambler",
   ];
 
   // 24×24 viewBox, tek renk çizgi grafikleri (pb-fill sınıfı dolu parçalar için).
@@ -1781,6 +1928,9 @@
     veteran_10: `<path d="M4.8 15.2L12 9l7.2 6.2"/>`,
     veteran_25: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
     veteran_50: `<path d="M4.8 10.2L12 4l7.2 6.2M4.8 15L12 8.8l7.2 6.2M4.8 19.8L12 13.6l7.2 6.2"/>`,
+    roulette_complete: `<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3.4v6.2M12 14.4v6.2M3.4 12h6.2M14.4 12h6.2M5.9 5.9l4.4 4.4M18.1 18.1l-4.4-4.4M18.1 5.9l-4.4 4.4M5.9 18.1l4.4-4.4"/>`,
+    roulette_winner: `<circle cx="12" cy="12" r="8.6"/><path class="pb-fill" d="M12 7.4l1.4 2.9 3.2.5-2.3 2.2.5 3.2-2.8-1.5-2.8 1.5.5-3.2-2.3-2.2 3.2-.5z"/>`,
+    gambler: `<rect x="4.5" y="4.5" width="15" height="15" rx="3.2"/><circle class="pb-fill" cx="8.7" cy="8.7" r="1.3"/><circle class="pb-fill" cx="15.3" cy="8.7" r="1.3"/><circle class="pb-fill" cx="12" cy="12" r="1.3"/><circle class="pb-fill" cx="8.7" cy="15.3" r="1.3"/><circle class="pb-fill" cx="15.3" cy="15.3" r="1.3"/>`,
   };
 
   const badgeIcon = (key) =>
@@ -2751,10 +2901,18 @@
             <button class="btn-primary btn-save-roles" type="button">${t("matches.save_roles")}</button>
           </div>`;
       };
+      // GÖREV 23: status üç değerlidir (valid | void | roulette). Rulet maçı
+      // geçmişte RULET rozetiyle + kazanan etiketiyle görünür; void düğmesi
+      // rulet maçında ÇİZİLMEZ (maç zaten rating dışıdır, ayrılmış eylemi
+      // detaydaki "Rulet bağlantısını çöz"dür).
+      const isRoulette = m.status === "roulette";
+      const winTag = `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
       const headBadge = voided
         ? `<span class="void-badge">${t("matches.void_badge")}</span>`
-        : `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
-      const voidBtn = voided
+        : isRoulette
+          ? `<span class="mh-badges"><span class="rlt-badge">${t("roulette.badge")}</span>${winTag}</span>`
+          : winTag;
+      const voidBtn = (voided || isRoulette)
         ? ""
         : `<button class="btn-void" type="button">${t("matches.void_btn")}</button>`;
       const card = document.createElement("article");
@@ -2811,7 +2969,7 @@
         }
       });
 
-      if (!voided) {
+      if (!voided && !isRoulette) {
         card.querySelector(".btn-void").addEventListener("click", async (e) => {
           const ok = confirm(t("matches.void_confirm"));
           if (!ok) return;
@@ -3117,17 +3275,69 @@
     buildTipOwner = null;
   }
 
+  // ── Maç detayı: RULET bölümü (GÖREV 23, "rlt-" öneki) ─────────
+  // Veri maç yanıtındaki `roulette` alanından gelir (api_contract §3): oturum
+  // yoksa null → bölüm hiç çizilmez. Atama kaydı team/ad taşımaz; ikisi de
+  // participants'tan player_id ile çözülür (contract iki kümenin birebir aynı
+  // olduğunu garanti eder; yine de eşleşmeyen kayıt savunmalı "?" gösterir).
+  // bought üç değerlidir: true ✓ / false ✗ / null ? ("items" NULL → doğrulanamadı).
+  function rlMark(v) {
+    return v === true ? `<span class="rlt-mk ok" aria-hidden="true">✓</span>`
+      : v === false ? `<span class="rlt-mk no" aria-hidden="true">✗</span>`
+      : `<span class="rlt-mk unk" aria-hidden="true">?</span>`;
+  }
+
+  function rlDetailRow(a, part) {
+    const side = part && part.team === 200 ? "red" : "blue";
+    const name = part ? part.display_name : "#" + a.player_id;
+    const boughtKey = a.bought === true ? "roulette.bought_yes"
+      : a.bought === false ? "roulette.bought_no" : "roulette.bought_unknown";
+    return `<li class="rlt-mrow ${side}">
+        <div class="rlt-mtop">
+          ${posIconHtml(a.position, a.position ? roleAbbr(a.position) : "?", "rlt-role")}
+          <span class="rlt-mname">${esc(name)}</span>
+          <span class="rlt-mchamp">${ddIconHtml(champIconSrc(a.champion), champPh(a.champion), "champ")}<span>${esc(a.champion)}</span></span>
+        </div>
+        <div class="rlt-items">${(a.item_ids || []).map(rlItemHtml).join("")}</div>
+        <div class="rlt-mflags">
+          <span>${rlMark(a.bought)} ${t(boughtKey)}</span>
+          <span>${rlMark(a.won === true)} ${t(a.won === true ? "roulette.won_yes" : "roulette.won_no")}</span>
+        </div>
+      </li>`;
+  }
+
+  function rouletteSectionHtml(m) {
+    const r = m.roulette;
+    if (!r || !Array.isArray(r.assignments)) return "";
+    const byId = new Map(m.participants.map(p => [p.player_id, p]));
+    const rows = [...r.assignments]
+      .sort((a, b) => {
+        const ta = (byId.get(a.player_id) || {}).team || 0;
+        const tb = (byId.get(b.player_id) || {}).team || 0;
+        return (ta - tb) || (roleOrder(a.position) - roleOrder(b.position));
+      })
+      .map(a => rlDetailRow(a, byId.get(a.player_id)));
+    return `<section class="rlt-sec">
+        <h3 class="ps-title">${t("roulette.section_title")}</h3>
+        <ul class="rlt-mlist">${rows.join("")}</ul>
+        <button id="btn-rlt-unlink" class="btn-rlt-unlink" type="button">${t("roulette.unlink_btn")}</button>
+      </section>`;
+  }
+
   function matchDetailHtml(m) {
     const stat = MD_STATS.find(s => s.key === state.matchStat) || MD_STATS[0];
     const voided = m.status === "void";
     // Void maç kazananını değil void rozetini taşır (Geçmiş kartıyla aynı kural).
+    // Rulet maçı (GÖREV 23) kazanan etiketinin yanında RULET rozeti de taşır.
     const outcome = voided
       ? `<span class="md-void">${t("matches.void_badge")}</span>`
       : `<span class="${m.winner_team === 100 ? "win-blue" : "win-red"}">${
           m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
+    const rltTag = m.status === "roulette"
+      ? ` <span class="rlt-badge">${t("roulette.badge")}</span>` : "";
     const head =
       `<header class="md-head">
-         <div class="md-title">${t("matchdetail.title", { id: m.id })} — ${outcome}</div>
+         <div class="md-title">${t("matchdetail.title", { id: m.id })} — ${outcome}${rltTag}</div>
          <div class="md-meta">${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</div>
        </header>`;
     const statbar =
@@ -3135,12 +3345,14 @@
       MD_STATS.map(s =>
         `<button type="button" class="md-statbtn${s.key === stat.key ? " active" : ""}" data-stat="${s.key}">${t(s.label)}</button>`
       ).join("") + `</div>`;
+    // RULET bölümü (GÖREV 23) beş sekmenin de altında kalıcıdır (roulette null → boş).
+    const rltSec = rouletteSectionHtml(m);
     // BUILD: bar/ibre/TOPLAM yok, gösterge yerine ikon satırları (GÖREV 14).
     if (stat.build) {
       const buildRows = mdRows(m)
         .map(r => mbRowHtml(mdRoleHtml(r.role), r.blue, r.red)).join("");
       return head + statbar + `<div class="md-graph mb-graph">${buildRows}</div>` +
-        `<p class="md-hint">${t("matchdetail.build_hint")}</p>`;
+        `<p class="md-hint">${t("matchdetail.build_hint")}</p>` + rltSec;
     }
     const gmax = mdGlobalMax(m, stat.key);
     const rows = mdRows(m).map(r =>
@@ -3154,7 +3366,7 @@
          <span><span class="md-key-needle">▼</span> ${t("matchdetail.legend_gauge")}</span>
        </div>`;
     return head + statbar + `<div class="md-graph">${rows}${mdTotalHtml(m, stat)}</div>` +
-      keys + `<p class="md-hint">${t("matchdetail.hint")}</p>`;
+      keys + `<p class="md-hint">${t("matchdetail.hint")}</p>` + rltSec;
   }
 
   // from: detayın hangi görünümden açıldığı — "matches" (Geçmiş kartı) ya da
@@ -3201,6 +3413,31 @@
     // kaynağı geri zincirine bu maçın bağlamını koydurur.
     box.querySelectorAll(".md-name-btn").forEach(btn =>
       btn.addEventListener("click", () => openProfile(Number(btn.dataset.player), "matchdetail")));
+    // "Rulet bağlantısını çöz" (GÖREV 23): onaydan sonra maç valid olur ve HER
+    // İKİ evren backend'de auto-replay koşar (api_contract §4.5). Rating'ler
+    // değiştiği için roster/geçmiş önbellekleri düşürülür ve maç taze çekilir.
+    const unlink = box.querySelector("#btn-rlt-unlink");
+    if (unlink) unlink.addEventListener("click", async () => {
+      if (!confirm(t("roulette.unlink_confirm"))) return;
+      unlink.disabled = true;
+      try {
+        const res = await api(`/matches/${m.id}/roulette/unlink`, { method: "POST" });
+        toast(t("roulette.unlink_done", { n: res.matches_replayed }), "ok");
+        state.roster = [];
+        state.matches = [];
+        const fresh = await api(`/matches/${m.id}`).catch(() => null);
+        if (fresh) {
+          state.matchDetail = fresh;
+        } else {   // taze çekilemedi: en azından rozet ve rulet bölümü düşsün
+          state.matchDetail.status = "valid";
+          state.matchDetail.roulette = null;
+        }
+        loadMatchDetail().catch(err => toast(err.message));
+      } catch (e) {
+        unlink.disabled = false;
+        toast(e.message);
+      }
+    });
   }
 
   // Fare ve klavye aynı tooltip'i açar; ayrılmak (mouseleave/blur) kapatır.

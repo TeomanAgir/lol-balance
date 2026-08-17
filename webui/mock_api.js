@@ -234,6 +234,48 @@
     });
   });
 
+  // ── Rulet maçı (GÖREV 23) ──
+  // status='roulette' + `roulette` alanı (api_contract §3): Geçmiş'teki RULET
+  // rozeti, maç detayındaki görev bölümü ve unlink akışı mock ile denenebilsin.
+  // Contract: rulet maçı HİÇBİR rating evrenine girmez → rating_change null;
+  // valid süzgeçli tüm türetimlerin (profil, enler, nemesis, rozet, tarihçe)
+  // dışında kalır — mock zaten her yerde status === "valid" süzer.
+  // Senaryolar: [0] iki eşya da envanterde + takımı kazandı (bought/won true),
+  // [5] iki eşya da envanterde ama takım kaybetti (won false), [2] items null →
+  // bought null ("doğrulanamadı"), kalanlar bought false.
+  (function addRouletteMatch() {
+    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const parts = ids.map((pid, i) => {
+      const part = mkParticipant(pid, i < 5 ? 100 : 200, POS[i % 5], 100, 40);
+      part.rating_change = null;
+      return part;
+    });
+    parts[2].items = null;
+    const assignments = parts.map((p, i) => {
+      // Atama kaydı contract §3 şeklidir (team YOK; detay ekranı takımı
+      // participants'tan çözer). bought=true satırlarda item_ids gerçekten
+      // envanterin ilk iki eşyasıdır (küme bazlı karşılaştırmayla tutarlı).
+      const item_ids = i === 0 || i === 5 ? [p.items[0], p.items[1]]
+        : i === 2 ? [3031, 3026]
+        : [3157, 3033];
+      const bought = i === 0 || i === 5 ? true : i === 2 ? null : false;
+      return {
+        player_id: p.player_id, champion: p.champion, position: p.position,
+        item_ids, bought, won: bought === true && p.team === 100,
+      };
+    });
+    matches.push({
+      id: nextMatchId++,
+      source_game_id: "6874242100",
+      played_at: "2026-08-10T20:30:00Z",
+      duration_s: 1780,
+      winner_team: 100,
+      status: "roulette",
+      participants: parts,
+      roulette: { session_id: 4, assignments },
+    });
+  })();
+
   matches.sort((a, b) => Date.parse(b.played_at) - Date.parse(a.played_at)); // en yeni başta
 
   // ── Yardımcılar ──
@@ -485,9 +527,13 @@
   //     sona BİLİNMEYEN bir anahtar eklenir: UI'ın "tanımadığın key'i sessizce atla"
   //     ileri uyumluluk yolu böyle denenir. null yaparsan yalnız gerçek rozetler döner.
   // Ece (14) hiç maç oynamadı → badges: [] (boş durum metni).
+  // GÖREV 23 üçlüsü katalog sonundadır (api_contract §2). Mock'ta gerçek
+  // türetim yok: BADGES_FULL_PLAYER yolu bu üçü de deterministik sayılarla
+  // doldurur (vitrin + i18n adları o oyuncuda bir bakışta denenir).
   const BADGE_CATALOG = [
     "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
     "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+    "roulette_complete", "roulette_winner", "gambler",
   ];
   const BADGES_FULL_PLAYER = 1;
 
@@ -783,6 +829,46 @@
     })).sort((x, y) => y.quality - x.quality);
   }
 
+  // ── Rulet oturumu (GÖREV 23) ──
+  // api_contract §4.5: en fazla 1 açık oturum — başarılı POST öncekini iptal
+  // eder (mock'ta üzerine yazmak aynı kapıya çıkar). GET /roulette/current
+  // yalnız AÇIK oturumu döner; yukarıdaki bağlı (linked) maçın oturumu (id 4)
+  // kapalıdır, burada görünmez.
+  let rouletteSession = null;   // {session_id, created_at, assignments}
+  let nextSessionId = 5;
+
+  // Contract'taki şekil doğrulaması (tamamı 422 + Türkçe detail). "Tamamlanmış
+  // eşya" kontrolü BİLEREK yok: havuz süzgeci istemcidedir, backend ham id saklar.
+  function validateRoulette(body) {
+    const asg = body && body.assignments;
+    if (!Array.isArray(asg) || asg.length !== 10)
+      return "Rulet oturumu tam 10 atama içermeli.";
+    const pids = new Set(), champs = new Set();
+    for (const a of asg) {
+      if (!a || typeof a !== "object") return "Atama kaydı geçersiz.";
+      if (!players.some(p => p.id === a.player_id))
+        return `Bilinmeyen oyuncu: ${a.player_id}`;
+      if (pids.has(a.player_id)) return "Oyuncular birbirinden farklı olmalı.";
+      pids.add(a.player_id);
+      if (a.team !== 100 && a.team !== 200) return "team 100 ya da 200 olmalı.";
+      if (!POS.includes(a.position)) return `Geçersiz rol: ${a.position}`;
+      if (typeof a.champion !== "string" || !a.champion.trim())
+        return "champion boş olmayan bir metin olmalı.";
+      if (champs.has(a.champion)) return "Şampiyonlar 10 kayıtta birbirinden farklı olmalı.";
+      champs.add(a.champion);
+      if (!Array.isArray(a.item_ids) || a.item_ids.length !== 2 ||
+          a.item_ids[0] === a.item_ids[1] ||
+          a.item_ids.some(x => !Number.isInteger(x) || x <= 0))
+        return "item_ids tam 2 farklı pozitif tam sayı olmalı.";
+    }
+    for (const team of [100, 200]) {
+      const side = asg.filter(a => a.team === team);
+      if (side.length !== 5 || new Set(side.map(a => a.position)).size !== 5)
+        return "Her takımda 5 oyuncu ve 5 rolün her biri tam 1 kez olmalı.";
+    }
+    return null;
+  }
+
   // ── Collector sağlığı (GÖREV 13) ──
   // api_contract §6: liste last_seen AZALAN sıralıdır; version / outbox_pending /
   // last_ingest_at / last_ingest_game_id nullable'dır. Zaman damgaları İSTEK
@@ -919,6 +1005,40 @@
       // Rol evreni replay'i: uygun tüm valid maçlar yeniden işlenir.
       const replayed = matches.filter(m => m.status === "valid" && roleEligible(m)).length;
       return json({ updated, role_matches_replayed: replayed });
+    }
+
+    // ── Rulet uçları (GÖREV 23, api_contract §4.5) ──
+    if (method === "POST" && path === "/roulette") {
+      let body = {};
+      try { body = JSON.parse(opts.body); } catch { /* gövde JSON değil */ }
+      const bad = validateRoulette(body);
+      if (bad) return err(422, bad);
+      // Önceki açık oturum(lar) iptal olur: üzerine yazmak mock'ta yeterli.
+      rouletteSession = {
+        session_id: nextSessionId++,
+        created_at: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+        assignments: body.assignments,
+      };
+      return json({
+        session_id: rouletteSession.session_id,
+        created_at: rouletteSession.created_at,
+      }, 201);
+    }
+
+    if (method === "GET" && path === "/roulette/current")
+      return json({ session: rouletteSession });
+
+    const unlinkMatch = path.match(/^\/matches\/(\d+)\/roulette\/unlink$/);
+    if (method === "POST" && unlinkMatch) {
+      const match = matches.find(m => m.id === Number(unlinkMatch[1]));
+      if (!match) return err(404, "Maç bulunamadı.");
+      if (match.status !== "roulette") return err(409, "Bu maç rulet maçına bağlı değil.");
+      match.status = "valid";
+      match.roulette = null;
+      // Gerçekte HER İKİ evren auto-replay koşar ve maç rating'e girer; mock'ta
+      // rating_change null kalır (UI "—" yolunu zaten bilir), yalnız sayaç döner.
+      const replayed = matches.filter(m => m.status === "valid").length;
+      return json({ status: "valid", matches_replayed: replayed, role_matches_replayed: replayed });
     }
 
     const voidMatch = path.match(/^\/matches\/(\d+)\/void$/);
