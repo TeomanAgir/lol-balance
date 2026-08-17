@@ -190,7 +190,9 @@
 
   // TERS YÖN: rakip E, K'nin counter listesinde DÜŞÜK winrate ile geçiyorsa
   // (E, K'ye karşı kötü) → K, E'ye karşı iyidir; pct = 1 - win_rate_against.
-  function reverseCounters(counters, roleKey, enemyName) {
+  // GÖREV 21-FIX (Eşleşme ekranı, app.js) export yüzeyinden de çağrılır — saf
+  // fonksiyon, analyze()'daki kullanımı da bu isimle sürer (davranış AYNI).
+  function reverseCounterRecords(counters, roleKey, enemyName) {
     const cell = counters && typeof counters === "object" ? counters[roleKey] : null;
     if (!cell || typeof cell !== "object") return [];
     const out = [];
@@ -319,7 +321,7 @@
           params: { name: laneFoe.champ, n: Math.round(r.win_rate_against * 100) } });
       });
       // Ters yön taraması — aynı rozet tipi, pct ters kayıttan türetilir.
-      reverseCounters(counters, roleKey, laneFoe.champ).forEach(r => {
+      reverseCounterRecords(counters, roleKey, laneFoe.champ).forEach(r => {
         if (taken.has(lower(r.champion))) return;
         const c = ensure(r.champion);
         if (c.badges.some(b => b.type === "counter")) return; // doğrudan kayıt üstündür
@@ -366,9 +368,11 @@
     return result;
   }
 
-  // tierIndex/counterRecords GÖREV 21-FIX'te dışa açıldı (Eşleşme ekranı, app.js):
-  // ikisi de zaten SAF fonksiyondu (yalnız parametre alır, kapsanan state'e
-  // dokunmaz) — dışa açmak analyze()/buildGroupIndex()'in davranışını DEĞİŞTİRMEZ,
-  // S3 "Seçim" ekranı aynı iki fonksiyonu aynı şekilde çağırmaya devam eder.
-  window.PickAdvisor = { analyze, buildGroupIndex, tierIndex, counterRecords };
+  // tierIndex/counterRecords GÖREV 21-FIX'te dışa açıldı (Eşleşme ekranı, app.js);
+  // reverseCounterRecords aynı görevin ikinci maddesinde (ters yön taraması)
+  // eklendi. Üçü de zaten SAF fonksiyondu (yalnız parametre alır, kapsanan
+  // state'e dokunmaz) — dışa açmak analyze()/buildGroupIndex()'in davranışını
+  // DEĞİŞTİRMEZ, S3 "Seçim" ekranı aynı fonksiyonları aynı şekilde çağırmaya
+  // devam eder.
+  window.PickAdvisor = { analyze, buildGroupIndex, tierIndex, counterRecords, reverseCounterRecords };
 })();
