@@ -16,13 +16,16 @@ onu); ham (yuvarlanmamış) değerle karşılaştırılır.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from rating import ROLES
 
 from .ratings import replay_order_by
+from .roulette import assignment_bought
 
-# api_contract §2: yanıt sırası SABİT katalog sırasıdır.
+# api_contract §2: yanıt sırası SABİT katalog sırasıdır; rulet rozetleri
+# (GÖREV 23) katalog sırasının SONUNDADIR.
 BADGE_KEYS = (
     "mvp",
     "vision",
@@ -37,6 +40,9 @@ BADGE_KEYS = (
     "veteran_10",
     "veteran_25",
     "veteran_50",
+    "roulette_complete",
+    "roulette_winner",
+    "gambler",
 )
 
 # Rekor rozetleri: rozet anahtarı → match_participants stat kolonu.
@@ -54,6 +60,9 @@ BENCH_BLOCK = 3
 
 # Eşik rozetleri: valid maç sayısı; her biri tek seferlik ve bağımsız.
 VETERAN_THRESHOLDS = {"veteran_10": 10, "veteran_25": 25, "veteran_50": 50}
+
+# gambler (GÖREV 23): roulette_winner sayısı eşiği — tek seferlik.
+GAMBLER_THRESHOLD = 5
 
 TEAM_SIZE = 5
 
@@ -255,6 +264,56 @@ def _is_bench(participants: list[sqlite3.Row], player_id: int, team: int) -> boo
     return at_lowest[0] == player_id
 
 
+def _roulette_rows(
+    conn: sqlite3.Connection, player_id: int
+) -> list[sqlite3.Row]:
+    """Oyuncunun rulet maçları (GÖREV 23), replay sort-key'iyle kronolojik.
+
+    Kaynak yalnız `status='roulette'` + `linked` oturum maçlarıdır (katalogdaki
+    TEK istisna — rulet maçları valid süzgeçli diğer tüm rozetlerin zaten
+    dışındadır). Oyuncunun o oturumdaki ataması JOIN'lenir; linked oturumda
+    oyuncu kümesi maçınkiyle birebir aynı olduğundan atama her zaman vardır.
+    """
+    return conn.execute(
+        "SELECT m.id AS match_id, m.winner_team, mp.team, mp.items_json,"
+        " ra.item_ids_json "
+        "FROM matches m "
+        "JOIN match_participants mp ON mp.match_id = m.id AND mp.player_id = ? "
+        "JOIN roulette_sessions rs ON rs.match_id = m.id"
+        " AND rs.status = 'linked' "
+        "JOIN roulette_assignments ra ON ra.session_id = rs.id"
+        " AND ra.player_id = mp.player_id "
+        f"WHERE m.status = 'roulette' {replay_order_by('m')}",
+        (player_id,),
+    ).fetchall()
+
+
+def _award_roulette_badges(
+    conn: sqlite3.Connection, player_id: int, tally: _Tally
+) -> None:
+    """roulette_complete / roulette_winner / gambler (api_contract §2, GÖREV 23).
+
+    `bought` mantığı maç yanıtındaki `roulette` alanıyla BİREBİR aynıdır
+    (roulette.assignment_bought — tek doğruluk noktası): atanan 2 eşyanın
+    ikisi de final envanterde, karşılaştırma KÜME bazlı; `items` NULL ise
+    doğrulanamaz → rozet yok. winner = complete + oyuncunun MAÇTAKİ takımı
+    kazanan; gambler = 5. winner'ı tamamlayan maçta tek seferlik.
+    """
+    winners = 0
+    for row in _roulette_rows(conn, player_id):
+        bought = assignment_bought(
+            json.loads(row["item_ids_json"]), row["items_json"]
+        )
+        if bought is not True:
+            continue
+        tally.award("roulette_complete", row["match_id"])
+        if row["team"] == row["winner_team"]:
+            tally.award("roulette_winner", row["match_id"])
+            winners += 1
+            if winners == GAMBLER_THRESHOLD:
+                tally.award("gambler", row["match_id"])
+
+
 def player_badges(
     conn: sqlite3.Connection, player_id: int, engine_version: str
 ) -> dict | None:
@@ -338,5 +397,9 @@ def player_badges(
         for key, threshold in VETERAN_THRESHOLDS.items():
             if played == threshold:
                 tally.award(key, match_id)
+
+    # --- Rulet rozetleri (GÖREV 23) --- valid akışından bağımsız ayrı geçiş:
+    # kaynağı yalnız roulette maçlarıdır, valid sayaçlarını etkilemez.
+    _award_roulette_badges(conn, player_id, tally)
 
     return {"player_id": player_id, "badges": tally.to_list()}

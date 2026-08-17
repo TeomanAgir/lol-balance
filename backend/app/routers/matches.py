@@ -13,11 +13,13 @@ from ..schemas import (
     ItemsUpdateResponse,
     PositionsUpdate,
     PositionsUpdateResponse,
+    RouletteUnlinkResponse,
 )
 from ..services.items import dump_items, load_items, validate_items
 from ..services.rating_history import historical_score, match_perf_prefixes
 from ..services.ratings import is_blend, replay
 from ..services.role_ratings import replay_roles
+from ..services.roulette import match_roulette, unlink_match
 
 router = APIRouter()
 
@@ -104,6 +106,9 @@ def _serialize_match(
     )
     return {
         **dict(match),
+        # api_contract §3 (GÖREV 23): maça bağlı rulet oturumu yoksa null;
+        # liste + detay aynı şekil (serializasyon paylaşıldığı için otomatik).
+        "roulette": match_roulette(conn, match["id"], match["winner_team"]),
         "participants": [
             {
                 "player_id": row["player_id"],
@@ -190,6 +195,41 @@ def void_match(
         "role_matches_replayed": role_matches_replayed,
         "engine_version": settings.engine_version,
     }
+
+
+@router.post("/matches/{match_id}/roulette/unlink")
+def unlink_roulette(
+    match_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RouletteUnlinkResponse:
+    """Yanlış otomatik eşleşmeyi çözer (api_contract §4.5, GÖREV 23).
+
+    Maç `valid` olur, oturum `cancelled` olur ve HER İKİ evren replay koşar
+    (maç rating'e girer — sıra-dışı ingest replay'iyle aynı mekanizma).
+    Ters yönde manuel bağlama (valid → roulette) YOKTUR.
+    """
+    row = conn.execute(
+        "SELECT id, status FROM matches WHERE id = ?", (match_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+    if row["status"] != "roulette":
+        raise HTTPException(
+            409,
+            detail=(
+                f"Maç bir rulet maçı değil (durum: {row['status']}); "
+                "unlink yalnız roulette maçlarda çalışır."
+            ),
+        )
+    unlink_match(conn, match_id)
+    matches_replayed = replay(conn, settings.engine_version)
+    role_matches_replayed = replay_roles(conn, settings.engine_version)
+    return RouletteUnlinkResponse(
+        status="valid",
+        matches_replayed=matches_replayed,
+        role_matches_replayed=role_matches_replayed,
+    )
 
 
 def _match_participant_ids(conn: sqlite3.Connection, match_id: int) -> set[int]:

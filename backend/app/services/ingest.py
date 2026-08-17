@@ -11,6 +11,7 @@ from . import ratings as rating_service
 from . import role_ratings as role_rating_service
 from .health import normalize_optional_client_id
 from .items import normalize_optional_items
+from .roulette import find_linkable_session, link_session
 
 VOID_THRESHOLD_S = 300
 
@@ -178,7 +179,32 @@ def ingest_match(
                     ),
                 )
 
-            if not is_void:
+            # Otomatik rulet eşleşmesi (api_contract §4.5, GÖREV 23):
+            # duplicate olmayan + auto-void OLMAYAN yeni maçta açık oturum,
+            # 24 saat penceresi ve birebir aynı 10 player_id kümesi aranır.
+            # Auto-void ÖNCELİKLİDİR: remake maç void olur, oturum açık kalır
+            # (maç yeniden oynanabilir) — bu yüzden kontrol `not is_void`
+            # dalındadır. Rulet maçı HİÇBİR rating evrenine girmez (incremental
+            # de auto-replay de koşmaz); ingest yanıt şekli DEĞİŞMEZ.
+            roulette_session_id = (
+                find_linkable_session(conn, set(player_ids))
+                if not is_void
+                else None
+            )
+            if roulette_session_id is not None:
+                conn.execute(
+                    "UPDATE matches SET status = 'roulette' WHERE id = ?",
+                    (match_id,),
+                )
+                link_session(conn, roulette_session_id, match_id)
+                logger.info(
+                    "Rulet eşleşmesi: match_id=%s source_game_id=%s "
+                    "session_id=%s; maç rating evrenlerine girmedi.",
+                    match_id,
+                    body.source_game_id,
+                    roulette_session_id,
+                )
+            elif not is_void:
                 # Sıra-dışı geliş (api_contract §5): maç, replay sırasında sona
                 # düşmüyorsa incremental "son maçı üste uygula" varsayımı çöker.
                 # O durumda tek maç yerine HER İKİ evren baştan kurulur; replay
