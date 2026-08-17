@@ -148,6 +148,7 @@ window.I18N_DICTS.tr = {
   "matchup.meta_title": "{role} · Meta Önerileri",
   "matchup.counter_title": "{role} vs {enemy} · Counter Önerileri",
   "matchup.no_data": "Bu rol için veri bulunamadı.",
+  "matchup.warn_counter": "{enemy} buna karşı %{n} (veri)",
   "leaderboard.hint": "Oyuncu adına dokununca istatistik sayfası açılır: maç dökümü, KDA, favori karakter/koridor, rol ratingleri ve en iyi anlaştığı takım arkadaşları.",
   "leaderboard.map_link": "Rol enleri haritası →",
   "leaderboard.th_rank": "#",

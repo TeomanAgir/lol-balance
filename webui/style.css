@@ -2628,6 +2628,15 @@ main.pa-wide { max-width: 1080px; }
   border-color: var(--brass-dim);
   background: color-mix(in srgb, var(--brass) 8%, transparent);
 }
+/* Negatif kullanım (GÖREV 21-FIX eki): rakip adayı counter'lıyorsa dolgu
+   kartı düşmez, kırmızı uyarı rozeti alır — mo-data ailesiyle aynı dilde
+   (dolu kenar + tint) ama --red tonunda. */
+.mo-item-badge.mo-warn {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 55%, var(--line));
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+}
+.mo-item.mo-item-warn { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
 .mo-none { font-size: 13px; color: var(--muted); }
 
 /* 390px'te taşma yok: rol kutuları küçülür, kart iç boşluğu daralır, ad
