@@ -2408,6 +2408,239 @@ main.pa-wide { max-width: 1080px; }
   .pa-role { flex-basis: 84px; }
 }
 
+/* ── Eşleşme optimizasyonu (GÖREV 21-FIX, "mo-"; tasarım M1 "Sahne") ──
+   S3 "Seçim" ekranından (pa-) AYRI, kendi ad alanı. Akış: ortada büyük rol
+   simgeleri → seçimde .mo-app'e mo-picked eklenir, sahne daralır (yükseklik/
+   punto geçişi), alt panel (rakip arama + sonuç listesi) max-height 0→açık
+   aralığıyla yumuşak açılır. Tek tema (koyu) — mevcut kök değişkenler
+   kullanılır, yeni sabit renk YOK. */
+.mo-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 8px 28px;
+  transition: padding 0.5s ease;
+}
+.mo-app.mo-picked .mo-stage { padding: 26px 8px 18px; }
+
+.mo-kicker {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.mo-h1 {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 26px;
+  margin: 0 0 6px;
+  transition: font-size 0.5s ease;
+}
+.mo-app.mo-picked .mo-h1 { font-size: 18px; }
+.mo-sub {
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 420px;
+  margin: 0 0 28px;
+  overflow: hidden;
+  transition: opacity 0.3s ease, max-height 0.4s ease, margin 0.4s ease;
+}
+.mo-app.mo-picked .mo-sub { opacity: 0; max-height: 0; margin: 0; }
+
+.mo-roles { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; transition: gap 0.4s ease; }
+.mo-app.mo-picked .mo-roles { gap: 8px; }
+
+.mo-role {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.4s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.3s ease;
+}
+.mo-app.mo-picked .mo-role { width: 50px; height: 50px; border-radius: 10px; gap: 0; }
+.mo-role:hover { border-color: var(--brass-dim); }
+.mo-role.sel {
+  border-color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 10%, var(--surface));
+  box-shadow: 0 0 0 1px var(--brass);
+}
+/* Simge/etiket rengi: seçili DEĞİLKEN nötr, seçiliyken pirinç. pos-ico mask'i
+   currentColor okur (bkz. 1359. satır ortak yorumu) → renk burada tek yerden. */
+.mo-role-ico {
+  --pos-ico: 32px;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  transition: color 0.15s ease;
+}
+.mo-app.mo-picked .mo-role-ico { --pos-ico: 20px; }
+.mo-role.sel .mo-role-ico { color: var(--brass); }
+.mo-role-label {
+  font-family: var(--display);
+  text-transform: uppercase;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.mo-app.mo-picked .mo-role-label { display: none; }
+.mo-role.sel .mo-role-label { color: var(--brass); }
+.mo-role-glow {
+  position: absolute;
+  inset: -28px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brass) 20%, transparent), transparent 70%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  z-index: -1;
+}
+.mo-role.sel .mo-role-glow { opacity: 1; }
+
+.mo-stepwrap {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  scroll-margin-top: 60px;
+  transition: max-height 0.6s ease, opacity 0.6s ease 0.1s;
+}
+.mo-app.mo-picked .mo-stepwrap { max-height: 2600px; opacity: 1; }
+.mo-panel { max-width: 620px; margin: 0 auto; }
+
+.mo-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 16px;
+}
+.mo-card-title {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  min-height: 1em; /* sonuç başlığı rol seçilmeden önce boştur, kart zıplamaz */
+}
+
+.mo-search { display: flex; align-items: center; gap: 8px; }
+.mo-search-port { flex: 0 0 30px; display: block; }
+.mo-search-port .dd-ico { width: 30px; height: 30px; border-radius: 7px; }
+.mo-search-box { position: relative; flex: 1 1 auto; min-width: 0; }
+.mo-input {
+  width: 100%;
+  min-height: 40px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+.mo-input::placeholder { color: var(--muted); }
+.mo-input:hover { border-color: var(--brass-dim); }
+.mo-search-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 264px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+.mo-opt { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 7px 10px; font-size: 14px; }
+.mo-opt .dd-ico { width: 24px; height: 24px; border-radius: 6px; flex: 0 0 24px; }
+.mo-opt:hover, .mo-opt.on { background: color-mix(in srgb, var(--brass) 12%, transparent); }
+
+.mo-state { font-size: 13px; color: var(--muted); font-style: italic; margin-top: 10px; }
+
+.mo-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.mo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  min-width: 0;
+}
+.mo-item-tier {
+  flex: 0 0 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.mo-item-tier.mo-t-s { color: var(--brass); border-color: var(--brass-dim); }
+.mo-item-tier.mo-t-a { color: var(--blue); }
+.mo-item-tier.mo-t-none { opacity: 0.5; }
+.mo-item-port { flex: 0 0 28px; }
+.mo-item-port .dd-ico { width: 28px; height: 28px; border-radius: 6px; }
+.mo-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mo-item-badge {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.mo-item-badge.mo-hi { color: var(--brass); border-color: var(--brass-dim); }
+.mo-item-badge.mo-data {
+  color: var(--brass);
+  border-color: var(--brass-dim);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+}
+.mo-none { font-size: 13px; color: var(--muted); }
+
+/* 390px'te taşma yok: rol kutuları küçülür, kart iç boşluğu daralır, ad
+   ellipsis'e düşer (yukarıdaki .mo-item-name zaten sarmıyor). */
+@media (max-width: 420px) {
+  .mo-role { width: 74px; height: 74px; }
+  .mo-app.mo-picked .mo-role { width: 46px; height: 46px; }
+  .mo-role-ico { --pos-ico: 26px; }
+  .mo-app.mo-picked .mo-role-ico { --pos-ico: 18px; }
+  .mo-roles { gap: 10px; }
+  .mo-card { padding: 14px; }
+}
+
 /* ── Toast ── */
 .toast {
   position: fixed;

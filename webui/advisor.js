@@ -366,5 +366,9 @@
     return result;
   }
 
-  window.PickAdvisor = { analyze, buildGroupIndex };
+  // tierIndex/counterRecords GÖREV 21-FIX'te dışa açıldı (Eşleşme ekranı, app.js):
+  // ikisi de zaten SAF fonksiyondu (yalnız parametre alır, kapsanan state'e
+  // dokunmaz) — dışa açmak analyze()/buildGroupIndex()'in davranışını DEĞİŞTİRMEZ,
+  // S3 "Seçim" ekranı aynı iki fonksiyonu aynı şekilde çağırmaya devam eder.
+  window.PickAdvisor = { analyze, buildGroupIndex, tierIndex, counterRecords };
 })();
