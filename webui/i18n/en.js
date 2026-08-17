@@ -146,6 +146,7 @@ window.I18N_DICTS.en = {
   "matchup.meta_title": "{role} · Meta Picks",
   "matchup.counter_title": "{role} vs {enemy} · Counter Picks",
   "matchup.no_data": "No data available for this role.",
+  "matchup.warn_counter": "{enemy} wins %{n} into this (data)",
   "leaderboard.hint": "Tap a player's name to open their stats page: match breakdown, KDA, favorite champion/lane, role ratings and best-synergy teammates.",
   "leaderboard.map_link": "Role bests map →",
   "leaderboard.th_rank": "#",

@@ -1058,16 +1058,34 @@
           out.push({ name: r.champion, counterPct: Math.round(r.win_rate_against * 100) });
         });
     }
-    if (tiers && out.length < MO_DECK_COUNTER) {
+    // Dolgu adayları temiz/uyarı olarak ikiye ayrılır: aday şampiyon RAKİBİN
+    // kendisi tarafından counter'lanıyorsa (counters[roleKey][aday] listesinde
+    // rakip win_rate_against≥0.5 ile geçiyorsa) NEGATİF — sessizce düşürülmez,
+    // temiz dolgu kartlarının ALTINA (kendi aralarında w artan) kırmızı uyarı
+    // rozetiyle eklenir (GÖREV 21-FIX eki, CHANGE_REQUESTS "negatif kullanım").
+    // NOT: uyarılı kartlar temiz kartlarla AYNI MO_DECK_COUNTER tavanı için
+    // yarışmaz — gerçek veride (bkz. verify) temiz dolgu her zaman tavanı
+    // doldurmaya yeter ve uyarılı kartlar hiç görünmezdi ("sessizce düşürme"
+    // ihlali); bu yüzden ayrı, kendi tavanına sahip bir kuyruk olarak eklenir.
+    if (tiers) {
+      const clean = [];
+      const warn = [];
       moSortedTierList(tiers, roleKey).forEach(c => {
-        if (out.length >= MO_DECK_COUNTER) return;
         const key = c.name.toLowerCase();
         if (taken.has(key)) return;
         taken.add(key);
-        out.push(c);
+        const neg = counters
+          ? window.PickAdvisor.counterRecords(counters, roleKey, c.name)
+              .find(r => r.champion === enemyName && r.win_rate_against >= 0.5)
+          : null;
+        if (neg) warn.push({ ...c, warnWr: neg.win_rate_against });
+        else clean.push(c);
       });
+      warn.sort((a, b) => a.warnWr - b.warnWr || (a.name < b.name ? -1 : 1));
+      clean.forEach(c => { if (out.length < MO_DECK_COUNTER) out.push(c); });
+      warn.forEach(c => { if (out.length < MO_DECK_COUNTER * 2) out.push(c); });
     }
-    return out.slice(0, MO_DECK_COUNTER);
+    return out;
   }
 
   // Counter kaydından gelen adayın kendi kademesi biliniyorsa gösterilir
@@ -1087,11 +1105,14 @@
     if (item.counterPct != null) {
       badgeHtml = `<span class="mo-item-badge mo-data">` +
         `${t("pick.b_counter", { name: esc(state.matchup.enemy), n: item.counterPct })}</span>`;
+    } else if (item.warnWr != null) {
+      badgeHtml = `<span class="mo-item-badge mo-warn">` +
+        `${t("matchup.warn_counter", { enemy: esc(state.matchup.enemy), n: Math.round(item.warnWr * 100) })}</span>`;
     } else if (item.wr != null) {
       const pct = Math.round(item.wr * 100);
       badgeHtml = `<span class="mo-item-badge${pct >= 54 ? " mo-hi" : ""}">${t("pick.b_wr", { n: pct })}</span>`;
     }
-    return `<article class="mo-item">
+    return `<article class="mo-item${item.warnWr != null ? " mo-item-warn" : ""}">
         ${tierHtml}
         <span class="mo-item-port">${moPortHtml(item.name)}</span>
         <span class="mo-item-name">${esc(item.name)}</span>
