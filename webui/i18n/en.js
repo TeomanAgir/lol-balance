@@ -10,6 +10,8 @@ window.I18N_DICTS.en = {
   "common.key_btn_title": "Change the API key",
   "common.nav_aria": "Main navigation",
   "common.menu_btn": "Open the menu",
+  "common.nav_group_room": "Group",
+  "common.nav_group_champselect": "Champion Select",
   "common.tab_balance": "Balance",
   "common.tab_leaderboard": "Ranks",
   "common.tab_highlights": "Weekly",

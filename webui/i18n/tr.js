@@ -12,6 +12,8 @@ window.I18N_DICTS.tr = {
   "common.key_btn_title": "API anahtarını değiştir",
   "common.nav_aria": "Ana gezinme",
   "common.menu_btn": "Menüyü aç",
+  "common.nav_group_room": "Grup Ortamı",
+  "common.nav_group_champselect": "Şampiyon Seçimi",
   "common.tab_balance": "Dengele",
   "common.tab_leaderboard": "Sıralama",
   "common.tab_highlights": "Enler",

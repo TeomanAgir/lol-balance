@@ -95,8 +95,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   border-left-color: var(--brass);
   background: color-mix(in srgb, var(--brass) 7%, transparent);
 }
-/* Gruplamaya hazırlık (K1'deki çizgili boşluk iması): liste bugün DÜZ,
-   ileride grup gerekirse .sb-list içine bu ayraç + başlık eklenir. */
+/* Grup ayracı: gruplar arası (ve son grup ile grupsuz kuyruk arası) ince çizgi. */
 .sb-gap { height: 20px; position: relative; }
 .sb-gap::after {
   content: "";
@@ -105,6 +104,18 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   top: 50%;
   width: 30px;
   border-top: 1px solid var(--line);
+}
+/* Grup başlığı (GÖREV 22): .sb-item ile aynı display-font/uppercase dili,
+   ama küçük + soluk + tıklanamaz — bir grubun ilk .sb-item'ının hemen üstünde. */
+.sb-group {
+  padding: 4px 18px 6px;
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.75;
 }
 /* Panelin alt bloğu: dil (TR/EN monogramı, display font) + API anahtarı (GÖREV 6) */
 .sb-bottom {
