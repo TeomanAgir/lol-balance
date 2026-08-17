@@ -26,6 +26,7 @@
   <div class="sb-brand">LoL <span>Balance</span></div>
   <nav class="sb-list">
     <button class="sb-item active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
+    <button class="sb-item"        data-view="pick"        type="button" data-i18n="common.tab_pick"></button>
     <button class="sb-item"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
     <button class="sb-item"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
     <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
@@ -86,6 +87,19 @@
       <button id="btn-balance" class="btn-primary" type="button"
               data-i18n="balance.balance_btn" disabled></button>
     </div>
+  </section>
+
+  <!-- ═══ Seçim danışmanı (GÖREV 21, tasarım S3 "Analiz Paneli") ═══ -->
+  <!-- Veri: assets/meta/tiers.json + counters.json + Data Dragon champions.json
+       (tags/info) — hepsi statik dosyadır, backend bu veriyi bilmez (api_contract
+       §8). Analiz tamamen istemcidedir: advisor.js motoru, app.js "Seçim" bloğu
+       çizer. Grup rozeti GET /matches'tan türetilir, öneri SIRASINI etkilemez.
+       Bu görünüm görünüm-bazlı GENİŞLİK İSTİSNASI taşır: showView main'e
+       .pa-wide basar (1080px), diğer görünümler 720px'te kalır. İçerik tamamen
+       JS'te kurulur (loadPick → sol giriş listeleri + sağ analiz paneli). -->
+  <section id="view-pick" class="view" hidden>
+    <p class="view-hint" data-i18n="pick.hint"></p>
+    <div id="pick-body" class="pa-grid"></div>
   </section>
 
   <!-- ═══ Leaderboard ═══ -->
@@ -311,6 +325,8 @@
 <script src="i18n/tr.js"></script>
 <script src="i18n/en.js"></script>
 <script src="i18n/core.js"></script>
+<!-- advisor.js app.js'ten ÖNCE gelir: Seçim ekranı window.PickAdvisor'ı kullanır -->
+<script src="advisor.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
