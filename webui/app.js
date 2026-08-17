@@ -36,6 +36,7 @@
     histOpen: null,             // grafikte popup'ı açık olan noktanın match_id'si
     backStack: [],              // profil ⇄ maç detayı geri zinciri (bkz. pushBack)
     pick: null,                 // Seçim danışmanı girişleri (GÖREV 21; ensurePickState kurar)
+    matchup: null,               // Eşleşme ekranı seçimleri (GÖREV 21-FIX; ensureMatchupState kurar)
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
@@ -352,7 +353,7 @@
     balance: loadBalance, leaderboard: loadLeaderboard, highlights: loadHighlights,
     map: loadMap, matches: loadMatches, profile: loadProfile,
     matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
-    faq: loadFaq, faqdetail: loadFaqDetail, pick: loadPick,
+    faq: loadFaq, faqdetail: loadFaqDetail, pick: loadPick, matchup: loadMatchup,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -973,6 +974,290 @@
     };
     renderPickShell();
     renderAnalysis();
+  }
+
+  // ── 1d) Eşleşme optimizasyonu (GÖREV 21-FIX, tasarım M1 "Sahne") ──
+  // S3 "Seçim" ekranından AYRI bir sayfa: Teoman geri bildirimi üzerine (çok
+  // adımlı akış ağır, sezgisel early/late ve grup W/R rozetleri alakasız
+  // bulundu) hafif bir akış kurulur — rol seç → sahne daralır → rakip şampiyonu
+  // gir (opsiyonel) → META ya da counter listesi. Veri katmanı S3 ile PAYLAŞILIR
+  // (kod kopyalanmaz): fetchMeta()/fetchCounters()/loadAssets()/paNames() yukarıdaki
+  // Seçim bloğunda tanımlıdır; tier/counter ayrıştırması advisor.js'in dışa
+  // açtığı tierIndex()/counterRecords() saf yardımcılarıyla yapılır. Bu ekranda
+  // sezgisel rozet ve grup rozeti YOKTUR — yalnız tier + winrate + counter verisi.
+  const MO_DECK_META = 8;
+  const MO_DECK_COUNTER = 10;
+  let moData = null; // {tiers, counters, names}
+
+  function ensureMatchupState() {
+    if (!state.matchup) state.matchup = { role: null, enemy: null };
+    return state.matchup;
+  }
+
+  const moPortHtml = (champ) =>
+    ddIconHtml(champ ? champIconSrc(champ) : null, champPh(champ), "champ");
+
+  // Serbest metni bilinen ada çözer (pick ekranındaki paCanonName ile aynı
+  // fikir, kendi veri kümesine bakar — paData'ya bağımlı DEĞİLDİR).
+  function moCanonName(text) {
+    const q = String(text || "").trim();
+    if (!q) return null;
+    const ln = q.toLowerCase();
+    const hit = moData && moData.names.find(n => n.toLowerCase() === ln);
+    return hit || q;
+  }
+
+  // Tier + winrate sıralaması: kademe önce (S→A→B), sonra winrate azalan
+  // (bilinmeyen winrate en sona düşer), son kırılım ad — dosya/girdi sırasından
+  // bağımsız DETERMİNİSTİK sonuç.
+  function moSortTierWr(a, b) {
+    return (META_TIERS.indexOf(a.tier) - META_TIERS.indexOf(b.tier)) ||
+      ((b.wr == null ? -1 : b.wr) - (a.wr == null ? -1 : a.wr)) ||
+      (a.name < b.name ? -1 : 1);
+  }
+
+  // Bir koridorun TAM tier+winrate listesi (moSortTierWr sırasıyla, kesilmemiş)
+  // — moMetaItems ilk 8'ini gösterir, moCounterItems dolgu için tamamını tarar.
+  function moSortedTierList(tiers, roleKey) {
+    const idx = window.PickAdvisor.tierIndex(tiers, roleKey);
+    return [...idx.entries()]
+      .map(([name, e]) => ({ name, tier: e.tier, wr: e.win_rate }))
+      .sort(moSortTierWr);
+  }
+
+  function moMetaItems(tiers, roleKey) {
+    return moSortedTierList(tiers, roleKey).slice(0, MO_DECK_META);
+  }
+
+  // Rakip biliniyorsa: gerçek counter kayıtları (win_rate_against yüksekten,
+  // yalnız ≥%50) ÖNCE, ardından tier dolgusu ~DECK büyüklüğüne tamamlar.
+  // Kayıttaki/tierdeki aynı ad iki kez düşmez (taken kümesi rakibi de kapsar).
+  function moCounterItems(tiers, counters, roleKey, enemyName) {
+    const taken = new Set([enemyName.toLowerCase()]);
+    const out = [];
+    if (counters) {
+      window.PickAdvisor.counterRecords(counters, roleKey, enemyName)
+        .filter(r => r.win_rate_against >= 0.5)
+        .sort((a, b) => b.win_rate_against - a.win_rate_against)
+        .forEach(r => {
+          const key = r.champion.toLowerCase();
+          if (taken.has(key)) return;
+          taken.add(key);
+          out.push({ name: r.champion, counterPct: Math.round(r.win_rate_against * 100) });
+        });
+    }
+    if (tiers && out.length < MO_DECK_COUNTER) {
+      moSortedTierList(tiers, roleKey).forEach(c => {
+        if (out.length >= MO_DECK_COUNTER) return;
+        const key = c.name.toLowerCase();
+        if (taken.has(key)) return;
+        taken.add(key);
+        out.push(c);
+      });
+    }
+    return out.slice(0, MO_DECK_COUNTER);
+  }
+
+  // Counter kaydından gelen adayın kendi kademesi biliniyorsa gösterilir
+  // (bonus bilgi); bilinmiyorsa boş rozet ("–") — kart hizası bozulmaz.
+  function moTierLetter(tiers, roleKey, name) {
+    if (!tiers) return null;
+    const e = window.PickAdvisor.tierIndex(tiers, roleKey).get(name);
+    return e ? e.tier : null;
+  }
+
+  function moItemHtml(item, roleKey) {
+    const tier = item.tier || moTierLetter(moData.tiers, roleKey, item.name);
+    const tierHtml = tier
+      ? `<span class="mo-item-tier mo-t-${tier.toLowerCase()}">${tier}</span>`
+      : `<span class="mo-item-tier mo-t-none" aria-hidden="true">–</span>`;
+    let badgeHtml = "";
+    if (item.counterPct != null) {
+      badgeHtml = `<span class="mo-item-badge mo-data">` +
+        `${t("pick.b_counter", { name: esc(state.matchup.enemy), n: item.counterPct })}</span>`;
+    } else if (item.wr != null) {
+      const pct = Math.round(item.wr * 100);
+      badgeHtml = `<span class="mo-item-badge${pct >= 54 ? " mo-hi" : ""}">${t("pick.b_wr", { n: pct })}</span>`;
+    }
+    return `<article class="mo-item">
+        ${tierHtml}
+        <span class="mo-item-port">${moPortHtml(item.name)}</span>
+        <span class="mo-item-name">${esc(item.name)}</span>
+        ${badgeHtml}
+      </article>`;
+  }
+
+  function renderMoResult() {
+    const titleEl = $("#mo-result-title");
+    const listEl = $("#mo-list");
+    const role = state.matchup.role;
+    if (!role) { titleEl.textContent = ""; listEl.innerHTML = ""; return; }
+    const rk = META_ROLE_KEY[role];
+    const enemy = state.matchup.enemy;
+    const hasData = !!(moData && (moData.tiers || moData.counters));
+    titleEl.textContent = enemy
+      ? t("matchup.counter_title", { role: roleName(role), enemy })
+      : t("matchup.meta_title", { role: roleName(role) });
+    if (!hasData) {
+      listEl.innerHTML = `<p class="mo-none">${t("matchup.no_data")}</p>`;
+      return;
+    }
+    const items = enemy
+      ? moCounterItems(moData.tiers, moData.counters, rk, enemy)
+      : (moData.tiers ? moMetaItems(moData.tiers, rk) : []);
+    listEl.innerHTML = items.length
+      ? items.map(it => moItemHtml(it, rk)).join("")
+      : `<p class="mo-none">${t("matchup.no_data")}</p>`;
+    ddBindImages(listEl);
+  }
+
+  function moSyncEnemyState() {
+    $("#mo-enemy-state").textContent = state.matchup.enemy
+      ? t("matchup.enemy_state_picked", { name: state.matchup.enemy })
+      : t("matchup.enemy_state_none");
+  }
+
+  // Arama kutusu pick ekranındaki pa-input/bindPickRow desenine uyarlanmıştır
+  // (autocomplete: yaz → aç, ok tuşları gezinir, Enter/tıklama seçer, dışarı
+  // tıklama/Enter boş bırakırsa rakip TEMİZLENİR). Kutu her renderMatchupShell
+  // çağrısında TAZE kurulur (innerHTML ile) — dinleyici birikmesi olmaz.
+  function moSearchWrapHtml() {
+    return `<div class="mo-search">
+        <span class="mo-search-port">${moPortHtml(state.matchup.enemy)}</span>
+        <span class="mo-search-box">
+          <input type="text" id="mo-search-input" class="mo-input" autocomplete="off" spellcheck="false"
+                 value="${esc(state.matchup.enemy || "")}"
+                 placeholder="${esc(t("pick.champ_placeholder"))}"
+                 aria-label="${esc(t("matchup.search_aria"))}">
+          <ul id="mo-search-list" class="mo-search-list" hidden></ul>
+        </span>
+      </div>`;
+  }
+
+  function moBindSearch() {
+    $("#mo-search-wrap").innerHTML = moSearchWrapHtml();
+    ddBindImages($("#mo-search-wrap"));
+    const input = $("#mo-search-input");
+    const list = $("#mo-search-list");
+    const port = $("#mo-search-wrap .mo-search-port");
+    let active = -1;
+
+    const closeList = () => { list.hidden = true; list.innerHTML = ""; active = -1; };
+    const commit = (name) => {
+      const canon = moCanonName(name);
+      state.matchup.enemy = canon;
+      input.value = canon || "";
+      port.innerHTML = moPortHtml(canon);
+      ddBindImages(port);
+      closeList();
+      moSyncEnemyState();
+      renderMoResult();
+    };
+    const openList = () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q || !moData || !moData.names.length) { closeList(); return; }
+      const starts = [], contains = [];
+      for (const n of moData.names) {
+        const ln = n.toLowerCase();
+        if (ln.startsWith(q)) starts.push(n);
+        else if (ln.indexOf(q) !== -1) contains.push(n);
+        if (starts.length >= 8) break;
+      }
+      const found = starts.concat(contains).slice(0, 8);
+      if (!found.length) { closeList(); return; }
+      list.innerHTML = found.map(n =>
+        `<li><button type="button" class="mo-opt" data-name="${esc(n)}">${moPortHtml(n)}<span>${esc(n)}</span></button></li>`).join("");
+      ddBindImages(list);
+      list.hidden = false;
+      active = -1;
+      list.querySelectorAll(".mo-opt").forEach(btn =>
+        btn.addEventListener("mousedown", (e) => { e.preventDefault(); commit(btn.dataset.name); }));
+    };
+    input.addEventListener("input", openList);
+    input.addEventListener("keydown", (e) => {
+      const opts = list.querySelectorAll(".mo-opt");
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        if (list.hidden || !opts.length) return;
+        e.preventDefault();
+        active = e.key === "ArrowDown"
+          ? (active + 1) % opts.length : (active - 1 + opts.length) % opts.length;
+        opts.forEach((o, j) => o.classList.toggle("on", j === active));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!list.hidden && opts.length) commit(opts[active === -1 ? 0 : active].dataset.name);
+        else commit(input.value);
+      } else if (e.key === "Escape") {
+        closeList();
+      }
+    });
+    input.addEventListener("blur", () => {
+      setTimeout(() => {
+        if (!input.isConnected) return;
+        closeList();
+        if (input.value.trim() !== (state.matchup.enemy || "")) commit(input.value);
+      }, 120);
+    });
+  }
+
+  function moRoleButtonHtml(role) {
+    const sel = state.matchup.role === role;
+    return `<button type="button" class="mo-role${sel ? " sel" : ""}" data-role="${role}"
+              aria-pressed="${sel}" aria-label="${esc(roleName(role))}">
+        <span class="mo-role-glow" aria-hidden="true"></span>
+        ${posIconHtml(role, roleAbbr(role), "mo-role-ico")}
+        <span class="mo-role-label" aria-hidden="true">${esc(roleName(role))}</span>
+      </button>`;
+  }
+
+  function renderMatchupRoles() {
+    const box = $("#mo-roles");
+    box.innerHTML = ROLES.map(moRoleButtonHtml).join("");
+    box.querySelectorAll(".mo-role").forEach(btn =>
+      btn.addEventListener("click", () => selectMoRole(btn.dataset.role)));
+  }
+
+  // Rol seçimi sahneyi daraltır (mo-picked) ve sonuç panelini yumuşak kaydırarak
+  // görünüre getirir; çubuk yeniden KURULMAZ, yalnız durum güncellenir (odak
+  // korunur — meta süzgeci deseniyle aynı fikir).
+  function selectMoRole(role) {
+    state.matchup.role = role;
+    $("#mo-app").classList.add("mo-picked");
+    $("#mo-roles").querySelectorAll(".mo-role").forEach(b => {
+      const on = b.dataset.role === role;
+      b.classList.toggle("sel", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    renderMoResult();
+    const target = $("#mo-stepwrap");
+    setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 320);
+  }
+
+  function renderMatchupShell() {
+    $("#mo-app").classList.toggle("mo-picked", !!state.matchup.role);
+    renderMatchupRoles();
+    moBindSearch();
+    moSyncEnemyState();
+    renderMoResult();
+  }
+
+  // Yükleyici hiç THROW ETMEZ (META/Seçim deseni): veri dosyası eksikse ilgili
+  // taraf sessizce atlanır, ekranın kalanı çalışır (matchup.no_data mesajı).
+  async function loadMatchup() {
+    ensureMatchupState();
+    const box = $("#mo-list");
+    if (!box.firstChild) box.innerHTML = `<p class="mo-none">${t("common.loading")}</p>`;
+    await loadAssets();
+    let tiers = null, counters = null;
+    if (CONFIG.USE_MOCK && window.MOCK_ADVISOR) {
+      tiers = window.MOCK_ADVISOR.tiers || null;
+      counters = window.MOCK_ADVISOR.counters || null;
+    } else {
+      const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
+      if (!mRes.err && mRes.data && mRes.data.tiers) tiers = mRes.data.tiers;
+      if (!cRes.err && cRes.data && cRes.data.counters) counters = cRes.data.counters;
+    }
+    moData = { tiers, counters, names: paNames(tiers) };
+    renderMatchupShell();
   }
 
   // ── 2) Leaderboard ────────────────────────────────────────────

@@ -27,6 +27,7 @@
   <nav class="sb-list">
     <button class="sb-item active" data-view="balance"     type="button" data-i18n="common.tab_balance"></button>
     <button class="sb-item"        data-view="pick"        type="button" data-i18n="common.tab_pick"></button>
+    <button class="sb-item"        data-view="matchup"     type="button" data-i18n="common.tab_matchup"></button>
     <button class="sb-item"        data-view="leaderboard" type="button" data-i18n="common.tab_leaderboard"></button>
     <button class="sb-item"        data-view="highlights"  type="button" data-i18n="common.tab_highlights"></button>
     <button class="sb-item"        data-view="matches"     type="button" data-i18n="common.tab_matches"></button>
@@ -100,6 +101,44 @@
   <section id="view-pick" class="view" hidden>
     <p class="view-hint" data-i18n="pick.hint"></p>
     <div id="pick-body" class="pa-grid"></div>
+  </section>
+
+  <!-- ═══ Eşleşme optimizasyonu (GÖREV 21-FIX; tasarım M1 "Sahne") ═══ -->
+  <!-- S3 "Seçim" ekranından AYRI, yeni bir sayfa: Teoman geri bildirimi üzerine
+       çok adımlı S3 rafa kaldırıldı (kodu/davranışı DEĞİŞMEDİ), burada tek rol
+       seçimi + tek rakip şampiyon ile hafif bir akış kurulur. Veri: yine
+       assets/meta/tiers.json + counters.json (api_contract §8) — app.js'in
+       Seçim ekranıyla PAYLAŞTIĞI fetchMeta()/fetchCounters() önbellekli
+       yükleyicileri ve advisor.js'in tierIndex()/counterRecords() saf
+       yardımcıları burada da kullanılır (veri mantığı KOPYALANMAZ). Sezgisel
+       early/late ve grup W/R rozetleri BU EKRANDA YOK (Teoman geri bildirimi).
+       İçerik tamamen JS'te kurulur (loadMatchup → renderMatchupShell). -->
+  <section id="view-matchup" class="view" hidden>
+    <div id="mo-app" class="mo-app">
+      <div class="mo-stage">
+        <div class="mo-kicker" data-i18n="matchup.kicker"></div>
+        <h1 class="mo-h1" data-i18n="matchup.title"></h1>
+        <p class="mo-sub" data-i18n="matchup.subtitle"></p>
+        <div id="mo-roles" class="mo-roles" role="group"
+             data-i18n-aria-label="matchup.role_group_aria"></div>
+      </div>
+      <div id="mo-stepwrap" class="mo-stepwrap">
+        <div class="mo-panel">
+          <section class="mo-card">
+            <h2 class="mo-card-title" data-i18n="matchup.enemy_card_title"></h2>
+            <!-- Arama kutusu app.js'te kurulur (pick ekranındaki pa-input
+                 desenine uyarlanmıştır): her açılışta TAZE düğümlerle kurulur,
+                 dinleyici birikmesi olmaz. -->
+            <div id="mo-search-wrap"></div>
+            <p id="mo-enemy-state" class="mo-state"></p>
+          </section>
+          <section class="mo-card">
+            <h2 id="mo-result-title" class="mo-card-title"></h2>
+            <div id="mo-list" class="mo-list" aria-live="polite"></div>
+          </section>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ═══ Leaderboard ═══ -->
