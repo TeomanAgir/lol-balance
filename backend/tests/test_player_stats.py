@@ -196,21 +196,12 @@ def test_favorite_role_ignores_null_position(client):
     }
 
 
-def test_synergy_order_and_min_matches(client):
+def test_synergy_threshold_drops_three_shared_matches(client):
+    # GÖREV 22: eşik n>=4. Bu senaryoda Ali'nin en sık takım arkadaşları
+    # 3'er ortak maçta kalıyor (Burak/Cem/Deniz/Fatma), Hakan 2, Emre/Gizem 1
+    # → hiçbiri aday değil. Eski tanımda (eşik 2) burada 3 kayıt dönüyordu.
     ids = _known_scenario(client)
-    synergy = _stats(client, ids["Ali"])["synergy"]
-    # Burak 3/2 (0.67), Deniz 3/2 (0.67), Hakan 2/1 (0.5), Cem 3/1, Fatma 3/1;
-    # Emre & Gizem 1'er maç → elenir. Sıra: winrate ↓, ortak maç ↓, ad ↑.
-    assert synergy == [
-        {"player_id": ids["Burak"], "display_name": "Burak",
-         "matches_together": 3, "wins_together": 2, "winrate": 0.67},
-        {"player_id": ids["Deniz"], "display_name": "Deniz",
-         "matches_together": 3, "wins_together": 2, "winrate": 0.67},
-        {"player_id": ids["Hakan"], "display_name": "Hakan",
-         "matches_together": 2, "wins_together": 1, "winrate": 0.5},
-    ]
-    # En fazla 3 kayıt; rakip olarak kalan Irmak/Jale hiç görünmez.
-    assert len(synergy) == 3
+    assert _stats(client, ids["Ali"])["synergy"] == []
 
 
 # --------------------------------------------------------------------------
@@ -302,31 +293,6 @@ def test_favorite_role_tie_uses_canonical_order(client):
     }
 
 
-def test_synergy_equal_winrate_prefers_more_matches(client):
-    names = ["Ali", "Burak", "Cem", "Deniz", "Emre", "Fatma", "Gizem", "Hakan",
-             "Irmak", "Zeynep"]
-    ids = _make_players(client, names)
-    # Zeynep 3 ortak maç (3G), Burak/Cem/Deniz 2'şer (2G) → hepsi winrate 1.0.
-    for i, sgid in enumerate(("g1", "g2")):
-        _ingest(
-            client, ids, sgid, f"2026-08-0{i + 1}T20:00:00Z",
-            ["Ali", "Burak", "Cem", "Deniz", "Zeynep"],
-            ["Emre", "Fatma", "Gizem", "Hakan", "Irmak"],
-            winner_team=100,
-        )
-    _ingest(
-        client, ids, "g3", "2026-08-03T20:00:00Z",
-        ["Ali", "Emre", "Fatma", "Gizem", "Zeynep"],
-        ["Burak", "Cem", "Deniz", "Hakan", "Irmak"],
-        winner_team=100,
-    )
-    synergy = _stats(client, ids["Ali"])["synergy"]
-    # Winrate eşit → ortak maç fazla olan (Zeynep) önce; kalanlar alfabetik.
-    assert [s["display_name"] for s in synergy] == ["Zeynep", "Burak", "Cem"]
-    assert synergy[0]["matches_together"] == 3
-    assert all(s["winrate"] == 1.0 for s in synergy)
-
-
 def test_void_match_excluded_from_all_metrics(client):
     ids = _make_players(client, TEN)
     _ingest(
@@ -341,7 +307,9 @@ def test_void_match_excluded_from_all_metrics(client):
     )
     before = _stats(client, ids["Ali"])
     assert before["totals"] == {"matches": 2, "wins": 1, "losses": 1, "winrate": 0.5}
-    assert before["synergy"][0]["matches_together"] == 2
+    # 2 ortak maç eşiğin (n>=4) altında → sinerji zaten boş; void'in sinerjiye
+    # etkisi ayrıca test_synergy_void_drops_candidate_below_threshold'ta.
+    assert before["synergy"] == []
 
     assert client.post(f"/api/v1/matches/{m2}/void").status_code == 200
 
@@ -354,7 +322,6 @@ def test_void_match_excluded_from_all_metrics(client):
         "champion": "Ahri", "matches": 1, "wins": 1, "winrate": 1.0
     }
     assert after["favorite_role"] == {"role": "MIDDLE", "matches": 1}
-    # Ortak maç 2'den 1'e düştü → sinerji eşiğinin (≥2) altına indi.
     assert after["synergy"] == []
 
 
@@ -362,3 +329,304 @@ def test_unknown_player_404(client):
     r = client.get("/api/v1/players/98765/stats")
     assert r.status_code == 404
     assert "98765" in r.json()["detail"]
+
+
+# --------------------------------------------------------------------------
+# Sinerji — GÖREV 22 lift ölçütü (api_contract §2 `synergy`)
+# --------------------------------------------------------------------------
+# Kurulum deseni: her maçın kadrosu ADLANDIRILMIŞ oyuncular + O MAÇA ÖZEL
+# dolgu oyuncularıyla tamamlanır. Dolgu tek maç oynadığı için hiçbiri n>=4
+# eşiğini geçemez → aday havuzu yalnız adlandırılmış oyunculardır ve beklenen
+# değerler elle hesaplanabilir. Ali HER ZAMAN team100'dedir; `ali_wins`
+# maçın kazananını belirler.
+#
+# Katsayılar (api_contract §2): MIN_TOGETHER=4, M=4, W_WR=W_PERF=0.5,
+# PERF_SCALE=3.4 → score = n/(n+4) * (0.5*wr_lift + 1.7*perf_delta).
+
+SHRINK4 = 4 / (4 + 4)  # n=4'te shrinkage katsayısı
+
+
+def _syn_ingest(client, ids, seq, team100, team200=(), ali_wins=True, overrides=None):
+    """Adlandırılmış kadroyu maça özel dolgularla 5+5'e tamamlayıp ingest eder."""
+    fill100 = [f"F{seq:02d}A{k}" for k in range(5 - len(team100))]
+    fill200 = [f"F{seq:02d}B{k}" for k in range(5 - len(team200))]
+    ids.update(_make_players(client, fill100 + fill200))
+    return _ingest(
+        client, ids, f"s{seq}", f"2026-08-{seq:02d}T20:00:00Z",
+        list(team100) + fill100, list(team200) + fill200,
+        winner_team=100 if ali_wins else 200,
+        overrides=overrides,
+    )
+
+
+def _set_perf(db, match_id, ids, perf_by_name):
+    """rating_history.perf_score'u oyuncu bazında sabitler (None = NULL).
+
+    test_badges.py'deki desenin aynısı: perf'i rating motoru yazar, test yalnız
+    okunacak değeri sabitler (backend perf'i KENDİ hesaplamaz).
+    """
+    conn = db()
+    with conn:
+        for name, value in perf_by_name.items():
+            conn.execute(
+                "UPDATE rating_history SET perf_score = ? "
+                "WHERE match_id = ? AND player_id = ?",
+                (value, match_id, ids[name]),
+            )
+    conn.close()
+
+
+def _pair_scenario(client, together_wins, solo_ali_wins, mate="Burak"):
+    """4 ortak + 4 ayrı maç; ortak maçların `together_wins` tanesi kazanılır.
+
+    Ayrı maçlarda `mate` team200'dedir (yani Ali'nin kaybettiğini kazanır).
+    Dönen: (ids, ortak match_id'leri, ayrı match_id'leri).
+    """
+    ids = _make_players(client, ["Ali", mate])
+    together = [
+        _syn_ingest(client, ids, seq, ["Ali", mate], ali_wins=seq <= together_wins)
+        for seq in range(1, 5)
+    ]
+    solo = [
+        _syn_ingest(
+            client, ids, seq, ["Ali"], [mate], ali_wins=seq - 4 <= solo_ali_wins
+        )
+        for seq in range(5, 9)
+    ]
+    return ids, together, solo
+
+
+def _only_synergy(client, ids):
+    """Ali'nin sinerji listesi tek kayıtlık olmalı; o kaydı döner."""
+    synergy = _stats(client, ids["Ali"])["synergy"]
+    assert len(synergy) == 1, synergy
+    return synergy[0]
+
+
+def test_synergy_empty_solo_uses_neutral_winrate(client):
+    # Ali ve Burak YALNIZ birlikte oynadı (4 maç, hepsi galibiyet) → solo küme
+    # boş, wr_solo ikisinde de nötr 0.5. Statlar eşit olduğu için perf 1.0'dır;
+    # solo tarafında hiç perf yok → her iki lift 0 (yokluk "kötü" değildir).
+    # wr_lift = 4/4 - (0.5+0.5)/2 = 0.5 → score = 0.5 * (0.5*0.5) = 0.125
+    ids = _make_players(client, ["Ali", "Burak"])
+    for seq in range(1, 5):
+        _syn_ingest(client, ids, seq, ["Ali", "Burak"])
+    assert _only_synergy(client, ids) == {
+        "player_id": ids["Burak"],
+        "display_name": "Burak",
+        "matches_together": 4,
+        "wins_together": 4,
+        "winrate": 1.0,
+        "score": 0.125,
+        "perf_delta": 0.0,
+    }
+
+
+def test_synergy_requires_four_matches_together(client):
+    # 3 ortak maç → aday değil; 4'üncü maç geldiğinde kayıt belirir.
+    ids = _make_players(client, ["Ali", "Burak"])
+    for seq in range(1, 4):
+        _syn_ingest(client, ids, seq, ["Ali", "Burak"])
+    assert _stats(client, ids["Ali"])["synergy"] == []
+    _syn_ingest(client, ids, 4, ["Ali", "Burak"])
+    assert _only_synergy(client, ids)["matches_together"] == 4
+
+
+def test_synergy_combines_winrate_and_perf_lift(client, db):
+    # Ortak 4 maçın 3'ü galibiyet (wr 0.75); ayrı 4 maçın 2'sini Ali, 2'sini
+    # Burak kazanıyor (wr_solo 0.5 / 0.5) → wr_lift = 0.25.
+    # perf: Ali 1.5 → 1.25, Burak 1.25 → 1.0 (ikisinde de lift 0.25)
+    # → perf_delta = 0.25. score = 0.5 * (0.5*0.25 + 0.5*3.4*0.25) ≈ 0.275.
+    ids, together, solo = _pair_scenario(client, together_wins=3, solo_ali_wins=2)
+    for mid in together:
+        _set_perf(db, mid, ids, {"Ali": 1.5, "Burak": 1.25})
+    for mid in solo:
+        _set_perf(db, mid, ids, {"Ali": 1.25, "Burak": 1.0})
+    entry = _only_synergy(client, ids)
+    assert entry["matches_together"] == 4
+    assert entry["wins_together"] == 3
+    assert entry["winrate"] == 0.75
+    assert entry["perf_delta"] == 0.25
+    assert entry["score"] == round(SHRINK4 * (0.5 * 0.25 + 0.5 * 3.4 * 0.25), 3)
+
+
+def test_synergy_ignores_matches_without_perf_score(client, db):
+    # Ali'nin bir ortak maçında perf_score NULL → o maç ORTALAMAYA GİRMEZ
+    # (0 ya da 1.0 sayılmaz): ort(1.5, 1.5, 1.5) = 1.5, lift = 0.25.
+    # NULL 0 sayılsaydı ortalama 1.125'e, lift eksiye düşerdi.
+    ids, together, solo = _pair_scenario(client, together_wins=3, solo_ali_wins=2)
+    for i, mid in enumerate(together):
+        _set_perf(db, mid, ids, {"Ali": None if i == 2 else 1.5, "Burak": 1.25})
+    for mid in solo:
+        _set_perf(db, mid, ids, {"Ali": 1.25, "Burak": 1.0})
+    entry = _only_synergy(client, ids)
+    assert entry["perf_delta"] == 0.25
+    assert entry["score"] == round(SHRINK4 * (0.5 * 0.25 + 0.5 * 3.4 * 0.25), 3)
+
+
+def test_synergy_lift_is_zero_when_one_side_has_no_perf(client, db):
+    # Burak'ın HİÇBİR maçında perf yok → lift(Burak) = 0 (contract kuralı),
+    # perf_delta yalnız Ali'nin lift'inin yarısıdır: (0.5 + 0)/2 = 0.25.
+    # W/L tarafı nötrlendi (ortak 2/4, ayrı 2/4) → skor tamamen perf'ten gelir.
+    ids, together, solo = _pair_scenario(client, together_wins=2, solo_ali_wins=2)
+    for mid in together:
+        _set_perf(db, mid, ids, {"Ali": 1.75, "Burak": None})
+    for mid in solo:
+        _set_perf(db, mid, ids, {"Ali": 1.25, "Burak": None})
+    entry = _only_synergy(client, ids)
+    assert entry["winrate"] == 0.5
+    assert entry["perf_delta"] == 0.25
+    assert entry["score"] == round(SHRINK4 * (0.5 * 0.0 + 0.5 * 3.4 * 0.25), 3)
+
+
+def test_synergy_excludes_negative_score(client):
+    # Ortak 4 maçın hepsi mağlubiyet, ayrı 4 maçın hepsi Ali'nin galibiyeti
+    # → wr_lift = 0 - (1.0 + 0.0)/2 = -0.5, perf nötr → score < 0 → listelenmez
+    # ("sahte birinci" gösterilmez; UI "kayda değer sinerji yok" der).
+    ids, _, _ = _pair_scenario(client, together_wins=0, solo_ali_wins=4)
+    assert _stats(client, ids["Ali"])["synergy"] == []
+
+
+def test_synergy_excludes_zero_score(client):
+    # Tam nötr çift: wr_lift = 0, perf lift = 0 → score = 0. Eşik `score > 0`
+    # olduğu için sıfır da listeye GİRMEZ.
+    ids, _, _ = _pair_scenario(client, together_wins=2, solo_ali_wins=2)
+    assert _stats(client, ids["Ali"])["synergy"] == []
+
+
+def test_synergy_score_formula_matches_contract():
+    # Saf formül (api_contract §2): n=4, 3 galibiyet, wr_solo 0.5/0.5,
+    # lift 0.25/0.25 → wr_lift 0.25, perf_delta 0.25.
+    from app.services.player_stats import synergy_score
+
+    score, perf_delta = synergy_score(4, 3, 0.5, 0.5, 0.25, 0.25)
+    assert perf_delta == 0.25
+    assert score == SHRINK4 * (0.5 * 0.25 + 0.5 * 3.4 * 0.25)
+
+
+def test_synergy_sort_key_breaks_ties_by_matches_then_name():
+    # Eşit skorda ortak maç çok olan önce; o da eşitse ad alfabetik.
+    from app.services.player_stats import synergy_sort_key
+
+    def entry(name, n):
+        return {"display_name": name, "matches_together": n}
+
+    items = [
+        (0.1, entry("Ali", 5)),
+        (0.2, entry("Zeynep", 4)),
+        (0.2, entry("Burak", 9)),
+        (0.2, entry("Ahmet", 9)),
+    ]
+    assert [e["display_name"] for _, e in sorted(items, key=synergy_sort_key)] == [
+        "Ahmet", "Burak", "Zeynep", "Ali",
+    ]
+
+
+def test_synergy_shrinkage_suppresses_small_samples():
+    # Aynı lift'ler, farklı örneklem: n=4 → 4/8, n=12 → 12/16. Skor oranı tam
+    # olarak shrinkage oranıdır (0.5 / 0.75) — küçük örneklem 0'a çekilir.
+    from app.services.player_stats import synergy_score
+
+    small, _ = synergy_score(4, 4, 0.5, 0.5, 0.2, 0.2)
+    big, _ = synergy_score(12, 12, 0.5, 0.5, 0.2, 0.2)
+    assert 0 < small < big
+    assert small / big == (4 / 8) / (12 / 16)
+
+
+def test_synergy_orders_by_score_not_by_match_count(client):
+    # Burak: 4 ortak maç, hepsi galibiyet; ayrı 4 maçta rakip ve hepsini kazanıyor
+    #   → wr_lift = 1.0 - (0.0 + 1.0)/2 = 0.5 → score = 0.5*0.5*0.5 = 0.125
+    # Cem: 6 ortak maç (4 galibiyet), ayrı 2 maçta rakip ve ikisini de kazanıyor
+    #   → wr_lift = 4/6 - (0.0 + 1.0)/2 ≈ 0.167 → score = 0.6*0.5*0.167 ≈ 0.05
+    # Cem'in ortak maçı DAHA ÇOK ama skoru düşük → sıralamayı skor belirler.
+    ids = _make_players(client, ["Ali", "Burak", "Cem"])
+    for seq in range(1, 5):
+        _syn_ingest(client, ids, seq, ["Ali", "Burak", "Cem"])
+    for seq in (5, 6):
+        _syn_ingest(client, ids, seq, ["Ali", "Cem"], ["Burak"], ali_wins=False)
+    for seq in (7, 8):
+        _syn_ingest(client, ids, seq, ["Ali"], ["Burak", "Cem"], ali_wins=False)
+    synergy = _stats(client, ids["Ali"])["synergy"]
+    assert [s["display_name"] for s in synergy] == ["Burak", "Cem"]
+    assert [s["matches_together"] for s in synergy] == [4, 6]
+    assert synergy[0]["score"] > synergy[1]["score"] > 0
+
+
+def test_synergy_limit_and_alphabetical_tie_break(client):
+    # Dört arkadaş da Ali'yle aynı 4 maçı aynı sonuçlarla oynadı → score, n ve
+    # winrate birebir eşit. Son kırılım ad alfabetik; yanıt en fazla 3 kayıt.
+    ids = _make_players(client, ["Ali", "Emre", "Cem", "Burak", "Deniz"])
+    for seq in range(1, 5):
+        _syn_ingest(client, ids, seq, ["Ali", "Burak", "Cem", "Deniz", "Emre"])
+    synergy = _stats(client, ids["Ali"])["synergy"]
+    assert [s["display_name"] for s in synergy] == ["Burak", "Cem", "Deniz"]
+    assert {s["score"] for s in synergy} == {0.125}
+
+
+def test_synergy_response_fields_and_rounding(client, db):
+    # Ham değerler bilinçli olarak uzun ondalıklı:
+    #   perf_delta = ((1.1+1.2+1.4)/3 - 1.0 + (1.2 - 1.0)) / 2 = 0.21666... → 0.22
+    #   score = 0.5 * (0.5*0.25 + 1.7*0.21666...) = 0.24666... → 0.247
+    # Yuvarlama YALNIZ yanıttadır (score 3, perf_delta 2 ondalık).
+    ids, together, solo = _pair_scenario(client, together_wins=3, solo_ali_wins=2)
+    ali_perfs = [1.1, 1.2, None, 1.4]
+    for perf, mid in zip(ali_perfs, together):
+        _set_perf(db, mid, ids, {"Ali": perf, "Burak": 1.2})
+    for mid in solo:
+        _set_perf(db, mid, ids, {"Ali": 1.0, "Burak": 1.0})
+    entry = _only_synergy(client, ids)
+    assert set(entry) == {
+        "player_id", "display_name", "matches_together", "wins_together",
+        "winrate", "score", "perf_delta",
+    }
+    assert entry["perf_delta"] == 0.22
+    assert entry["score"] == 0.247
+
+
+def test_synergy_perf_delta_never_negative_zero(client, db):
+    # Çok küçük negatif perf farkı 2 ondalığa yuvarlanınca IEEE -0.0 olur ve
+    # JSON'a "-0.0" diye düşerdi. Değer 0.0'dır; işareti yanıta sızmamalı.
+    import math
+
+    ids, together, solo = _pair_scenario(client, together_wins=3, solo_ali_wins=2)
+    for mid in together:
+        _set_perf(db, mid, ids, {"Ali": 1.0, "Burak": 1.0})
+    for mid in solo:
+        _set_perf(db, mid, ids, {"Ali": 1.001, "Burak": 1.0})
+    entry = _only_synergy(client, ids)  # wr_lift pozitif olduğu için listede
+    assert entry["perf_delta"] == 0.0
+    assert math.copysign(1.0, entry["perf_delta"]) == 1.0
+
+
+def test_synergy_void_drops_candidate_below_threshold(client):
+    # 4 ortak maçın biri void edilince n=3'e düşer → aday listeden çıkar.
+    ids = _make_players(client, ["Ali", "Burak"])
+    matches = [_syn_ingest(client, ids, seq, ["Ali", "Burak"]) for seq in range(1, 5)]
+    assert _only_synergy(client, ids)["matches_together"] == 4
+    assert client.post(f"/api/v1/matches/{matches[-1]}/void").status_code == 200
+    assert _stats(client, ids["Ali"])["synergy"] == []
+
+
+def test_synergy_identical_after_replay(client):
+    # Determinizm: perf_score'lar replay'de bit-bit yeniden üretilir, sinerji
+    # de yalnız onları okuduğu için yanıt DEĞİŞMEZ (toplama sırası match_id'ye
+    # bağlıdır, satır sırasına değil).
+    ids = _make_players(client, ["Ali", "Burak"])
+    strong = {"stats": {"kills": 14, "deaths": 1, "assists": 12, "gold": 19000,
+                        "cs": 280, "damage_to_champs": 41000, "vision_score": 34}}
+    weak = {"stats": {"kills": 1, "deaths": 9, "assists": 2, "gold": 8000,
+                      "cs": 90, "damage_to_champs": 9000, "vision_score": 8}}
+    for seq in range(1, 5):
+        _syn_ingest(
+            client, ids, seq, ["Ali", "Burak"],
+            overrides={"Ali": dict(strong), "Burak": dict(strong)},
+        )
+    for seq in range(5, 9):
+        _syn_ingest(
+            client, ids, seq, ["Ali"], ["Burak"], ali_wins=False,
+            overrides={"Ali": dict(weak), "Burak": dict(weak)},
+        )
+    before = _stats(client, ids["Ali"])["synergy"]
+    assert before and before[0]["perf_delta"] > 0  # perf gerçekten oynuyor
+    assert client.post("/api/v1/admin/replay").status_code == 200
+    assert _stats(client, ids["Ali"])["synergy"] == before

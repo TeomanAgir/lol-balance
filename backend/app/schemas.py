@@ -136,12 +136,18 @@ class FavoriteRoleOut(BaseModel):
 
 
 class SynergyOut(BaseModel):
-    # Aynı takımda ≥2 ortak valid maç; yalnız GÖSTERİM (rating'e girmez).
+    # api_contract §2 `synergy` [YENİDEN TANIMLANDI — GÖREV 22, 2026-08-19]:
+    # aynı takımda ≥4 ortak valid maç + POZİTİF lift skoru; yalnız GÖSTERİM
+    # (rating'e girmez). W/L alanları KORUNUR — UI hem skoru hem ham sayıları
+    # gösterir (dürüst gösterim kararı).
     player_id: int
     display_name: str
     matches_together: int
     wins_together: int
     winrate: float
+    # Lift skoru (winrate + perf harmanı, shrinkage'lı) ve ortalama perf farkı.
+    score: float
+    perf_delta: float
 
 
 class TopItemOut(BaseModel):
