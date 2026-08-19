@@ -75,12 +75,24 @@ def plain_text(desc: str) -> str:
 #   * başka eşyaya DÖNÜŞMEZ (`into` yok) + bileşenlerden ÜRETİLİR (`from` var)
 #   * trinket / tüketilebilir / bot eşyaları hariç (tags)
 #   * şampiyona/müttefike özel eşyalar (Ornn vb.) hariç
+#   * MOD/KUYRUK VARYANTI olmayan KANONİK kayıt (aşağıya bkz.)
 # Kabul ölçütü (contract): 3031 Ebedi Kılıç ve 3026 Koruyucu Melek True;
 # bileşen (from'suz ya da into'lu), tüketilebilir, trinket ve botlar False.
 COMPLETED_EXCLUDED_TAGS = {"Trinket", "Consumable", "Boots"}
 
 
 def is_completed(item: dict) -> bool:
+    """Eşya, rulet havuzuna girecek "tamamlanmış" bir SR eşyası mı?
+
+    MOD VARYANTI ELEMESİ (16.16.1'de 20 kayıt): Data Dragon, aynı eşyanın
+    mod/kuyruk'a özel ikinci bir kaydını 6 haneli id ile taşır (ör. 322065
+    "Shurelya's Battlesong", 667666 "The Collector"). Bu kayıtlar `maps`
+    sözlüğünde YALNIZCA "11"i açık bırakır; kanonik SR eşyaları ise her zaman
+    en az bir başka haritada da (12/21/35/453) açıktır. Ayrım önemlidir:
+    gerçek maç sonu envanteri KANONİK id'yi bildirir (bkz. collector
+    fixtures/mh_game_custom_real.json — hepsi 4 haneli), yani varyant id
+    atanan oyuncu görevini ASLA tamamlayamazdı.
+    """
     gold = item.get("gold") or {}
     maps = item.get("maps") or {}
     tags = set(item.get("tags") or [])
@@ -88,12 +100,36 @@ def is_completed(item: dict) -> bool:
         gold.get("purchasable")
         and item.get("inStore", True)
         and maps.get("11")
+        and sum(1 for enabled in maps.values() if enabled) > 1
         and not item.get("into")
         and item.get("from")
         and not (tags & COMPLETED_EXCLUDED_TAGS)
         and not item.get("requiredChampion")
         and not item.get("requiredAlly")
     )
+
+
+def drop_duplicate_completed(items: dict[str, dict]) -> None:
+    """Aynı ADA sahip birden çok "completed" kaydı kalırsa yalnız KANONİK
+    (sayısal olarak en küçük id'li) olan bayraklı kalır; yerinde düzeltir.
+
+    `is_completed`'ın harita kuralı 16.16.1'de tüm varyantları zaten eliyor;
+    bu geçiş, Riot varyantlara başka bir harita eklerse havuzun sessizce
+    ulaşılamaz id'lerle dolmasını engelleyen İKİNCİ emniyettir.
+    """
+    canonical: dict[str, str] = {}
+    for item_id, meta in items.items():
+        if not meta.get("completed"):
+            continue
+        name = meta["name_en"]
+        best = canonical.get(name)
+        if best is None:
+            canonical[name] = item_id
+            continue
+        loser = max(best, item_id, key=lambda x: (len(x), x))
+        winner = best if loser == item_id else item_id
+        items[loser]["completed"] = False
+        canonical[name] = winner
 
 
 def build_items() -> dict[str, dict]:
@@ -110,6 +146,7 @@ def build_items() -> dict[str, dict]:
             "tags": en_item.get("tags", []),
             "completed": is_completed(en_item),
         }
+    drop_duplicate_completed(items)
     return items
 
 

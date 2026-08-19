@@ -441,15 +441,20 @@
     // (nemesis'teki desen: eğlence modu dengeleme ekranını asla bloke etmez).
     renderRoulette();
     if (!state.roulette) {
-      api("/roulette/current").then(res => {
+      api("/roulette/current").then(async res => {
         const s = res && res.session;
-        if (s && Array.isArray(s.assignments) && !state.roulette) {
-          state.roulette = {
-            assignments: s.assignments, phase: "current",
-            sessionId: s.session_id, createdAt: s.created_at, detail: "",
-          };
-          if (currentView === "balance") renderRoulette();
-        }
+        if (!s || !Array.isArray(s.assignments) || state.roulette) return;
+        // Varlık sözlükleri ÇİZİMDEN ÖNCE yüklenir: sayfa açılışında bu yol
+        // dd- katmanından önce koşuyordu ve kartlar kalıcı yer tutucuya
+        // düşüyordu (bölüm bir daha çizilmediği için düzelmiyordu).
+        // loadAssets() önbelleklidir; ikinci çağrı bedavadır.
+        await loadAssets();
+        if (state.roulette) return;   // bu arada çark çevrildiyse ona dokunma
+        state.roulette = {
+          assignments: s.assignments, phase: "current",
+          sessionId: s.session_id, createdAt: s.created_at, detail: "",
+        };
+        if (currentView === "balance") renderRoulette();
       }).catch(() => { /* eski backend / ağ hatası: bölüm çizilmez */ });
     }
   }

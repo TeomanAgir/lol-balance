@@ -276,6 +276,10 @@
     });
   })();
 
+  // api_contract §3: `roulette` alanı HER maçta bulunur — bağlı oturum yoksa
+  // null. Tek yerden tamamlanır ki her maç kurucusuna elle eklenmesin.
+  matches.forEach(m => { if (m.roulette === undefined) m.roulette = null; });
+
   matches.sort((a, b) => Date.parse(b.played_at) - Date.parse(a.played_at)); // en yeni başta
 
   // ── Yardımcılar ──
@@ -1061,6 +1065,8 @@
         duration_s: body.duration_s,
         winner_team: body.winner_team,
         status: "valid",
+        // Elle girilen maç rulet oturumuna bağlanmaz (api_contract §3: null).
+        roulette: null,
         participants: body.participants.map(pt => {
           const p = players.find(x => x.id === pt.player_id);
           const won = pt.team === body.winner_team;
