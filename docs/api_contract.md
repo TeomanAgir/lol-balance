@@ -728,8 +728,29 @@ GET  /admin/ping                   → 204; `X-Admin-Key` doğrulama ucu (fix-2 
                                      Paneli giriş şifresini bununla sınar; yan etkisiz)
 GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
                                      (harman olmayan version'da score = ordinal;
-                                      role_ratings alanı burada da döner, bkz. §2)
+                                      role_ratings alanı burada da döner, bkz. §2;
+                                      rank_delta alanı — aşağıya bkz.)
 ```
+**Sıra değişimi `rank_delta` (Teoman, 2026-08-19):** `GET /leaderboard` her oyuncuda
+`rank_delta` döndürür — **EN SON valid maçtan hemen ÖNCEKİ sıralamaya göre** kaç sıra
+değiştiği. Pozitif = YÜKSELDİ (`+2` → iki sıra yukarı), negatif = DÜŞTÜ (`-1`), `0` =
+değişmedi, `null` = karşılaştırma yapılamıyor.
+- **Referans an:** aktif engine'in `rating_history`'sinde replay sort-key'ine göre EN YENİ
+  valid maç; "önceki sıralama", o maç HARİÇ tüm maçlar işlenmiş hâldeki `score` sırasıdır
+  (her oyuncu için o maçtan önceki son `score_after`; o maçta oynamamış oyuncunun score'u
+  değişmez ama SIRASI değişebilir — bu doğru davranıştır ve gösterilir).
+- Sıralama kuralı iki anda da leaderboard'un kendi kuralıyla AYNIdır (`score` azalan; aynı
+  deterministik kırılımlar). Rulet maçları rating dışı olduğu için referans an yalnız
+  `status='valid'` maçlara bakar.
+- `null` hâlleri: hiç valid maç yoksa (referans an yok); oyuncunun önceki anda hiç
+  rating satırı yoksa (yani ilk maçıyla listeye yeni girmiştir — "yeni" sayılır, sahte
+  bir yükseliş gösterilmez).
+- Salt-okur türetilmiştir, DB'ye yazılmaz; `POST /admin/replay` sonrası bit-bit aynı kalır.
+- Web UI gösterimi (V1 "İnce Chevron", Teoman seçimi): oyuncu adının SAĞINDA çerçevesiz
+  kalın rakam + küçük chevron; yükselişte yeşil (`--ok`) yukarı, düşüşte kırmızı (`--red`)
+  aşağı, **rakam da renkli**; değişim yoksa soluk gri tire (yer tutar, satır kaymaz).
+  Satır yüksekliği DEĞİŞMEZ, sıralama sayfasının teması korunur.
+
 **Durum değişimi + replay ATOMİKTİR (fix-3):** `void`, `unvoid` ve `roulette/unlink`
 uçlarında `matches.status` yazımı ile her iki evrenin replay'i TEK transaction'da yapılır.
 Replay hata verirse durum yazımı da geri alınır — aksi hâlde maç `void` görünürken
