@@ -55,6 +55,15 @@ Content-Type: application/json
 - Collector, gönderim başarısız olursa (network/5xx) payload'ı lokal `outbox/` klasörüne JSON olarak yazar ve bir sonraki çalışmada yeniden dener (at-least-once delivery). Idempotency backend tarafında `source_game_id` ile sağlanır, bu yüzden çift gönderim güvenlidir.
 - **Oto-yetişme (2026-08-13):** Canlı mod, LCU'ya her bağlandığında canlı döngüye geçmeden ÖNCE match history'yi geriye doğru sınırlı tarar (varsayılan son 14 gün; `CATCHUP_DAYS` env ile ayarlanır, `0` = kapalı) ve collector kapalıyken oynanmış custom maçları gönderir. Bu, `--backfill` modunun sınırlı halidir; aynı roster filtresi ve kronolojik (eskiden-yeniye) gönderim kuralları geçerlidir. Yetişme taraması hata verirse canlı mod ENGELLENMEZ (logla, devam et). Çift gönderim idempotency sayesinde zararsızdır.
 - **Sıra-dışı geliş (2026-08-13):** Backend, duplicate olmayan bir maç mevcut en yeni valid maçtan daha eski `played_at` ile gelirse incremental update yerine HER İKİ rating evrenini otomatik replay eder (bkz. api_contract §5). Yanıt şekli değişmez; collector'ın bilmesi gereken bir şey yoktur.
+- **İsim tazeleme (2026-08-19, fix-2):** Oyuncu `puuid` ile eşleştiğinde gelen `riot_id`
+  kayıttakinden farklıysa (case-sensitive karşılaştırma) `players.riot_id` GÜNCELLENİR —
+  oyun içi yeniden adlandırmalar sisteme yansır. `display_name` yalnız ÖZELLEŞTİRİLMEMİŞSE
+  güncellenir: mevcut `display_name`, ESKİ `riot_id`'nin `#` öncesi kısmına (türetilmiş ada)
+  eşitse yeni türetilmiş ada çekilir; farklıysa (elle `PATCH /players/{id}` ile verilmiş
+  özel ad) DOKUNULMAZ. Tazeleme DUPLICATE maçta da uygulanır (yanıt `duplicate: true`
+  kalır; `ingest_events`'e yeni satır eklenmez, maç verisi değişmez — yalnız `players`
+  satırı tazelenir; böylece `backfill` yeniden gönderimi adları onarır). `riot_id`'si
+  boş/NULL gelen participant'ta tazeleme atlanır; rating'e sıfır etki (isimler rating dışı).
 
 ## Response
 - `201 {"match_id": 42, "duplicate": false}` — yeni kayıt

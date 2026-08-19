@@ -1331,6 +1331,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
+/* Hijyen: grid çocuklarının varsayılan min-width:auto'su, içindeki .p-who
+   ellipsis kuralını etkisiz bırakıp sütunu içerik genişliğine göre şişirebilir
+   (klasik grid taşkını). min-width:0 sütunun gerçekten daralmasına izin verir;
+   geniş ekranda zaten yer bol olduğundan görünüm değişmez (fix-2c). */
+.match-teams > .team { min-width: 0; }
 .match-teams .team li { font-size: 14px; }
 .team .delta { font-variant-numeric: tabular-nums; font-size: 13px; }
 .delta.up { color: var(--ok); }
@@ -1419,6 +1424,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
    TR taşma 3px → 0px, EN 14px → 9px; yani portre EKLENDİĞİ HALDE mevcut taşma
    büyümez, küçülür. Adın gördüğü genişlik de artar (~32px → ~46px). */
 @media (max-width: 420px) {
+  /* Teoman kararı (fix-2c): dar ekranda iki takım sütunu yan yana sığmıyor
+     (sağdaki kırmızı takımın adları karttan taşıyordu) — sütunlar alt alta
+     dizilir; DOM sırası zaten mavi (100) önce, kırmızı (200) sonra basıyor,
+     o yüzden ek bir yeniden sıralamaya gerek yok. */
+  .match-teams { grid-template-columns: 1fr; }
   .match-teams .team li { gap: 4px; padding-left: 6px; }
   .match-teams .pos-tag { min-width: 0; font-size: 10px; letter-spacing: 0; }
   .match-teams .delta { font-size: 12px; }
