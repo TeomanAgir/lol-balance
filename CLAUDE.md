@@ -40,6 +40,7 @@ Sen bu repo'nun ORKESTRATÖRÜSÜN. Görevin implementasyon yapmak değil; işi 
 3. Web UI'da roster listelendi, 10 oyuncu seçildi → 3 dengeleme önerisi geldi.
 4. Bir maç void edildi → replay koştu → leaderboard tutarlı.
 5. `POST /admin/replay` sonrası rating_history, incremental ile birebir aynı (determinizm).
+   (fix-2'den beri bu uç `X-Admin-Key` ister — E2E'de `ADMIN_KEY` env'i verilmelidir.)
 Bu senaryoyu entegrasyon testi olarak koştur ve sonucu insana raporla.
 
 ## Kapsam hatırlatması

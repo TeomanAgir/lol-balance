@@ -18,10 +18,20 @@ Son güncelleme: 2026-08-19 (orkestratör)
   Panel v1: maç void/geri al listesi + tüm-replay + oyuncu adı düzeltme (PATCH).
   E2E tarayıcıda PASS (şifre kapısı 403/204, void↔unvoid+replay determinizmi,
   rename, 359px stack).
-- **Deploy sonrası bekleyen:** (1) VPS'te secret'a ADMIN_KEY eklenmesi (Teoman;
-  komut PR #66 gövdesinde) — yoksa idari uçlar 503. (2) Canlı maç #22 (1736190243,
-  yanlış void) yeni unvoid ucuyla geri getirilecek. (3) Oyuncu #5 "YETİ VE PİÇİ"
-  yeni nick'i: Teoman söylerse PATCH, yoksa arkadaş backfill'i otomatik düzeltir.
+- **Tamamlandı:** ADMIN_KEY secret'ı VPS'te girildi ve doğrulandı (canlı `/admin/ping`
+  204); canlı maç #22 (1736190243) unvoid ile geri getirildi (25/25 maç valid,
+  iki evren replay). Kalan tek açık: oyuncu #5 "YETİ VE PİÇİ" yeni nick'i —
+  arkadaşın backfill'i otomatik düzeltir (isim tazeleme fix-2a canlıda).
+
+## 2026-08-19: fix-3 — panel sertleştirme + iç düzen (İNCELEME SONRASI)
+- Tetikleyici: fix-2 sonrası iki bağımsız inceleme. Bulgular: (a) void kapatıldı ama
+  `roulette/unlink` + `PATCH/POST /players` açık kalmıştı (aynı risk sınıfı),
+  (b) ASCII olmayan `ADMIN_KEY` doğru girilse bile 403 → panel sessizce kilitli
+  (header latin-1; ampirik doğrulandı), (c) status yazımı + replay atomik değildi,
+  (d) `/admin/ping` sınırsız şifre oracle'ı, (e) panel tek uzun sayfaydı.
+- Teoman kararları: kapsam genişletsin; `positions`/`items` AÇIK kalsın (collector
+  `backfill-*` bağımlılığı — arayüz panele taşınır); panel sekmeli/aranabilir olsun,
+  TÜM maçlar görünsün; hız sınırı gelsin. Ayrıntı: CHANGE_REQUESTS 2026-08-19 fix-3.
 
 ## 2026-08-17/19: GÖREV 18-23 (PR #56-#63) — hepsi CANLIDA
 - 18 Geçmiş delta = efektif score farkı · 19 KDA gösterimi · 20 Manuel ekranı
