@@ -692,9 +692,29 @@
          <span id="rlt-status"></span>
        </div>
        <div class="rlt-teams">${team(100)}${team(200)}</div>
-       <p class="rlt-mission">${t("roulette.mission_note")}</p>`;
+       <p class="rlt-mission">${t("roulette.mission_note")}</p>
+       <button id="btn-rlt-clear" class="btn-rlt-unlink" type="button">${t("roulette.clear_btn")}</button>`;
     updateRouletteStatus();
     ddBindImages(box);
+    // "Listeyi temizle" (Teoman, 2026-08-19): bağlanmamış (open+cancelled)
+    // TÜM oturumları siler (api_contract §4.5); ekrandaki çekiliş de sıfırlanır
+    // — görünürlük mevcut rulet bölümü mantığıyla aynıdır (state.roulette
+    // truthy olduğu her an, açık oturum ekranda hiç çekiliş yapılmadan
+    // yüklenmiş olsa bile).
+    const clearBtn = $("#btn-rlt-clear");
+    if (clearBtn) clearBtn.addEventListener("click", async () => {
+      if (!confirm(t("roulette.clear_confirm"))) return;
+      clearBtn.disabled = true;
+      try {
+        const res = await api("/roulette/clear", { method: "POST" });
+        toast(t("roulette.clear_done", { n: res.deleted }), "ok");
+        state.roulette = null;
+        renderRoulette();
+      } catch (e) {
+        clearBtn.disabled = false;
+        toast(e.message);
+      }
+    });
   }
 
   $("#btn-roulette").addEventListener("click", async () => {

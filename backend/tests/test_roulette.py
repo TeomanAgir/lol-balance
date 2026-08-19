@@ -631,3 +631,105 @@ def test_gambler_threshold_catalog_order_and_replay_determinism(client):
     client.post("/api/v1/admin/replay")
     after = client.get(f"/api/v1/players/{target}/badges").json()
     assert before == after
+
+
+# ── POST /roulette/clear (Teoman 2026-08-19, api_contract §4.5) ────────────
+
+def _session_ids(db):
+    conn = db()
+    try:
+        return [row["id"] for row in conn.execute("SELECT id FROM roulette_sessions")]
+    finally:
+        conn.close()
+
+
+def test_clear_empty_returns_zero(client):
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"deleted": 0}
+
+
+def test_clear_deletes_open_and_cancelled_counts_correctly(client, db):
+    ids = _create_players(client)
+    # open + cancelled: iki oturum aç (ilki cancelled olur), bir tanesi açık kalır.
+    first = _post_session(client, ids)
+    second = _post_session(client, ids)
+    assert _session_row(db, first["session_id"])["status"] == "cancelled"
+    assert _session_row(db, second["session_id"])["status"] == "open"
+
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"deleted": 2}
+    assert _session_ids(db) == []
+    # roulette_assignments de temizlenmiş olmalı (FK RESTRICT'e takılmadan).
+    conn = db()
+    try:
+        assert (
+            conn.execute("SELECT COUNT(*) AS n FROM roulette_assignments").fetchone()[
+                "n"
+            ]
+            == 0
+        )
+    finally:
+        conn.close()
+
+
+def test_clear_preserves_linked_session_and_match_roulette_field(client, db):
+    ids, session, match_id = _link_setup(client, game_id="rlt-clear-linked")
+    # Ayrıca bağlanmamış bir oturum ekle: silinecek olan bu.
+    unlinked = _post_session(client, ids)
+    assert _session_row(db, unlinked["session_id"])["status"] == "open"
+
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"deleted": 1}
+
+    # linked oturum ve atamaları AYNEN korunur.
+    assert _session_row(db, session["session_id"]) == {
+        "status": "linked",
+        "match_id": match_id,
+    }
+    match = client.get(f"/api/v1/matches/{match_id}").json()
+    assert match["status"] == "roulette"
+    assert match["roulette"]["session_id"] == session["session_id"]
+    assert len(match["roulette"]["assignments"]) == 10
+    # Rozet türetimi de etkilenmedi (linked oturum verisi bozulmadı).
+    _badges(client, ids[0])  # hatasız çağrılabiliyor olması yeterli kanıt
+
+
+def test_clear_does_not_touch_rating_or_replay(client, db):
+    ids, _, match_id = _link_setup(client, game_id="rlt-clear-rating")
+    before = _rating_rows(db)
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"deleted": 0}  # yalnız linked oturum var, silinecek yok
+    assert _rating_rows(db) == before == (0, 0)
+    assert _match_status(db, match_id) == "roulette"
+
+
+def test_clear_then_current_is_null(client):
+    ids = _create_players(client)
+    _post_session(client, ids)
+    assert client.get("/api/v1/roulette/current").json()["session"] is not None
+
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.json() == {"deleted": 1}
+    assert client.get("/api/v1/roulette/current").json() == {"session": None}
+
+
+def test_clear_then_ingest_does_not_auto_link(client, db):
+    """Açık oturum kalmadığından, clear sonrası eşleşen bir maç bile
+    normal `valid` maç olarak işlenir (oto-eşleşme YOK)."""
+    ids = _create_players(client)
+    _post_session(client, ids)
+    resp = client.post("/api/v1/roulette/clear")
+    assert resp.json() == {"deleted": 1}
+
+    body = _ingest(
+        client,
+        make_roster_payload(
+            "rlt-clear-noauto", "2026-08-17T20:00:00Z", ids[:5], ids[5:]
+        ),
+    )
+    assert _match_status(db, body["match_id"]) == "valid"
+    assert _rating_rows(db) == (10, 10)

@@ -213,6 +213,34 @@ def _session_assignments(conn: sqlite3.Connection, session_id: int) -> list[dict
     ]
 
 
+def clear_unlinked_sessions(conn: sqlite3.Connection) -> int:
+    """POST /roulette/clear (api_contract §4.5, Teoman 2026-08-19): `match_id IS
+    NULL` olan (open+cancelled) TÜM oturumları ve atamalarını SİLER; `linked`
+    oturumlar (maç yanıtındaki `roulette` alanı + rozet türetimi bunlara
+    dayanır) DOKUNULMAZ. Rating'e/replay'e sıfır etki — sadece oturum
+    kayıtları silinir. Silinen oturum sayısını döner (hiç yoksa 0).
+    """
+    with conn:
+        ids = [
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM roulette_sessions WHERE match_id IS NULL"
+            )
+        ]
+        if not ids:
+            return 0
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(
+            f"DELETE FROM roulette_assignments WHERE session_id IN ({placeholders})",
+            ids,
+        )
+        conn.execute(
+            f"DELETE FROM roulette_sessions WHERE id IN ({placeholders})",
+            ids,
+        )
+        return len(ids)
+
+
 def _open_session_row(conn: sqlite3.Connection) -> Optional[sqlite3.Row]:
     # Değişmez gereği en fazla 1 açık oturum vardır; ORDER BY savunma amaçlıdır
     # (bozuk veri hâlinde en yenisi kazanır, sonuç deterministik kalır).
