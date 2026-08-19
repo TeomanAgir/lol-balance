@@ -11,11 +11,13 @@ from fastapi import APIRouter, Depends
 
 from ..deps import get_db
 from ..schemas import (
+    RouletteClearResponse,
     RouletteCreate,
     RouletteCreateResponse,
     RouletteCurrentResponse,
 )
 from ..services.roulette import (
+    clear_unlinked_sessions,
     create_session,
     current_session,
     validate_assignments,
@@ -42,3 +44,12 @@ def get_current_session(
 ) -> RouletteCurrentResponse:
     """Açık oturum ya da `{"session": null}` (api_contract §4.5)."""
     return RouletteCurrentResponse(session=current_session(conn))
+
+
+@router.post("/roulette/clear")
+def clear_roulette_sessions(
+    conn: sqlite3.Connection = Depends(get_db),
+) -> RouletteClearResponse:
+    """`match_id IS NULL` (open+cancelled) oturumları siler; `linked`
+    korunur, rating'e/replay'e etkisi yok (api_contract §4.5, Teoman 2026-08-19)."""
+    return RouletteClearResponse(deleted=clear_unlinked_sessions(conn))

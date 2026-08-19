@@ -1048,6 +1048,15 @@
     if (method === "GET" && path === "/roulette/current")
       return json({ session: rouletteSession });
 
+    // Liste temizleme (Teoman, 2026-08-19): mock'ta tek açık oturum değişkeni
+    // var (linked'e karşılık gelen önceden gömülü rulet maçı ayrı, `matches`
+    // fixture'ında sabit — dokunulmaz); açık oturum varsa 1 silinir, yoksa 0.
+    if (method === "POST" && path === "/roulette/clear") {
+      const deleted = rouletteSession ? 1 : 0;
+      rouletteSession = null;
+      return json({ deleted });
+    }
+
     const unlinkMatch = path.match(/^\/matches\/(\d+)\/roulette\/unlink$/);
     if (method === "POST" && unlinkMatch) {
       const match = matches.find(m => m.id === Number(unlinkMatch[1]));

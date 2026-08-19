@@ -348,6 +348,11 @@ class RouletteUnlinkResponse(BaseModel):
     role_matches_replayed: int
 
 
+class RouletteClearResponse(BaseModel):
+    # api_contract §4.5 (Teoman, 2026-08-19): silinen (match_id IS NULL) oturum sayısı.
+    deleted: int
+
+
 class BalanceRequest(BaseModel):
     player_ids: list[int]
     top_n: int = 3
