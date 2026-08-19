@@ -249,7 +249,10 @@ GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı
                                      maç detayına atlama)
 PUT  /matches/{id}/items           → katılımcı envanterlerini yazar (GÖREV 14
                                      backfill-items; rating'e etkisi YOK, replay koşmaz)
-POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
+POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler.
+                                     `status='roulette'` maçta 409 — rulet maçı zaten
+                                     rating dışıdır, void edilemez (Teoman, 2026-08-19;
+                                     yanlış eşleşme çözümü unlink'tir)
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
 
