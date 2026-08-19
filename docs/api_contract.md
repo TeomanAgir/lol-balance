@@ -81,7 +81,8 @@ Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluştu
 ```
 Hiç oynanmamış rol default döner (mu=25, sigma=25/3, perf_avg=1.0, score=0.0, matches=0).
 Harman olmayan aktif version'da ana rating kuralının aynısı geçerlidir: `perf_avg = null`,
-`score = mu - 3*sigma` (rol çekirdeğinin ordinal'i). Spec: rating_contract.md "Rol Rating Evreni".
+`score` = rol harmanı `mu_eff_role - S*sigma_role` (S = aktif version'ın sigma katsayısı;
+blend30-s2'de 2). Spec: rating_contract.md "Rol Rating Evreni".
 
 ### Oyuncu profili (GÖREV 1)
 ```
@@ -172,11 +173,11 @@ Kurallar (salt-okur; rating'e etkisi yok):
 - Yalnız `status='valid'` maçlar; sıra replay sort-key'iyle birebir aynı (kronolojik artan).
   Determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır.
 - `score_after` = o maç SONRASI efektif score (leaderboard `score` alanıyla aynı tanım):
-  aktif engine harmansa `mu_eff - 3*sigma_after`, `mu_eff` o ana kadarki KÜMÜLATİF
+  aktif engine harmansa `mu_eff - S*sigma_after`, `mu_eff` o ana kadarki KÜMÜLATİF
   `P_avg` ile hesaplanır (o maç dahil, kronolojik önekteki perf_score'ların ortalaması;
   `perf_score` NULL satırlar ortalamaya katılmaz — rating_contract P_avg tanımıyla
   tutarlı). Hesap rating paketinin mevcut yardımcılarıyla yapılır, formül backend'e
-  KOPYALANMAZ. Harman olmayan engine'de `score_after = mu_after - 3*sigma_after`.
+  KOPYALANMAZ. Harman olmayan engine'de `score_after = mu_after - 3*sigma_after` (ordinal; S yalnız harman engine'lerde geçerlidir).
 - `win` = katılımcının takımı `winner_team` ile aynı mı. `champion`/`position` ve
   `stats` içindeki k/d/a alanları nullable'dır (ingest ile tutarlı); k/d/a'nın üçü de
   null ise `stats: null` döner.
@@ -603,7 +604,7 @@ PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV
   durumunu ifade edebilmek için gereklidir.
 - `score_before`/`score_after` (GÖREV 18, Teoman 2026-08-16): katılımcının EFEKTİF
   score'u — bu maçtan önce / sonra. Tanım "Rating tarihçesi" (§2) `score_after` ile
-  BİREBİR aynıdır: harman engine'de kümülatif P_avg'lı `mu_eff - 3*sigma` (o maç
+  BİREBİR aynıdır: harman engine'de kümülatif P_avg'lı `mu_eff - S*sigma` (o maç
   dahil kronolojik önek; `score_before` aynı önekten o maç HARİÇ, oyuncunun hiç
   önceki maçı yoksa default durumdan), harman olmayan engine'de `mu - 3*sigma`.
   Hesap rating paketinin yardımcılarıyla yapılır (formül backend'e kopyalanmaz);

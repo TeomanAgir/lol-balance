@@ -22,6 +22,9 @@ rating (OpenSkill blend50, ana + rol evreni) → web UI (framework'süz).
   - rating testleri: `backend\rating\.venv\Scripts\python.exe`
 - rating paketi backend venv'ine KOPYA kurulur: `backend/rating/` değiştiyse
   `backend\.venv\Scripts\python.exe -m pip install ./backend/rating` (editable BOZUK).
+  **WORKTREE TUZAĞI:** `backend/rating/.venv` içindeki kurulum EDITABLE ve ANA REPO
+  yoluna sabittir — worktree'den rating testi koşarken `PYTHONPATH=<worktree>/backend/rating`
+  verilmezse SESSİZCE ana repodaki eski kodu test eder (yaşandı: GÖREV 27).
 - Test komutları (repo kökünden):
   - backend: `backend\.venv\Scripts\python.exe -m pytest backend/tests`
   - collector: `backend\.venv\Scripts\python.exe -m pytest collector`

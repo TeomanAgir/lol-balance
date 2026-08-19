@@ -328,9 +328,11 @@ harman `score` S=2 kullanır. Aktif version `ENGINE_VERSION` config'iyle seçili
    `perf_score` ana evrendeki maç perf değeriyle aynıdır (aynı stats, aynı fonksiyon).
 5. **P_avg rol bazındadır:** `P_avg(player, role) = AVG(role_rating_history.perf_score)`
    — yalnız valid maçlar, yalnız bu engine_version, yalnız o rolün satırları.
-   `mu_eff_role = (1-W)*mu_role + W*(25 + 20*(P_avg_role - 1))` (W = aktif version'ın
-   perf ağırlığı; blend20'de 0.8), `score_role = mu_eff_role - 3*sigma_role`.
-6. **Hiç oynanmamış rol:** default prior + P_avg=1.0 → score 0 (nötr).
+   `mu_eff_role = (1-W)*mu_role + W*(25 + 20*(P_avg_role - 1))`, `score_role =
+   mu_eff_role - S*sigma_role` — W ve S AKTİF version'ın sabitleridir
+   (blend30-s2'de W=0.70, S=2; blend20/blend50'de W=0.8/0.5, S=3).
+6. **Hiç oynanmamış rol:** default prior + P_avg=1.0 → nötr score; sayısal değeri aktif
+   version'ın S'ine bağlıdır (S=3 iken ≈0, blend30-s2'de S=2 iken ≈8.33).
 7. **Position düzeltmesi** (`PUT /matches/{id}/positions`) rol evreninde replay tetikler;
    ana evren bit-bit değişmeden kalır. Rol replay'i her zaman `match_participants.position`'ın
    GÜNCEL değerinden okur (ham ingest payload'ından değil).
@@ -341,7 +343,12 @@ harman `score` S=2 kullanır. Aktif version `ENGINE_VERSION` config'iyle seçili
    (backend harmanı uygular, rating paketine harmanlanmış Rating geçer — mevcut desenle
    tutarlı).
 2. 126 ayrımın her birinde, HER TAKIM için 120 rol atamasından takım toplam
-   `score_role`'ünü (= geçilen Rating'in ordinal'i) maksimize eden atama seçilir.
+   `score_role`'ünü (= geçilen Rating'in ordinal'i, yani `mu_eff_role − 3*sigma_role`)
+   maksimize eden atama seçilir. **NOT (blend30-s2, 2026-08-20):** dengeleme hedefi
+   bilinçli olarak ORDINAL'de (3σ) kaldı; gösterilen `score` ise aktif version'ın
+   S'ini (2σ) kullanır. Gerekçe: dengeleme, az maçlı/belirsiz oyuncuyu daha
+   TEMKİNLİ değerlendirmelidir — ekrandaki puanla birebir aynı olması gerekmez.
+   Dengelemeyi de S'e bağlamak DAVRANIŞSAL değişikliktir, ayrı insan onayı ister.
    Eşitlikte deterministik kırılım: roller `TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY`
    sırasıyla gezilir, ilk bulunan maksimum korunur (strict-greater karşılaştırma).
 3. `p_win`: seçilen atamadaki `(mu_eff_role, sigma_role)` çiftleriyle `predict_win`.
