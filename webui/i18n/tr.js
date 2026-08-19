@@ -365,7 +365,7 @@ window.I18N_DICTS.tr = {
   "matches.close_editor": "Düzenlemeyi kapat",
   "matches.save_roles": "Rolleri Kaydet",
   "matches.role_select_aria": "{name} rolü",
-  "matches.no_changes": "Değişen rol yok.",
+  "matches.no_changes": "Değişen rol yok: kayıtlı rollerden farklı bir seçim yapılmadı.",
   "matches.roles_saved": "{updated} rol güncellendi · rol evreninde {replayed} maç yeniden işlendi.",
   "matches.open_detail": "Maç detayını aç",
   "matchdetail.title": "Maç #{id}",
@@ -475,5 +475,7 @@ window.I18N_DICTS.tr = {
   "control.name_saved": "Ad güncellendi: {name}",
   "control.name_unchanged": "Ad değişmedi.",
   "control.name_empty": "Ad boş bırakılamaz.",
-  "control.unsaved_confirm": "Kaydedilmemiş ad değişikliği var. Kaydetmeden devam edilsin mi?"
+  "control.unsaved_confirm": "Kaydedilmemiş ad değişikliği var. Kaydetmeden devam edilsin mi?",
+  "control.unsaved_roles_confirm": "Kaydedilmemiş rol seçimleri var. Kaydetmeden devam edilsin mi? (Seçimler atılır.)",
+  "control.unsaved_both_confirm": "Kaydedilmemiş ad değişikliği ve rol seçimleri var. Kaydetmeden devam edilsin mi?"
 };

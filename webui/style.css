@@ -2165,6 +2165,9 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   font-size: 14px;
   padding: 4px 8px;
 }
+/* Kaydedilmemiş seçim: kutu vurgulanır — kullanıcı neyin sunucuda, neyin
+   yalnız ekranda olduğunu görsün (seçimler yeniden çizimde korunuyor). */
+.re-row select.re-dirty { border-color: var(--brass); }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
 
 /* ── Maç detayı (GÖREV 8) — "md-" öneki bu görünüme aittir ──
