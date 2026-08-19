@@ -1667,21 +1667,31 @@
       ? `<section class="prof-section"><h3 class="ps-title">${t("profile.role_ratings_title")}</h3>${strip}</section>`
       : "";
 
-    const synMeta = (x) =>
-      `<span class="syn-meta">${t("profile.syn_meta", { n: x.matches_together, pct: pctText(x.winrate) })}</span>`;
-    const synLink = (x, cls) =>
-      `<button type="button" class="syn-link${cls ? " " + cls : ""}" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
+    // GÖREV 22: sinerji kartı yeniden tanımlandı (api_contract §2 "synergy") —
+    // "en sinerjili" iddiası değil "birlikte en iyi oynadıkların" dürüst gösterimi.
+    // Skor artık winrate-lift + perf-lift harmanı (score); perf_delta ikincil bilgi
+    // olarak skor rozetinin title tooltip'inde gösterilir (satırı kalabalıklaştırmadan;
+    // görünür-tekst metni her zaman n maç + G-M taşır, dokunmatik ekranda da okunur).
+    const synLink = (x) =>
+      `<button type="button" class="syn-link" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
+    const synRow = (x) => {
+      const losses = x.matches_together - x.wins_together;
+      const scoreTxt = fmtDelta2(x.score);
+      const perfTxt = typeof x.perf_delta === "number" ? fmtDelta2(x.perf_delta) : "—";
+      const title = t("profile.syn_score_title", { val: perfTxt });
+      return `<li>${synLink(x)}` +
+        `<span class="syn-stats">` +
+        `<span class="syn-score delta up" title="${esc(title)}">${scoreTxt}</span>` +
+        `<span class="syn-meta">${t("profile.syn_meta", { n: x.matches_together, w: x.wins_together, l: losses })}</span>` +
+        `</span></li>`;
+    };
     const synSec =
       `<section class="prof-section">
-         <h3 class="ps-title">${t("profile.synergy_title")}</h3>` +
+         <h3 class="ps-title">${t("profile.synergy_title")}</h3>
+         <p class="ps-hint">${t("profile.synergy_hint")}</p>` +
       (syn.length
-        ? `<div class="syn-top">${synLink(syn[0], "syn-name")}${synMeta(syn[0])}</div>` +
-          (syn.length > 1
-            ? `<ul class="syn-rest">` +
-              syn.slice(1).map(x => `<li>${synLink(x)}${synMeta(x)}</li>`).join("") +
-              `</ul>`
-            : "")
-        : `<p class="ps-empty">${t("profile.synergy_empty")}</p>`) +
+        ? `<ul class="syn-rest">` + syn.map(synRow).join("") + `</ul>`
+        : `<p class="ps-empty">${t("profile.synergy_empty", { n: played })}</p>`) +
       `</section>`;
 
     // Tarihçe bölümü (GÖREV 10) burada yalnız YER AÇAR: içeriğini renderHistory()

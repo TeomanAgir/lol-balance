@@ -142,12 +142,15 @@ def leaderboard(
 def player_profile_stats(
     player_id: int,
     conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> PlayerStatsOut:
     """Oyuncu profil istatistikleri (api_contract §2 "Oyuncu profili").
 
-    Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz.
+    Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz. `engine_version`
+    sinerjinin perf tarafı için gerekir (aktif engine'in `rating_history`
+    perf_score'ları okunur; GÖREV 22).
     """
-    stats = player_stats(conn, player_id)
+    stats = player_stats(conn, player_id, settings.engine_version)
     if stats is None:
         raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
     return stats
