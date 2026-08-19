@@ -39,11 +39,64 @@ def validate_rules(body: IngestMatch) -> None:
             )
 
 
+def _derived_display_name(riot_id: str) -> str:
+    """riot_id'nin '#' öncesi kısmı — türetilmiş görünen ad."""
+    return riot_id.split("#", 1)[0]
+
+
 def _display_name_from(participant: IngestParticipant) -> str:
     if participant.riot_id:
-        return participant.riot_id.split("#", 1)[0]
+        return _derived_display_name(participant.riot_id)
     assert participant.puuid is not None
     return participant.puuid[:12]
+
+
+def refresh_player_name(
+    conn: sqlite3.Connection, row: sqlite3.Row, new_riot_id: str | None
+) -> None:
+    """puuid ile eşleşen oyuncunun adını tazeler (ingest_contract "İsim tazeleme").
+
+    `row` en az id, riot_id, display_name taşımalıdır. Gelen riot_id boş/NULL ise
+    veya kayıttakiyle birebir (case-sensitive) aynıysa hiçbir şey yapılmaz.
+    riot_id her zaman güncellenir; display_name YALNIZ özelleştirilmemişse —
+    yani ESKİ riot_id'den türetilmiş ada eşitse — yeni türetilmiş ada çekilir.
+    Elle verilmiş özel ad (PATCH /players/{id}) korunur. Rating'e etkisi yoktur.
+    """
+    if not new_riot_id or new_riot_id == row["riot_id"]:
+        return
+
+    old_riot_id = row["riot_id"]
+    old_derived = _derived_display_name(old_riot_id) if old_riot_id else None
+    if old_derived is not None and row["display_name"] == old_derived:
+        conn.execute(
+            "UPDATE players SET riot_id = ?, display_name = ? WHERE id = ?",
+            (new_riot_id, _derived_display_name(new_riot_id), row["id"]),
+        )
+    else:
+        conn.execute(
+            "UPDATE players SET riot_id = ? WHERE id = ?", (new_riot_id, row["id"])
+        )
+
+
+def refresh_player_names(conn: sqlite3.Connection, body: IngestMatch) -> None:
+    """DUPLICATE maçta yalnız isim tazelemesini koşturur.
+
+    Maç verisine DOKUNULMAZ: ingest_events'e satır eklenmez, matches /
+    match_participants değişmez, rating evrenleri çalışmaz — yalnız puuid'si
+    eşleşen players satırları tazelenir (böylece backfill yeniden gönderimi
+    eski adları onarır). Idempotency yine DB'deki UNIQUE(source_game_id)'dedir;
+    bu fonksiyon idempotency kararına karışmaz.
+    """
+    with conn:
+        for p in body.participants:
+            if not p.puuid or not p.riot_id:
+                continue
+            row = conn.execute(
+                "SELECT id, riot_id, display_name FROM players WHERE puuid = ?",
+                (p.puuid,),
+            ).fetchone()
+            if row is not None:
+                refresh_player_name(conn, row, p.riot_id)
 
 
 def resolve_player(conn: sqlite3.Connection, p: IngestParticipant, index: int) -> int:
@@ -67,9 +120,11 @@ def resolve_player(conn: sqlite3.Connection, p: IngestParticipant, index: int) -
         return row["id"]
 
     row = conn.execute(
-        "SELECT id FROM players WHERE puuid = ?", (p.puuid,)
+        "SELECT id, riot_id, display_name FROM players WHERE puuid = ?", (p.puuid,)
     ).fetchone()
     if row is not None:
+        # İsim tazeleme: oyun içi yeniden adlandırma kayda yansır.
+        refresh_player_name(conn, row, p.riot_id)
         return row["id"]
 
     if p.riot_id:
@@ -115,6 +170,10 @@ def ingest_match(
         "SELECT id FROM matches WHERE source_game_id = ?", (body.source_game_id,)
     ).fetchone()
     if existing is not None:
+        # Duplicate = "maç için işlem yok"; tek istisna isim tazelemesidir
+        # (ingest_contract "İsim tazeleme"): maç verisi değişmez, yalnız
+        # players satırları gelen riot_id'lerle güncellenir.
+        refresh_player_names(conn, body)
         return existing["id"], True
 
     try:
@@ -241,6 +300,9 @@ def ingest_match(
                 (body.source_game_id,),
             ).fetchone()
             if row is not None:
+                # Transaction geri alındı; resolve_player içindeki tazeleme de
+                # birlikte gitti. Duplicate dalıyla aynı davranış için tekrar koş.
+                refresh_player_names(conn, body)
                 return row["id"], True
         raise
 
