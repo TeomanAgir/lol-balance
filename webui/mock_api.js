@@ -1049,6 +1049,10 @@
     if (method === "POST" && voidMatch) {
       const match = matches.find(m => m.id === Number(voidMatch[1]));
       if (!match) return err(404, "Maç bulunamadı.");
+      // api_contract §3 (Teoman, 2026-08-19): rulet maçı zaten rating dışıdır,
+      // void anlamsız → 409 (gerçek backend'le parite; unlink 409'uyla aynı kalıp).
+      if (match.status === "roulette")
+        return err(409, "Maç bir rulet maçı; rulet maçları zaten rating'e katılmıyor, void edilemez.");
       if (match.status === "void") return err(422, "Bu maç zaten void işaretli.");
       match.status = "void";
       return json({ match_id: match.id, status: "void" });
