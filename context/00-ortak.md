@@ -41,9 +41,13 @@ rating (OpenSkill blend50, ana + rol evreni) → web UI (framework'süz).
 - Kod yorumları/log'lar mevcut dosyanın diline uyar (çoğunlukla TR yorum, EN log).
 - Deterministiklik esastır: eşitlik kırılımları contract'ta tanımlanır; testler
   bit-bit eşitlik kanıtlayabilmelidir (replay == incremental gibi).
-- Test tabanları (2026-08-19): rating 156 · backend 318 · collector 479 (475+4 skip)
-  · webui 20 (`pytest webui/tests`, backend venv'iyle).
+- Test tabanları (2026-08-19 gece): rating 156 · backend 406 · collector 479 (475+4 skip)
+  · webui 32 (`pytest webui/tests`, backend venv'iyle).
   Worker, taban sayıyı DÜŞÜRMEDEN teslim eder ve önce/sonra sayısını raporlar.
+  **Sayım tuzağı:** pytest çıktısını `tail`/`head` ile boruya sokma — renkli ilerleme
+  noktaları kesilince özet satırı yanlış okunur (bir test worker'ı böylece 406'yı 361
+  sandı). Çıktıyı dosyaya yaz, sonunu oku. Ayrıca `backend/tests` ve `webui/tests` aynı
+  anda koşulurken dosya adları benzersiz olmalıdır (aynı basename = import çakışması).
 
 ## E2E deseni (orkestratör koşar; worker'a bilgi)
 `backend/data/lol_balance.db` scratchpad'e kopyalanır → `API_KEY=e2e-test-key

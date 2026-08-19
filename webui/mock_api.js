@@ -583,30 +583,103 @@
     };
   }
 
-  // ── Rozetler (GÖREV 11+12) ──
-  // api_contract §2 "Rozetler": yanıt yalnız {key, count, last_match_id} taşır
-  // (ad/açıklama web UI sözlüğünde), sıra SABİT katalog sırasıdır, yalnız
-  // count > 0 rozetler döner, rozetsiz oyuncuda badges: [].
+  // ── Rozetler (GÖREV 11+12; katalog GÖREV 24'te 27 rozet) ──
+  // api_contract §2 "Rozetler": yanıt `key` + sayısal alanları taşır (ad/açıklama
+  // web UI sözlüğünde), sıra SABİT katalog sırasıdır (ID = sıradaki konum),
+  // `include_locked=false` iken yalnız count > 0 rozetler döner.
   //
-  // Gerçek hesapta mvp/bench rating satırındaki perf_score'a bakar; mock'ta
-  // perf_score yok, bu yüzden deterministik bir VEKİL kullanılır — şekil ve
+  // Gerçek hesapta perf temelli rozetler rating satırındaki perf_score'a bakar;
+  // mock'ta perf_score yok, bu yüzden deterministik bir VEKİL kullanılır — şekil ve
   // kenar durumları doğru olsun diye, sayılar backend'le aynı olmak zorunda değil.
+  // Mock fixture'ı küçük olduğu için bazı rozetler (kill_20, role_record…) doğal
+  // olarak hiç düşmez; onlar KİLİTLİ yolu (include_locked) besler.
   //
   // SENARYO BAYRAĞI (test için elle değiştir):
   //   BADGES_FULL_PLAYER = <id> → o oyuncuda eksik katalog rozetleri deterministik
-  //     sayılarla tamamlanır (13 kartçıklı vitrin bir bakışta görülebilsin) ve
-  //     sona BİLİNMEYEN bir anahtar eklenir: UI'ın "tanımadığın key'i sessizce atla"
-  //     ileri uyumluluk yolu böyle denenir. null yaparsan yalnız gerçek rozetler döner.
-  // Ece (14) hiç maç oynamadı → badges: [] (boş durum metni).
-  // GÖREV 23 üçlüsü katalog sonundadır (api_contract §2). Mock'ta gerçek
-  // türetim yok: BADGES_FULL_PLAYER yolu bu üçü de deterministik sayılarla
-  // doldurur (vitrin + i18n adları o oyuncuda bir bakışta denenir).
+  //     sayılarla tamamlanır (27 rozetlik profil + ALTI KADEMENİN hepsi bir
+  //     bakışta görülebilsin: mvp STELLAR (görev tamam), gold DIAMOND (görev 2/3),
+  //     cs_per_min PLATINUM, vision GOLD, role_duel SILVER, damage BRONZE — vitrine
+  //     bu sırayla mvp/gold/cs_per_min girer) ve sona BİLİNMEYEN bir anahtar
+  //     eklenir: UI'ın "tanımadığın key'i
+  //     sessizce atla" ileri uyumluluk yolu böyle denenir. null yaparsan yalnız
+  //     gerçek rozetler döner.
+  // Ece (14) hiç maç oynamadı → include_locked=false ile badges: [] (boş durum
+  // metni), include_locked=true ile 27 kilitli rozet + ilerleme (0/10 …).
+  //
+  // class / source / tiered / one_time alanları GET /badges kataloğunun
+  // (api_contract §2 "Rozet kataloğu ucu") alanlarıdır; sıra ID sırasıdır.
   const BADGE_CATALOG = [
-    "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
-    "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
-    "roulette_complete", "roulette_winner", "gambler",
+    { key: "mvp", cls: "record", src: "valid", tiered: true, one: false },
+    { key: "vision", cls: "record", src: "valid", tiered: true, one: false },
+    { key: "damage", cls: "record", src: "valid", tiered: true, one: false },
+    { key: "cs_per_min", cls: "record", src: "valid", tiered: true, one: false },
+    { key: "gold", cls: "record", src: "valid", tiered: true, one: false },
+    { key: "role_duel", cls: "role", src: "valid", tiered: true, one: false },
+    { key: "role_record", cls: "role", src: "valid", tiered: false, one: false },
+    { key: "pr_perf", cls: "personal", src: "valid", tiered: false, one: false },
+    { key: "pr_damage", cls: "personal", src: "valid", tiered: false, one: false },
+    { key: "kill_20", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "kda_10", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "deathless", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "comeback", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "tragic_hero", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "marathon_5", cls: "narrative", src: "valid", tiered: false, one: false },
+    { key: "win_streak_3", cls: "streak", src: "valid", tiered: false, one: false },
+    { key: "lose_streak_3", cls: "streak", src: "valid", tiered: false, one: false },
+    { key: "bench_2", cls: "streak", src: "valid", tiered: false, one: false },
+    { key: "nemesis_6", cls: "relational", src: "valid", tiered: false, one: true },
+    { key: "duo_6", cls: "relational", src: "valid", tiered: false, one: true },
+    { key: "versatile", cls: "identity", src: "valid", tiered: false, one: true },
+    { key: "veteran_10", cls: "milestone", src: "valid", tiered: false, one: true },
+    { key: "veteran_20", cls: "milestone", src: "valid", tiered: false, one: true },
+    { key: "veteran_50", cls: "milestone", src: "valid", tiered: false, one: true },
+    { key: "roulette_complete", cls: "roulette", src: "roulette", tiered: false, one: false },
+    { key: "roulette_winner", cls: "roulette", src: "roulette", tiered: false, one: false },
+    { key: "gambler", cls: "roulette", src: "roulette", tiered: false, one: true },
+    // ID 28 (Teoman 2026-08-19): katalog SONUNA eklendi. Tek NADİR ölçekli
+    // kademeli rozet (eşikler seyrek olay için daha düşük).
+    { key: "perfect_quad", cls: "record", src: "valid", tiered: true, scale: "rare", one: false },
   ];
   const BADGES_FULL_PLAYER = 1;
+
+  // Kademe eşikleri (api_contract §2 "Kademe — ALTI SEVİYE").
+  // [REVİZE — Teoman, 2026-08-19] Kademe KÜMÜLATİF SAYAÇLADIR ve ASLA DÜŞMEZ:
+  // ölçüt `count`, ORAN KULLANILMAZ (oran paydaya bağlı olduğu için kötü bir gece
+  // kademeyi düşürebiliyordu). İki ölçek var: STANDART (her maçta ~1 dağılan
+  // rozetler) ve NADİR (yalnız `perfect_quad`). `matches_played >= 8` şartı
+  // KALDIRILDI. `rate` yanıtta SALT BİLGİ olarak kalır, kademeyi etkilemez.
+  //
+  // `stellar` SAYAÇLA KAZANILMAZ: elmas eşiği + o rozeti ARDIŞIK 3 valid maçta
+  // kazanma GÖREVİ. Bu yüzden elmasta next_tier_count NULL'dur (sıradaki basamak
+  // sayaçla değil görevle açılır) ve yanıt `stellar_quest` alanını taşır.
+  const TIER_STEPS = {
+    standard: { silver: 3, gold: 5, platinum: 8, diamond: 12 },
+    rare: { silver: 2, gold: 3, platinum: 4, diamond: 6 },
+  };
+  const TIER_BRONZE = 1, STELLAR_TARGET = 3;
+
+  function tierOf(count, played, scale, questBest) {
+    const step = TIER_STEPS[scale] || TIER_STEPS.standard;
+    const rate = played > 0 ? count / played : 0;
+    let tier = "bronze";
+    if (count >= step.diamond) tier = "diamond";
+    else if (count >= step.platinum) tier = "platinum";
+    else if (count >= step.gold) tier = "gold";
+    else if (count >= step.silver) tier = "silver";
+    const best = Math.max(0, Number(questBest) || 0);
+    const met = best >= STELLAR_TARGET;
+    if (tier === "diamond" && met) tier = "stellar";
+    const next = count < TIER_BRONZE ? TIER_BRONZE
+      : tier === "bronze" ? step.silver
+        : tier === "silver" ? step.gold
+          : tier === "gold" ? step.platinum
+            : tier === "platinum" ? step.diamond
+              : null;
+    return {
+      tier, rate: +rate.toFixed(2), next_tier_count: next,
+      stellar_quest: { target: STELLAR_TARGET, best, met },
+    };
+  }
 
   // perf_score vekili: NULL stat varsa perf de NULL sayılır (contract: perf_score
   // NULL satır mvp/bench için aday değildir).
@@ -618,40 +691,85 @@
     return s.kills * 3 + s.assists * 1.5 - s.deaths * 2 + s.gold / 4000 + s.damage_to_champs / 9000;
   }
 
-  function playerBadges(id) {
+  function playerBadges(id, includeLocked) {
     if (!players.some(x => x.id === id)) return null;
     const mine = matches
       .filter(m => m.status === "valid" && m.participants.some(x => x.player_id === id))
       .sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at));
 
-    const acc = new Map();   // key -> {count, last_match_id}
-    const add = (key, mid) => {
-      const e = acc.get(key) || { count: 0, last_match_id: null };
+    // key -> {count, last_match_id, best_match_id, best_value, run, best_run}
+    // val verilirse "en iyi an" izlenir (rekor/rol/kişisel sınıfları).
+    // best_run = kariyerdeki EN UZUN ARDIŞIK kazanım serisi (stellar görevi):
+    // rozet, kronolojik sırada bir önceki maçta da kazanıldıysa seri uzar, aksi
+    // hâlde 1'e döner (arada kazanılmayan/kapsam dışı maç seriyi KIRAR).
+    const acc = new Map();
+    let curIdx = -1;
+    const add = (key, mid, val) => {
+      const e = acc.get(key) ||
+        { count: 0, last_match_id: null, best_match_id: null, best_value: null,
+          run: 0, best_run: 0, runEnd: -2 };
       e.count++; e.last_match_id = mid;
+      if (typeof val === "number" && (e.best_value === null || val > e.best_value)) {
+        e.best_value = +val.toFixed(2); e.best_match_id = mid;
+      }
+      e.run = e.runEnd === curIdx - 1 ? e.run + 1 : 1;
+      e.runEnd = curIdx;
+      if (e.run > e.best_run) e.best_run = e.run;
       acc.set(key, e);
     };
 
     const roles = new Set();
-    let winRun = 0, benchRun = 0, played = 0;
+    const nights = new Map();     // gece anahtarı -> {n, last}
+    const foeWins = new Map();    // rakip player_id -> galibiyet
+    const mateWins = new Map();   // arkadaş player_id -> birlikte galibiyet
+    let winRun = 0, loseRun = 0, benchRun = 0, played = 0;
+    let bestPerf = null, bestDpm = null, perfSeen = 0, dpmSeen = 0;
 
     for (const m of mine) {
+      curIdx++;                   // kronolojik sıra: ardışıklık sayımının temeli
       played++;
       const me = m.participants.find(x => x.player_id === id);
       const win = m.winner_team === me.team;
       if (me.position) roles.add(me.position);
       if (roles.size === 5 && !acc.has("versatile")) add("versatile", m.id);
-      [10, 25, 50].forEach(n => { if (played === n) add("veteran_" + n, m.id); });
+      [10, 20, 50].forEach(n => { if (played === n) add("veteran_" + n, m.id); });
+
+      // Oyun gecesi: played_at (UTC) − 6 saat → tarih (sabaha kadar süren
+      // oturum tek gece sayılır, api_contract §2 "marathon_5").
+      const nk = new Date(Date.parse(m.played_at) - 6 * 3600 * 1000)
+        .toISOString().slice(0, 10);
+      const nb = nights.get(nk) || { n: 0, last: null };
+      nb.n++; nb.last = m.id;
+      nights.set(nk, nb);
+      if (nb.n === 5) add("marathon_5", nb.last);
+
+      // İlişkisel rozetler: aynı rakibe / aynı arkadaşla 6 galibiyet (tek seferlik).
+      if (win) {
+        for (const other of m.participants) {
+          if (other.player_id === id) continue;
+          const tally = other.team === me.team ? mateWins : foeWins;
+          const key = other.team === me.team ? "duo_6" : "nemesis_6";
+          const v = (tally.get(other.player_id) || 0) + 1;
+          tally.set(other.player_id, v);
+          if (v === 6 && !acc.has(key)) add(key, m.id);
+        }
+      }
 
       // Maçın en'leri: NULL aday değil, EŞİTLİKTE eşit olan herkes alır.
+      // Rekor sınıfında best_value = o maçtaki metrik değeri (contract §2).
+      // Dönüş değeri `perfect_quad` için gerekir: dört bileşenin AYNI maçta
+      // birden alınıp alınmadığı buradan bilinir.
       const statBadge = (key, fn) => {
         const nums = m.participants.map(fn).filter(v => typeof v === "number");
         const v = fn(me);
-        if (nums.length && typeof v === "number" && v === Math.max(...nums)) add(key, m.id);
+        const top = nums.length > 0 && typeof v === "number" && v === Math.max(...nums);
+        if (top) add(key, m.id, v);
+        return top;
       };
       statBadge("vision", x => (x.stats ? x.stats.vision_score : null));
-      statBadge("damage", x => (x.stats ? x.stats.damage_to_champs : null));
-      statBadge("gold", x => (x.stats ? x.stats.gold : null));
-      statBadge("cs_per_min", x =>
+      const gotDamage = statBadge("damage", x => (x.stats ? x.stats.damage_to_champs : null));
+      const gotGold = statBadge("gold", x => (x.stats ? x.stats.gold : null));
+      const gotCs = statBadge("cs_per_min", x =>
         m.duration_s > 0 && x.stats && typeof x.stats.cs === "number"
           ? x.stats.cs / (m.duration_s / 60) : null);
 
@@ -665,9 +783,21 @@
           b.stats.assists - a.stats.assists ||
           a.stats.deaths - b.stats.deaths ||
           a.player_id - b.player_id);
-      if (winners.length && winners[0].player_id === id) add("mvp", m.id);
+      const gotMvp = winners.length > 0 && winners[0].player_id === id;
+      if (gotMvp) add("mvp", m.id);
+      // Kusursuz Dörtlük (ID 28): MVP + en yüksek hasar + en çok gold + en
+      // yüksek CS/dk AYNI maçta. Bileşenler kendi rozetlerinin kuralıyla ölçülür,
+      // biri hesaplanamıyorsa (statBadge false döner) o maç bu rozetin dışındadır.
+      if (gotMvp && gotDamage && gotGold && gotCs) add("perfect_quad", m.id);
 
       if (me.stats && me.stats.deaths === 0) add("deathless", m.id);
+
+      // Anlatısal eşikler: bir maçta 20+ kill, KDA >= 10.
+      if (me.stats && typeof me.stats.kills === "number" && me.stats.kills >= 20)
+        add("kill_20", m.id);
+      if (me.stats && ["kills", "deaths", "assists"].every(f => typeof me.stats[f] === "number")
+        && (me.stats.kills + me.stats.assists) / Math.max(1, me.stats.deaths) >= 10)
+        add("kda_10", m.id);
 
       // Comeback: kazandı + 10 gold'un hepsi non-null + kazananın toplamı küçük.
       const golds = m.participants.map(x => (x.stats ? x.stats.gold : null));
@@ -677,32 +807,201 @@
         if (sum(m.winner_team) < sum(m.winner_team === 100 ? 200 : 100)) add("comeback", m.id);
       }
 
-      // Ayrık bloklar: 5 galibiyet / 3 bench maçı tamamlanınca sayaç sıfırlanır.
+      // Koridor hâkimi: aynı rolde KARŞI takımda tam 1 rakip + perf oranı >= 1.5.
+      // best_value = oran (contract §2 "role_duel").
+      const mineP = perfProxy(me);
+      if (me.position && mineP !== null) {
+        const foes = m.participants.filter(x => x.team !== me.team && x.position === me.position);
+        const foeP = foes.length === 1 ? perfProxy(foes[0]) : null;
+        if (foeP !== null && foeP > 0 && mineP / foeP >= 1.5) add("role_duel", m.id, mineP / foeP);
+      }
+
+      // Talihsiz kahraman: kaybeden takımın TEK BAŞINA en yüksek perf'lisi
+      // (bench_2'nin aynası; eşitlikte rozet yok).
+      const loseTeam = m.winner_team === 100 ? 200 : 100;
+      if (!win) {
+        const lp = m.participants.filter(x => x.team === loseTeam).map(perfProxy);
+        const top = lp.every(v => v !== null) ? Math.max(...lp) : null;
+        if (top !== null && lp.filter(v => v === top).length === 1 && mineP === top)
+          add("tragic_hero", m.id);
+      }
+
+      // Kişisel rekorlar: en az 5 ÖNCEKİ karşılaştırılabilir maç + kesin aşma.
+      if (mineP !== null) {
+        if (perfSeen >= 5 && mineP > bestPerf) add("pr_perf", m.id, mineP);
+        perfSeen++;
+        if (bestPerf === null || mineP > bestPerf) bestPerf = mineP;
+      }
+      const dpm = m.duration_s > 0 && me.stats && typeof me.stats.damage_to_champs === "number"
+        ? me.stats.damage_to_champs / (m.duration_s / 60) : null;
+      if (dpm !== null) {
+        if (dpmSeen >= 5 && dpm > bestDpm) add("pr_damage", m.id, dpm);
+        dpmSeen++;
+        if (bestDpm === null || dpm > bestDpm) bestDpm = dpm;
+      }
+
+      // Ayrık bloklar: 3 galibiyet / 3 mağlubiyet / 2 bench maçı tamamlanınca
+      // sayaç sıfırlanır (GÖREV 24 eşikleri).
       winRun = win ? winRun + 1 : 0;
-      if (winRun === 5) { add("win_streak_5", m.id); winRun = 0; }
+      if (winRun === 3) { add("win_streak_3", m.id); winRun = 0; }
+      loseRun = win ? 0 : loseRun + 1;
+      if (loseRun === 3) { add("lose_streak_3", m.id); loseRun = 0; }
 
       const team = m.participants.filter(x => x.team === me.team);
       const perfs = team.map(perfProxy);
-      const mineP = perfProxy(me);
       const comparable = perfs.every(v => v !== null) && mineP !== null;
       const lowest = comparable && perfs.filter(v => v === Math.min(...perfs)).length === 1
         && mineP === Math.min(...perfs);
       benchRun = lowest ? benchRun + 1 : 0;
-      if (benchRun === 3) { add("bench_3", m.id); benchRun = 0; }
+      if (benchRun === 2) { add("bench_2", m.id); benchRun = 0; }
     }
 
-    const badges = BADGE_CATALOG
-      .filter(k => acc.has(k))
-      .map(k => ({ key: k, count: acc.get(k).count, last_match_id: acc.get(k).last_match_id }));
+    // Rulet üçlüsü: katalogdaki TEK istisna — status='roulette' maçlardan
+    // türetilir (contract §2). Mock'ta atama kaydındaki bought/won bayrakları
+    // "iki eşya da envanterde" / "+ takım kazandı" anlamını taşır.
+    let rouletteWins = 0;
+    curIdx = -1;                  // rulet maçları ayrı bir kronoloji (seri sayacı sıfırlanır)
+    for (const m of matches.filter(x => x.status === "roulette" && x.roulette)
+      .sort((a, b) => Date.parse(a.played_at) - Date.parse(b.played_at))) {
+      curIdx++;
+      const a = (m.roulette.assignments || []).filter(x => x.player_id === id)[0];
+      if (!a) continue;
+      if (a.bought === true) add("roulette_complete", m.id);
+      if (a.won === true) {
+        add("roulette_winner", m.id);
+        rouletteWins++;
+        if (rouletteWins === 5) add("gambler", m.id);
+      }
+    }
 
+    // İlerleme (contract §2): kilometre, kimlik, ilişkisel, AÇIK seri, gambler.
+    const maxOf = (map) => (map.size ? Math.max(...map.values()) : 0);
+    const prog = {
+      veteran_10: { current: played, target: 10 },
+      veteran_20: { current: played, target: 20 },
+      veteran_50: { current: played, target: 50 },
+      versatile: { current: roles.size, target: 5 },
+      nemesis_6: { current: maxOf(foeWins), target: 6 },
+      duo_6: { current: maxOf(mateWins), target: 6 },
+      win_streak_3: { current: winRun, target: 3 },
+      lose_streak_3: { current: loseRun, target: 3 },
+      bench_2: { current: benchRun, target: 2 },
+      gambler: { current: rouletteWins, target: 5 },
+    };
+
+    // SENARYO: tam vitrin + kademe yolları. Sentetik sayaçlar acc'ye YAZILIR ki
+    // kademe hesabı gerçek yolun aynısından (tierOf) geçsin.
     if (id === BADGES_FULL_PLAYER && mine.length) {
       const lastId = mine[mine.length - 1].id;
-      const full = BADGE_CATALOG.map((k, i) =>
-        badges.find(b => b.key === k) || { key: k, count: 1 + (i % 3), last_match_id: lastId });
-      full.push({ key: "future_badge_unknown", count: 2, last_match_id: lastId });
-      return { player_id: id, badges: full };
+      // Hedef SAYAÇLAR altı kademenin hepsini tek profilde gösterir (eşikler:
+      // standart 1/3/5/8/12, nadir 1/2/3/4/6):
+      //   mvp 12 + görev TAMAM (3 seri)  = STELLAR
+      //   gold 12 + görev 2/3            = DIAMOND (göreve 1 kaldı)
+      //   cs_per_min 8 = PLATINUM · vision 5 = GOLD · role_duel 3 = SILVER
+      //   damage 1 = BRONZE · perfect_quad 4 = PLATINUM (NADİR ölçek)
+      const COUNTS = {
+        mvp: 12, gold: 12, cs_per_min: 8, vision: 5, role_duel: 3, damage: 1,
+        perfect_quad: 4,
+      };
+      BADGE_CATALOG.forEach((c, i) => {
+        const want = COUNTS[c.key];
+        const cur = acc.get(c.key);
+        if (want != null) {
+          // KADEMELİ rozetlerde sayaç sentetik değere SABİTLENİR (gerçek sayı
+          // daha büyük olsa bile): amaç altı kademenin HEPSİNİ tek profilde
+          // göstermek; gerçek sayı bırakılsa bazı rozetler aynı kademede
+          // yığılıp gümüş/bronz yolu hiç denenmezdi.
+          const best = cur && cur.best_match_id != null ? cur : null;
+          acc.set(c.key, {
+            count: want, last_match_id: lastId,
+            best_match_id: best ? best.best_match_id : lastId,
+            best_value: best ? best.best_value : +(1.4 + i / 10).toFixed(2),
+            run: 0, best_run: cur ? cur.best_run : 0, runEnd: -2,
+          });
+        } else if (!cur) {
+          const measurable = c.cls === "record" || c.cls === "role" || c.cls === "personal";
+          acc.set(c.key, {
+            count: c.one ? 1 : 1 + (i % 3), last_match_id: lastId,
+            best_match_id: measurable ? lastId : null,
+            best_value: measurable ? +(1.2 + i / 10).toFixed(2) : null,
+            run: 0, best_run: 0, runEnd: -2,
+          });
+        }
+      });
+      // Stellar GÖREVİ yolları (iki yol da denenebilsin): mvp'de görev
+      // TAMAMLANMIŞ (ardışık 3 → stellar), gold'da göreve 1 KALMIŞ (2/3 →
+      // elmasta kalır ve baloncukta görev satırı görünür).
+      const RUNS = {
+        mvp: 3, gold: 2, cs_per_min: 2, vision: 1, role_duel: 1, damage: 1,
+        perfect_quad: 1,
+      };
+      Object.keys(RUNS).forEach(k => {
+        const e = acc.get(k);
+        if (e) e.best_run = RUNS[k];
+      });
     }
-    return { player_id: id, badges };
+
+    const rows = BADGE_CATALOG.map(c => {
+      const e = acc.get(c.key) ||
+        { count: 0, last_match_id: null, best_match_id: null, best_value: null };
+      // Kilitli kademeli rozet (count: 0): tier null, rate 0.0 (hiç maç yoksa
+      // null), next_tier_count = bronz eşiği (1).
+      const tier = !c.tiered ? { tier: null, rate: null, next_tier_count: null, stellar_quest: null }
+        : e.count > 0 ? tierOf(e.count, played, c.scale, e.best_run)
+          : { tier: null, rate: played > 0 ? 0 : null, next_tier_count: TIER_BRONZE, stellar_quest: null };
+      const p = prog[c.key] || null;
+      return {
+        key: c.key,
+        count: e.count,
+        last_match_id: e.last_match_id,
+        best_match_id: e.best_match_id,
+        best_value: e.best_value,
+        tier: tier.tier,
+        rate: tier.rate,
+        next_tier_count: tier.next_tier_count,
+        stellar_quest: tier.stellar_quest,
+        progress: p ? { current: p.current, target: p.target } : null,
+      };
+    }).filter(r => includeLocked || r.count > 0);
+
+    // İleri uyumluluk yolu: UI tanımadığı anahtarı sessizce atlar.
+    if (id === BADGES_FULL_PLAYER && mine.length) {
+      rows.push({
+        key: "future_badge_unknown", count: 2, last_match_id: mine[mine.length - 1].id,
+        best_match_id: null, best_value: null, tier: null, rate: null,
+        next_tier_count: null, stellar_quest: null, progress: null,
+      });
+    }
+    return { player_id: id, matches_played: played, badges: rows };
+  }
+
+  // ── Rozet kataloğu (GÖREV 24) ──
+  // GET /badges: salt-okur, global. holders = o rozetten en az 1 taşıyan oyuncu
+  // sayısı; roster_size = en az 1 valid maçı olan oyuncu sayısı (hiç oynamamış
+  // kayıt nadirliği şişirmesin). Per-player hesapların saf toplamıdır.
+  function badgeCatalogPayload() {
+    const roster = players.filter(p => matches.some(m =>
+      m.status === "valid" && m.participants.some(x => x.player_id === p.id)));
+    const holders = new Map();
+    for (const p of roster) {
+      const b = playerBadges(p.id, false);
+      for (const row of (b ? b.badges : [])) {
+        if (row.count > 0) holders.set(row.key, (holders.get(row.key) || 0) + 1);
+      }
+    }
+    const size = roster.length;
+    return {
+      roster_size: size,
+      badges: BADGE_CATALOG.map((c, i) => {
+        const n = holders.get(c.key) || 0;
+        return {
+          id: i + 1, key: c.key, class: c.cls, source: c.src,
+          tiered: c.tiered, tier_scale: c.tiered ? (c.scale || "standard") : null,
+          one_time: c.one,
+          holders: n, holders_pct: size > 0 ? +((n / size) * 100).toFixed(1) : 0,
+        };
+      }),
+    };
   }
 
   // ── Haftanın enleri (GÖREV 2) ──
@@ -989,12 +1288,17 @@
       return h ? json(h) : err(404, "Oyuncu bulunamadı.");
     }
 
-    // Rozetler (GÖREV 11+12) — profil vitrininin verisi.
-    const badgePath = path.match(/^\/players\/(\d+)\/badges$/);
+    // Rozetler (GÖREV 11+12) — profil vitrininin verisi. GÖREV 24: kilitliler
+    // ?include_locked=true ile gelir (varsayılan false = yalnız kazanılmışlar).
+    const badgePath = path.match(/^\/players\/(\d+)\/badges(?:\?(.*))?$/);
     if (method === "GET" && badgePath) {
-      const b = playerBadges(Number(badgePath[1]));
+      const locked = /(^|&)include_locked=(true|1)(&|$)/.test(badgePath[2] || "");
+      const b = playerBadges(Number(badgePath[1]), locked);
       return b ? json(b) : err(404, "Oyuncu bulunamadı.");
     }
+
+    // Rozet kataloğu (GÖREV 24) — nadirlik göstergesinin kaynağı.
+    if (method === "GET" && path === "/badges") return json(badgeCatalogPayload());
 
     if (method === "GET" && path === "/leaderboard")
       return json([...players].sort((a, b) => b.rating.score - a.rating.score));

@@ -176,16 +176,20 @@ def player_rating_history(
 @router.get("/players/{player_id}/badges")
 def player_badge_list(
     player_id: int,
+    include_locked: bool = False,
     conn: sqlite3.Connection = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> PlayerBadgesOut:
-    """Oyuncunun rozetleri (api_contract §2 "Rozetler", GÖREV 11+12).
+    """Oyuncunun rozetleri (api_contract §2 "Rozetler"; katalog GÖREV 24).
 
     Yalnız GÖSTERİM: rating'e girmez, hiçbir tablo yazılmaz — rozetler her
     istekte mevcut maç/rating satırlarından hesaplanır. Rozetsiz oyuncuda
-    `badges: []`.
+    `badges: []`. `include_locked=true` katalogdaki 27 anahtarın hepsini
+    döndürür (kilitli rozetin ilerlemesi için); varsayılan yalnız count > 0.
     """
-    badges = player_badges(conn, player_id, settings.engine_version)
+    badges = player_badges(
+        conn, player_id, settings.engine_version, include_locked
+    )
     if badges is None:
         raise HTTPException(404, detail=f"Oyuncu bulunamadı: {player_id}.")
     return badges

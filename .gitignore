@@ -20,3 +20,6 @@ collector/.env
 
 # GOREV 14: Data Dragon varliklari build-time indirilir, repo'ya girmez
 webui/assets/ddragon/
+
+# Gorev notlari yerel-only (new_modules.md deseninin devami)
+modules/

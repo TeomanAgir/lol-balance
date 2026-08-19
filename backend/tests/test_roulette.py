@@ -563,8 +563,13 @@ def test_roulette_badges_complete_and_winner(client):
         },
     )
     badges, _ = _badges(client, winner)
+    # GÖREV 24 alanları: rulet sınıfı ölçülebilir/kademeli DEĞİLDİR
+    # (roulette_complete/winner'da progress da yok; yalnız gambler'da var).
     assert badges["roulette_complete"] == {
         "key": "roulette_complete", "count": 1, "last_match_id": match_id,
+        "best_match_id": None, "best_value": None,
+        "tier": None, "rate": None, "next_tier_count": None, "progress": None,
+        "stellar_quest": None,
     }
     assert badges["roulette_winner"]["count"] == 1
     assert "gambler" not in badges
@@ -617,9 +622,21 @@ def test_gambler_threshold_catalog_order_and_replay_determinism(client):
     assert badges["roulette_winner"]["count"] == 5
     assert badges["gambler"] == {
         "key": "gambler", "count": 1, "last_match_id": match_ids[4],
+        "best_match_id": None, "best_value": None,
+        "tier": None, "rate": None, "next_tier_count": None,
+        # gambler'ın ilerlemesi roulette_winner sayısıdır (GÖREV 24).
+        "progress": {"current": 5, "target": 5},
+        "stellar_quest": None,
     }
-    # Rulet rozetleri katalog sırasının SONUNDA.
-    assert keys[-3:] == ["roulette_complete", "roulette_winner", "gambler"]
+    # Rulet rozetleri katalog sırasının SONUNDA; perfect_quad (28., GÖREV 24
+    # revizyonu) onlardan da SONRA gelir. "plain-g" maçında statlar tüm
+    # katılımcılarda eşittir (bkz. make_roster_payload) → target (en küçük
+    # player_id, mvp'nin kendi kırılımıyla) o TEK valid maçta dört bileşeni de
+    # (mvp+damage+gold+cs_per_min, hepsi eşitlikte "lider") toplar.
+    assert keys[-4:] == [
+        "roulette_complete", "roulette_winner", "gambler", "perfect_quad",
+    ]
+    assert badges["perfect_quad"]["count"] == 1
     # Valid maçtan gelen rozetler (deathless: deaths=2 → yok; mvp olabilir)
     # rulet öncesinde sıralanır — keys katalog sırasına uyar.
     from app.services.badges import BADGE_KEYS

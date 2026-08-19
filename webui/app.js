@@ -123,9 +123,12 @@
     pos == null ? "—" : (ROLES.includes(pos) ? roleName(pos) : pos);
   const roleOrder = (pos) => { const i = ROLES.indexOf(pos); return i === -1 ? ROLES.length : i; };
 
-  // role_ratings kompakt şeridi. long=true → geniş yerleşim (sıralama tablosu).
-  // matches === 0 olan rol soluk gösterilir (default prior, gerçek veri değil).
-  function roleCells(rr, long = false) {
+  // role_ratings kompakt şeridi (oyuncu kartı). matches === 0 olan rol soluk
+  // gösterilir (default prior, gerçek veri değil).
+  // NOT: profilde bu şerit KULLANILMAZ — orada resmî rol simgeli yay görünümü
+  // vardır (profRoleGrid, GÖREV 24 / K2-2), o yüzden eski "long" geniş yerleşim
+  // varyantı kaldırıldı.
+  function roleCells(rr) {
     if (!rr) return ""; // backend eski şekli dönüyorsa şerit hiç çizilmez
     const cells = ROLES.map(r => {
       const v = rr[r];
@@ -134,12 +137,12 @@
       const title = t("common.role_cell_title",
         { role: roleName(r), score: fmtRating(v.score), matches: v.matches });
       return `<div class="role-cell${zero ? " zero" : ""}" title="${title}">
-          <span class="rc-role">${long ? roleName(r) : roleAbbr(r)}</span>
+          <span class="rc-role">${roleAbbr(r)}</span>
           <span class="rc-score">${fmtRating(v.score)}</span>
-          <span class="rc-matches">${long ? t("common.n_matches", { n: v.matches }) : v.matches}</span>
+          <span class="rc-matches">${v.matches}</span>
         </div>`;
     }).join("");
-    return cells ? `<div class="role-strip${long ? " long" : ""}">${cells}</div>` : "";
+    return cells ? `<div class="role-strip">${cells}</div>` : "";
   }
 
   // ── Data Dragon varlıkları (GÖREV 14) ─────────────────────────
@@ -403,6 +406,10 @@
     // fix-3: Kontrol Paneli de geniştir — maç satırı (#id + tarih + durum +
     // iki takım + eylemler) 720px'te sarılıp okunmaz hale geliyordu.
     $("#main").classList.toggle("pa-wide", name === "pick" || name === "control");
+    // GÖREV 24: profil K2-2 konseptindeki gibi TAM GENİŞLİK kullanır — kaide
+    // kenardan kenara, içerik 1240px'e kadar. Kısıt YALNIZ bu görünümde kalkar
+    // (global main kuralı ve diğer görünümler etkilenmez).
+    $("#main").classList.toggle("pa-full", name === "profile");
     syncFaqHash(name);
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
@@ -1590,13 +1597,6 @@
   // (tr "%50", en "50%") — common.percent anahtarı taşır.
   const pctText = (x) => (typeof x === "number" ? t("common.percent", { n: Math.round(x * 100) }) : "—");
 
-  const statCard = (title, main, sub) =>
-    `<article class="stat-card">
-       <h3 class="sc-title">${title}</h3>
-       <div class="sc-main">${main}</div>
-       ${sub ? `<div class="sc-sub">${sub}</div>` : ""}
-     </article>`;
-
   // ── Favori eşya kartı (GÖREV 14) ──────────────────────────────
   // Veri: GET /players/{id}/stats → top_items (sayım azalan, en fazla 10 kayıt).
   // Contract §2: "favori eşya" SEÇİMİ web UI'dadır — totem/tüketilebilir etiketli
@@ -1613,95 +1613,183 @@
   function favItemCard(x) {
     const id = Number(x.item_id);
     const n = Number.isFinite(Number(x.matches)) ? Number(x.matches) : 0;
-    return `<article class="stat-card fi-card">
-        <h3 class="sc-title">${t("profile.card_fav_item")}</h3>
+    return `<div class="k2-card fi-card">
+        <div class="k2-card-hd"><span class="k2-lbl">${t("profile.card_fav_item")}</span></div>
         <div class="fi-row">
           ${ddIconHtml(itemIconSrc(id), itemPh(id), "item")}
-          <span class="sc-main fi-name">${esc(itemName(id))}</span>
+          <span class="fi-name">${esc(itemName(id))}</span>
         </div>
-        <div class="sc-sub">${t("profile.fav_item_matches", { n })}</div>
-      </article>`;
+        <div class="k2-gg-n fi-sub">${t("profile.fav_item_matches", { n })}</div>
+      </div>`;
+  }
+
+  // ── Rol yayları (konsept: .gauges / .gg) ──────────────────────
+  // Yerleşim, ölçü ve %46'lık simge oranı konseptten birebir. İki fark:
+  //   · Simge konseptin çizimi DEĞİL, PROJENİN RESMÎ rol ikonudur (ortak
+  //     posIconHtml → assets/ddragon/position/*.svg; Geçmiş kartı ve maç
+  //     detayıyla aynı varlık ve sınıf, yeni varlık eklenmedi). İkon
+  //     çizilemezse etiket düz metin kalır.
+  //   · Yayın DOLGU ORANI oyuncunun KENDİ rolleri arasındadır: score mu_eff−3σ
+  //     olduğu için mutlak bir tavan yoktur; kendi en iyi rolü %100 sayılır
+  //     (kartın altındaki not bunu yazar).
+  // 270°'lik yay: r=26 → çevrenin %75'i = 122.5 birim; boşluk aşağıda kalsın
+  // diye grup 135° döndürülür. Hiç oynanmamış rol SOLUK ve yaysızdır.
+  function k2Gauges(rr) {
+    if (!rr) return "";
+    const rows = ROLES.map(r => ({ r, v: rr[r] }))
+      .filter(x => x.v && typeof x.v.score === "number");
+    if (!rows.length) return "";
+    const top = rows.reduce((m, x) => (x.v.matches && x.v.score > m ? x.v.score : m), 0);
+    const R = 26, ARC = 2 * Math.PI * R * 0.75;
+    const cells = rows.map(({ r, v }) => {
+      const off = !v.matches;
+      const f = off || !(top > 0) ? 0 : Math.max(0, Math.min(1, v.score / top));
+      return `<div class="k2-gg${off ? " k2-off" : ""}"><div class="k2-gg-w">
+          <svg class="k2-gg-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <g transform="rotate(135 32 32)">
+              <circle class="k2-g-bg" cx="32" cy="32" r="${R}" stroke-dasharray="${ARC.toFixed(1)} 999"/>
+              <circle class="k2-g-fg" cx="32" cy="32" r="${R}" stroke-dasharray="${(ARC * f).toFixed(1)} 999"/>
+            </g>
+          </svg>
+          <span class="k2-gg-ic">${posIconHtml(r, roleAbbr(r), "k2-ri")}</span>
+        </div>
+        <span class="k2-gg-v">${off ? "—" : fmtRating(v.score)}</span>
+        <span class="k2-gg-n">${off ? t("profile.role_unplayed") : t("common.n_matches", { n: v.matches })}</span>
+      </div>`;
+    }).join("");
+    return `<div class="k2-gauges">${cells}</div>` +
+      `<p class="k2-role-foot">${t("profile.role_ratings_hint")}</p>`;
   }
 
   // s = GET /players/{id}/stats yanıtı. kda / favoriler null, synergy boş,
-  // winrate null olabilir — hepsi kısa notla gösterilir.
+  // winrate null olabilir — hepsi "—" ya da kısa notla gösterilir.
+  //
+  // YERLEŞİM: Teoman'ın seçtiği K2-2 "Kaidenin İki Yanı" konsepti BİREBİR
+  // taşındı (iskelet, sınıf yapısı ve ölçüler konsept dosyasından):
+  //   .k2-hero > .k2-hero-in > .k2-cap + .k2-stage(.k2-nbs-l | .pb-plinth | .k2-nbs-r)
+  //   .k2-body > .k2-sec(rating + roller ikilisi) → sinerji → rozet kuyruğu → diğer
+  // Konseptte OLUP bilinçli olarak ALINMAYANLAR (Teoman'ın düzeltmeleri):
+  //   · puanın altındaki `openskill-pl-blend20-v1 · mu_eff − 3σ` satırı (.cap-eng)
+  //   · vitrindeki "EN NADİR 1/2/3" sıra etiketleri (.pl-rank)
+  //   · vitrindeki nadirlik yüzdesi ve çubuğu (.pl-meta / .rar-cells) — nadirlik
+  //     yalnız bilgi baloncuğunda
+  //   · konseptin kendi rol simgesi çizimleri (yerine ortak posIconHtml)
   function profileHtml(s) {
     const p = s.player || {};
-    const rp = state.roster.find(x => x.id === p.id); // rol şeridi + puan roster'dan
+    const rp = state.roster.find(x => x.id === p.id); // rol yayları + puan roster'dan
     const tot = s.totals || {};
     const played = tot.matches || 0;
     const k = s.kda, fc = s.favorite_champion, fr = s.favorite_role;
     const syn = s.synergy || [];
     const fi = favItem(s.top_items);
+    const show = badgeShowcase();
 
-    const scoreHtml = rp
-      ? `<div class="prof-score">${fmtRating(rp.rating.score)}<span>${t("common.points_word")}</span></div>`
-      : "";
-    const head =
-      `<header class="prof-head">
-         <h2 class="prof-name">${esc(p.display_name)}</h2>
-         ${p.riot_id ? `<span class="prof-riot">${esc(p.riot_id)}</span>` : ""}
-         ${scoreHtml}
-       </header>`;
+    // Rakam bloğu (konsept: .nb): küçük etiket + büyük tabular sayı.
+    const nb = (label, value) =>
+      `<div class="k2-nb"><span class="k2-lbl">${label}</span>` +
+      `<span class="k2-nb-v">${value}</span></div>`;
 
-    const cards =
-      statCard(t("profile.card_matches"),
-        played ? t("profile.matches_line", { n: played, w: tot.wins, l: tot.losses }) : t("profile.no_matches"),
-        played && tot.winrate != null ? t("profile.win_pct", { pct: pctText(tot.winrate) }) : "") +
-      statCard(t("profile.card_kda"),
-        k ? `${num1(k.kills_avg)} / ${num1(k.deaths_avg)} / ${num1(k.assists_avg)}` : "—",
-        k ? t("profile.kda_ratio", { ratio: num2(k.ratio) }) : t("profile.no_stat_matches")) +
+    // Sol yan: hacim (maç, G/M, oran). Sağ yan: karakter (KDA, koridor, şampiyon).
+    const left =
+      nb(t("profile.nb_matches"), played ? String(played) : "—") +
+      nb(t("profile.nb_wl"), played
+        ? `<span class="k2-g">${tot.wins}</span><span class="k2-sep">/</span>` +
+          `<span class="k2-m">${tot.losses}</span>`
+        : "—") +
+      nb(t("profile.nb_winrate"), played && tot.winrate != null ? pctText(tot.winrate) : "—");
+    const right =
+      nb(t("profile.card_kda"), k
+        ? `${num2(k.ratio)}<small>${num1(k.kills_avg)}/${num1(k.deaths_avg)}/${num1(k.assists_avg)}</small>`
+        : "—") +
+      // Simgenin yedek ETİKETİ bilinçli olarak BOŞTUR: rolün adı hemen yanında
+      // ZATEN yazıyor (konseptte de simge + "Orta" birlikte duruyor). Simge
+      // çizilemezse kutu boş kalır ve yalnız ad okunur — aksi hâlde "ORT Orta"
+      // gibi tekrar görünürdü.
+      nb(t("profile.card_role"), fr
+        ? posIconHtml(fr.role, "", "k2-nb-ico") +
+          `<span class="k2-txt">${esc(roleLabel(fr.role))}</span>` +
+          `<small>${t("common.n_matches", { n: fr.matches })}</small>`
+        : "—") +
       // Favori karakter [REVİZE 2026-08-15]: seçim ölçütü galibiyet SAYISI →
       // alt yazı da galibiyeti önde gösterir ("3 galibiyet · 4 mac").
-      statCard(t("profile.card_champion"),
-        fc ? esc(fc.champion) : "—",
-        fc ? t("profile.champ_line", { w: fc.wins, n: fc.matches }) : t("profile.no_champion_data")) +
-      statCard(t("profile.card_role"),
-        fr ? esc(roleLabel(fr.role)) : "—",
-        fr ? t("common.n_matches", { n: fr.matches }) : t("profile.no_role_data")) +
-      // Favori eşya kartı yalnız uygun kayıt varsa şeride girer (GÖREV 14).
-      (fi ? favItemCard(fi) : "");
+      // Şampiyon adı BÜYÜK HARFE ÇEVRİLMEZ (.k2-name): Türkçe eşlemede
+      // "Diana" → "DİANA" olurdu.
+      nb(t("profile.card_champion"), fc
+        ? `<span class="k2-txt k2-name">${esc(fc.champion)}</span>` +
+          `<small>${t("profile.champ_line", { w: fc.wins, n: fc.matches })}</small>`
+        : "—");
 
-    const strip = rp ? roleCells(rp.role_ratings, true) : "";
-    const roleSec = strip
-      ? `<section class="prof-section"><h3 class="ps-title">${t("profile.role_ratings_title")}</h3>${strip}</section>`
+    // Vitrin (3 büyük madalyon) yalnız YER AÇAR; içeriğini renderBadges()
+    // doldurur — rozet uçları düşerse kaide rozetsiz ama bozulmadan durur.
+    const head =
+      `<header class="k2-hero"><div class="k2-hero-in">
+         <div class="k2-cap">
+           ${show.length ? `<span class="k2-lbl">${t("profile.showcase_label")}</span>` : ""}
+           <h2 class="k2-cap-nm">${esc(p.display_name)}</h2>
+           ${p.riot_id ? `<span class="k2-riot">${esc(p.riot_id)}</span>` : ""}
+           ${rp ? `<div class="k2-cap-sc"><b>${fmtRating(rp.rating.score)}</b>` +
+             `<span class="k2-sc-u">${t("common.points_word")}</span></div>` : ""}
+         </div>
+         <div class="k2-stage">
+           <div class="k2-nbs k2-nbs-l">${left}</div>
+           <div class="pb-plinth" id="prof-showcase"></div>
+           <div class="k2-nbs k2-nbs-r">${right}</div>
+         </div>
+       </div><div class="k2-floor"></div></header>`;
+
+    // Rating tarihçesi + rol yayları TEK bölüm başlığı altında iki karttır
+    // (konsept: .sec > .sec-hd + .duo). Tarihçe kartı yalnız YER AÇAR:
+    // içeriğini renderHistory() doldurur (aralık düğmeleri profil yeniden
+    // çekilmeden yeniden çizebilsin diye). Grafiğin ETKİLEŞİMİ değişmedi:
+    // nokta → maç künyesi → maç detayı, zaman aralığı düğmeleri.
+    const roleCard = rp && k2Gauges(rp.role_ratings)
+      ? `<div class="k2-card">
+           <div class="k2-card-hd"><span class="k2-lbl">${t("profile.role_ratings_title")}</span>
+           <span class="k2-lbl">${t("profile.role_ratings_unit")}</span></div>
+           ${k2Gauges(rp.role_ratings)}
+         </div>`
       : "";
+    const duo = `<div class="k2-duo${roleCard ? "" : " k2-duo-solo"}">` +
+      `<div class="k2-card k2-card-accent" id="prof-history" hidden></div>${roleCard}</div>`;
+    const ratingSec =
+      `<section class="k2-sec"><div class="k2-sec-hd">
+         <h3>${t("profile.rating_roles_title")}</h3>
+         <span class="k2-note">${t("profile.rating_roles_note")}</span>
+       </div>${duo}</section>`;
 
-    // GÖREV 22: sinerji kartı yeniden tanımlandı (api_contract §2 "synergy") —
-    // "en sinerjili" iddiası değil "birlikte en iyi oynadıkların" dürüst gösterimi.
-    // Skor artık winrate-lift + perf-lift harmanı (score); perf_delta ikincil bilgi
-    // olarak skor rozetinin title tooltip'inde gösterilir (satırı kalabalıklaştırmadan;
-    // görünür-tekst metni her zaman n maç + G-M taşır, dokunmatik ekranda da okunur).
-    const synLink = (x) =>
-      `<button type="button" class="syn-link" data-player="${x.player_id}">${esc(x.display_name)}</button>`;
-    const synRow = (x) => {
+    // Sinerji (konsept: .syn / .syn-c) — büyük delta solda, ad ve künye sağda.
+    // GÖREV 22: skor winrate-lift + perf-lift harmanıdır; perf_delta ikincil
+    // bilgi olarak title tooltip'inde durur (satırı kalabalıklaştırmadan).
+    const synCard = (x) => {
       const losses = x.matches_together - x.wins_together;
-      const scoreTxt = fmtDelta2(x.score);
       const perfTxt = typeof x.perf_delta === "number" ? fmtDelta2(x.perf_delta) : "—";
-      const title = t("profile.syn_score_title", { val: perfTxt });
-      return `<li>${synLink(x)}` +
-        `<span class="syn-stats">` +
-        `<span class="syn-score delta up" title="${esc(title)}">${scoreTxt}</span>` +
-        `<span class="syn-meta">${t("profile.syn_meta", { n: x.matches_together, w: x.wins_together, l: losses })}</span>` +
-        `</span></li>`;
+      return `<div class="k2-syn-c">
+          <span class="k2-syn-d" title="${esc(t("profile.syn_score_title", { val: perfTxt }))}">${fmtDelta2(x.score)}</span>
+          <span><button type="button" class="syn-link k2-syn-nm" data-player="${x.player_id}">${esc(x.display_name)}</button>
+          <span class="k2-syn-m">${t("profile.syn_meta", { n: x.matches_together, w: x.wins_together, l: losses })}</span></span>
+        </div>`;
     };
     const synSec =
-      `<section class="prof-section">
-         <h3 class="ps-title">${t("profile.synergy_title")}</h3>
-         <p class="ps-hint">${t("profile.synergy_hint")}</p>` +
+      `<section class="k2-sec"><div class="k2-sec-hd">
+         <h3>${t("profile.synergy_title")}</h3>
+         <span class="k2-note">${t("profile.synergy_hint")}</span>
+       </div>` +
       (syn.length
-        ? `<ul class="syn-rest">` + syn.map(synRow).join("") + `</ul>`
+        ? `<div class="k2-syn">${syn.map(synCard).join("")}</div>`
         : `<p class="ps-empty">${t("profile.synergy_empty", { n: played })}</p>`) +
       `</section>`;
 
-    // Tarihçe bölümü (GÖREV 10) burada yalnız YER AÇAR: içeriğini renderHistory()
-    // doldurur — aralık düğmeleri profil yeniden çekilmeden yeniden çizebilsin diye.
-    const histSec = `<section class="prof-section" id="prof-history" hidden></section>`;
-    // Rozet vitrini (GÖREV 11+12) tarihçe grafiğinin ALTINDA; aynı desenle yalnız
-    // yer açar, içeriğini renderBadges() doldurur (uç düşerse hiç görünmez).
-    const badgeSec = `<section class="prof-section" id="prof-badges" hidden></section>`;
+    // Rozet KUYRUĞU (konsept: .tail): vitrine giren 3 rozet burada YİNE
+    // listelenmez. Yalnız yer açar, içeriğini renderBadges() doldurur.
+    const badgeSec = `<section class="k2-sec" id="prof-badges" hidden></section>`;
+    // Favori eşya yalnız uygun kayıt varsa çizilir (GÖREV 14).
+    const otherSec = fi
+      ? `<section class="k2-sec"><div class="k2-sec-hd">
+           <h3>${t("profile.other_title")}</h3>
+         </div><div class="k2-duo">${favItemCard(fi)}</div></section>`
+      : "";
 
-    return head + `<div class="stat-grid">${cards}</div>` + histSec + badgeSec + roleSec + synSec;
+    return head + `<div class="k2-body">${ratingSec}${synSec}${badgeSec}${otherSec}</div>`;
   }
 
   async function loadProfile() {
@@ -1721,10 +1809,14 @@
       // profilin kalanı çalışsın — /nemesis'teki desenin aynısı, o bölüm çizilmez.
       // loadAssets (GÖREV 14) reject etmez: varlık yoksa favori eşya kartı yer
       // tutucuyla çizilir, profil beklemez.
+      // include_locked=true (GÖREV 24): kilitli rozetler de gelir (count: 0) ve
+      // vitrinin sonunda soluk + ilerlemeli gösterilir. Parametreyi bilmeyen eski
+      // backend onu yok sayar → yalnız kazanılmışlar döner, vitrin yine çalışır.
       const [s, h, b] = await Promise.all([
         api(`/players/${state.profileId}/stats`),
         api(`/players/${state.profileId}/rating-history`).catch(() => null),
-        api(`/players/${state.profileId}/badges`).catch(() => null),
+        api(`/players/${state.profileId}/badges?include_locked=true`).catch(() => null),
+        fetchBadgeCatalog(),
         loadAssets(),
       ]);
       state.ratingHistory = h;
@@ -1755,7 +1847,10 @@
   // Renk TEK BAŞINA taşıyıcı değildir: nokta mavi/kırmızı ama G/M bilgisi popup'ta
   // metin olarak ve noktanın aria-label'ında da vardır.
   // W/H oranı grafiğin en-boyudur: 320px ekranda ~125px, geniş ekranda ~300px yüksek.
-  const PH = { W: 320, H: 160, PADX: 10, TOP: 10, BOT: 13 };
+  // Ölçüler K2-2 konseptinden (640×210): grafik artık geniş bir kartın içinde
+  // duruyor, eski 320×160 (2:1) oranı o kartta gereğinden yüksek kalıyordu.
+  // Tüm geometri bu sabitlerden türer — çizim mantığı değişmedi.
+  const PH = { W: 640, H: 210, PADX: 8, TOP: 10, BOT: 12 };
   const PH_RANGES = [
     { key: "all", label: "profile.range_all", days: null },
     { key: "30", label: "profile.range_30d", days: 30 },
@@ -1842,6 +1937,15 @@
       (pts.length > 1 ? `<span>${esc(fmtDay(pts[pts.length - 1].played_at))}</span>` : "") +
       `</div>`;
 
+    // Gösterge satırı (konsept: .ph-key). Renk TEK BAŞINA taşıyıcı değildir:
+    // G/M bilgisi künyede metin olarak ve noktanın aria-label'ında da vardır —
+    // bu satır o eşlemeyi görünür kılar.
+    const key = `<div class="ph-key">
+         <span><b class="ph-k-w"></b>${t("profile.hist_win")}</span>
+         <span><b class="ph-k-l"></b>${t("profile.hist_loss")}</span>
+         <span><b class="ph-k-n"></b>${t("profile.hist_last")}</span>
+         <span>${t("profile.hist_legend_hint")}</span>
+       </div>`;
     const html =
       `<div class="ph-chart">
          <div class="ph-yaxis">${yaxis}</div>
@@ -1851,7 +1955,7 @@
              ${grid}${area}${line}${dots}${hits}
            </svg>
          </div>
-       </div>${xaxis}`;
+       </div>${xaxis}${key}`;
     return { xy, html };
   }
 
@@ -1865,10 +1969,13 @@
     if (!state.ratingHistory) { sec.hidden = true; sec.innerHTML = ""; return; }
     sec.hidden = false;
 
-    const title = `<h3 class="ps-title">${t("profile.history_title")}</h3>`;
+    // Kart kabuğu konseptten (K2-2): üstte küçük etiket, sağında aralık
+    // düğmeleri; altında "N maç · aralık" notu, sonra grafik.
+    const head = (extra) =>
+      `<div class="k2-card-hd"><span class="k2-lbl">${t("profile.history_title")}</span>${extra}</div>`;
     // Hiç maç yok → aralık düğmeleri de anlamsız, tek satır boş durum.
     if (!histAll().length) {
-      sec.innerHTML = title + `<p class="ps-empty">${t("profile.history_empty")}</p>`;
+      sec.innerHTML = head("") + `<p class="ps-empty">${t("profile.history_empty")}</p>`;
       return;
     }
     const pills = `<div class="ph-ranges" role="group" aria-label="${esc(t("profile.range_aria"))}">` +
@@ -1885,7 +1992,9 @@
       histLayout = histChart(pts);
       body = histLayout.html;
     }
-    sec.innerHTML = title + pills + body;
+    const rangeLbl = (PH_RANGES.find(r => r.key === state.historyRange) || PH_RANGES[0]).label;
+    const note = `<div class="k2-lbl ph-note">${t("common.n_matches", { n: pts.length })} · ${t(rangeLbl)}</div>`;
+    sec.innerHTML = head(pills) + note + body;
 
     sec.querySelectorAll(".ph-pill").forEach(btn =>
       btn.addEventListener("click", () => {
@@ -1975,9 +2084,11 @@
     closeHistPopup(false);
   });
 
-  // ── 2b3) Rozet vitrini (GÖREV 11+12) ──────────────────────────
-  // Veri: GET /players/{id}/badges — yanıt yalnız {key, count, last_match_id}
-  // taşır; ad ve açıklama BURADA, sözlüktedir (api_contract §2 "Rozetler").
+  // ── 2b3) Rozet vitrini (GÖREV 11+12; katalog GÖREV 24'te 27 rozete çıktı) ──
+  // Veri: GET /players/{id}/badges?include_locked=true — yanıt yalnız `key` +
+  // sayısal alanlar taşır; ad ve açıklama BURADA, sözlüktedir (api_contract §2
+  // "Rozetler"). Nadirlik için ayrıca GET /badges kataloğu çekilir (uç yoksa
+  // gösterim sessizce atlanır — eski backend'le geriye uyumluluk).
   // Sıra contract'ta SABİT katalog sırasıdır; yine de burada katalog sırasına göre
   // dizilir (ileri sürüm backend'i sırayı değiştirirse vitrin bozulmasın diye).
   // Bilinmeyen anahtar SESSİZCE atlanır: backend yeni rozet eklediğinde eski UI
@@ -1988,11 +2099,33 @@
   // her kartçıkta yazılıdır, açıklama da ekran okuyucuya .pb-sr ile verilir.
   // GÖREV 23: roulette_complete / roulette_winner / gambler katalog sırasının
   // SONUNDADIR (api_contract §2 — status='roulette' maçlardan türetilen tek üçlü).
+  //
+  // BU LİSTENİN SIRASI DONDURULMUŞTUR: dizideki konum + 1 = rozetin katalog
+  // ID'sidir (badges/rozetler.md) ve madalyon görsel dosyasının adıdır. Yeni
+  // rozet SONA eklenir, araya girmez — aksi hâlde tüm görseller kayar.
   const BADGE_KEYS = [
-    "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
-    "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+    "mvp", "vision", "damage", "cs_per_min", "gold", "role_duel",
+    "role_record", "pr_perf", "pr_damage",
+    "kill_20", "kda_10", "deathless", "comeback", "tragic_hero", "marathon_5",
+    "win_streak_3", "lose_streak_3", "bench_2",
+    "nemesis_6", "duo_6",
+    "versatile", "veteran_10", "veteran_20", "veteran_50",
     "roulette_complete", "roulette_winner", "gambler",
+    // ID 28 (GÖREV 24, Teoman 2026-08-19): katalog SONUNA eklendi — sıra
+    // dondurulmuş olduğu için yeni rozet araya GİRMEZ (görsel dosya adları
+    // dizideki konuma bağlı).
+    "perfect_quad",
   ];
+  // ID↔key eşlemesi TEK yerde: görsel dosya adı buradan türer, manifest yoktur.
+  const badgeId = (key) => BADGE_KEYS.indexOf(key) + 1;
+
+  // Nötr gri kalan (kıracak vurgusu olmayan) esprili rozetler.
+  const BADGE_MUTED = ["bench_2", "lose_streak_3"];
+  // Kademe ALTI SEVİYE (api_contract §2 "Kademe — ALTI SEVİYE", Teoman 2026-08-19).
+  // Sıra ARTAN'dır: dizideki konum = kademe rütbesi (vitrin seçimi ve "bir üst
+  // kademe" hesabı bu sıradan okunur). `stellar` en üstte ve AYRICALIKLIDIR
+  // (gökkuşağı/CD kırınımı çerçevesi — style.css `.pb-t-stellar`).
+  const BADGE_TIERS = ["bronze", "silver", "gold", "platinum", "diamond", "stellar"];
 
   // 24×24 viewBox, tek renk çizgi grafikleri (pb-fill sınıfı dolu parçalar için).
   const BADGE_ICONS = {
@@ -2001,100 +2134,509 @@
     damage: `<circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.5M12 17.9v3.5M2.6 12h3.5M17.9 12h3.5M5.4 5.4l2.5 2.5M16.1 16.1l2.5 2.5M18.6 5.4l-2.5 2.5M7.9 16.1l-2.5 2.5"/>`,
     cs_per_min: `<circle cx="12" cy="12" r="8.6"/><path d="M12 6.8v5.4l3.4 2"/>`,
     gold: `<ellipse cx="12" cy="6.4" rx="7.4" ry="2.9"/><path d="M4.6 6.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/><path d="M4.6 11.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/>`,
+    // GÖREV 24 — yeni sınıflar: rol düellosu (çapraz kılıçlar), rekor kırma
+    // (bayrak / zirve / şimşek), anlatısal (kurukafa, mücevher, gece), kara seri
+    // (yağmur bulutu), ilişkisel (hedef tahtası, iki figür).
+    role_duel: `<path d="M5.2 5.2l8.4 8.4M18.8 5.2l-8.4 8.4"/><path class="pb-fill" d="M3.4 18.6l3.6-3.6 1.8 1.8-3.6 3.6zM20.6 18.6l-3.6-3.6-1.8 1.8 3.6 3.6z"/>`,
+    role_record: `<path d="M6.4 20.6V4"/><path d="M6.4 5.2h11l-2.4 3.6 2.4 3.6h-11z"/>`,
+    pr_perf: `<path d="M2.6 19.4l6.2-9.4 3.3 4.4 2.5-3.3 6.8 8.3z"/><path d="M12 3.2v4.4"/><path class="pb-fill" d="M12 3.2l4 1.5-4 1.5z"/>`,
+    pr_damage: `<path class="pb-fill" d="M13.6 2.6L5.4 13.8h4.9l-1.5 7.6 8.4-11.4h-5z"/>`,
+    kill_20: `<path d="M12 3.2c-3.8 0-6.8 2.9-6.8 6.6 0 2.2 1.1 3.6 1.9 4.6.5.6.7 1 .7 1.8v1.2h8.4v-1.2c0-.8.2-1.2.7-1.8.8-1 1.9-2.4 1.9-4.6 0-3.7-3-6.6-6.8-6.6z"/><circle class="pb-fill" cx="9.6" cy="10.2" r="1.3"/><circle class="pb-fill" cx="14.4" cy="10.2" r="1.3"/><path d="M8.8 20.6h6.4"/>`,
+    kda_10: `<path d="M12 3.2l8.4 5.6-8.4 12L3.6 8.8z"/><path d="M3.6 8.8h16.8M12 3.2L8.6 8.8 12 20.8l3.4-12z"/>`,
     deathless: `<path d="M12 2.8l7.4 2.7v6c0 4.4-3 8-7.4 9.7-4.4-1.7-7.4-5.3-7.4-9.7v-6z"/><path d="M8.8 12.1l2.3 2.3 4.1-4.5"/>`,
     comeback: `<path d="M4.8 19.5V13a5.6 5.6 0 0 1 11.2 0v6.5"/><path d="M12.4 16.3l3.6 3.4 3.6-3.4"/>`,
-    win_streak_5: `<path d="M12 21c3.5 0 6-2.4 6-5.6 0-4.2-4.1-5.9-3.3-11.4-2.9 1.2-5.2 4-5.2 6.4 0 1.2.4 2 .4 2S8.1 11.6 7 10c-.6 1.2-1 2.9-1 4.6C6 18.3 8.5 21 12 21z"/>`,
-    bench_3: `<path d="M3.6 9.6h16.8M3.6 13.1h16.8"/><path d="M5.8 13.1v6.1M18.2 13.1v6.1M5.8 9.6V5.4M18.2 9.6V5.4"/>`,
+    tragic_hero: `<path d="M6.4 3.8c2.6.5 4.5 2.2 5.6 4.8 1.1-2.6 3-4.3 5.6-4.8"/><path d="M12 9.4v8.4"/><path class="pb-fill" d="M12 21.2l-3.2-3.6h6.4z"/>`,
+    marathon_5: `<path d="M15.4 3.4a8.4 8.4 0 1 0 4.9 12.5A9 9 0 0 1 15.4 3.4z"/><circle class="pb-fill" cx="17.8" cy="6.6" r="1"/><circle class="pb-fill" cx="20.4" cy="10.4" r="0.8"/>`,
+    win_streak_3: `<path d="M12 21c3.5 0 6-2.4 6-5.6 0-4.2-4.1-5.9-3.3-11.4-2.9 1.2-5.2 4-5.2 6.4 0 1.2.4 2 .4 2S8.1 11.6 7 10c-.6 1.2-1 2.9-1 4.6C6 18.3 8.5 21 12 21z"/>`,
+    lose_streak_3: `<path d="M7.2 14.4a3.6 3.6 0 0 1 .4-7.2 5 5 0 0 1 9.4 1.2 3 3 0 0 1-.6 6z"/><path d="M8.6 17.2l-1 3M12 17.2l-1 3M15.4 17.2l-1 3"/>`,
+    bench_2: `<path d="M3.6 9.6h16.8M3.6 13.1h16.8"/><path d="M5.8 13.1v6.1M18.2 13.1v6.1M5.8 9.6V5.4M18.2 9.6V5.4"/>`,
+    nemesis_6: `<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="4.4"/><circle class="pb-fill" cx="12" cy="12" r="1.5"/>`,
+    duo_6: `<circle cx="9" cy="9.2" r="2.9"/><circle cx="16.4" cy="11" r="2.3"/><path d="M3.6 19.8c.6-2.7 2.8-4.5 5.4-4.5s4.8 1.8 5.4 4.5"/><path d="M15.6 15.4c2.1.3 3.8 1.9 4.3 4.1"/>`,
     versatile: `<path d="M12 3.1l8.6 6.2-3.3 10.1H6.7L3.4 9.3z"/><circle class="pb-fill" cx="12" cy="12" r="1.7"/>`,
     veteran_10: `<path d="M4.8 15.2L12 9l7.2 6.2"/>`,
-    veteran_25: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
+    veteran_20: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
     veteran_50: `<path d="M4.8 10.2L12 4l7.2 6.2M4.8 15L12 8.8l7.2 6.2M4.8 19.8L12 13.6l7.2 6.2"/>`,
     roulette_complete: `<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3.4v6.2M12 14.4v6.2M3.4 12h6.2M14.4 12h6.2M5.9 5.9l4.4 4.4M18.1 18.1l-4.4-4.4M18.1 5.9l-4.4 4.4M5.9 18.1l4.4-4.4"/>`,
     roulette_winner: `<circle cx="12" cy="12" r="8.6"/><path class="pb-fill" d="M12 7.4l1.4 2.9 3.2.5-2.3 2.2.5 3.2-2.8-1.5-2.8 1.5.5-3.2-2.3-2.2 3.2-.5z"/>`,
     gambler: `<rect x="4.5" y="4.5" width="15" height="15" rx="3.2"/><circle class="pb-fill" cx="8.7" cy="8.7" r="1.3"/><circle class="pb-fill" cx="15.3" cy="8.7" r="1.3"/><circle class="pb-fill" cx="12" cy="12" r="1.3"/><circle class="pb-fill" cx="8.7" cy="15.3" r="1.3"/><circle class="pb-fill" cx="15.3" cy="15.3" r="1.3"/>`,
+    // Kusursuz Dörtlük (ID 28): dört köşesi de dolu bir dörtlü — dört bileşenin
+    // (MVP + hasar + gold + CS) AYNI maçta birden tamamlanması.
+    perfect_quad: `<rect x="3.6" y="3.6" width="7.4" height="7.4" rx="1.4"/><rect x="13" y="3.6" width="7.4" height="7.4" rx="1.4"/><rect x="3.6" y="13" width="7.4" height="7.4" rx="1.4"/><rect x="13" y="13" width="7.4" height="7.4" rx="1.4"/><path class="pb-fill" d="M5.4 5.4h3.8v3.8H5.4zM14.8 5.4h3.8v3.8h-3.8zM5.4 14.8h3.8v3.8H5.4zM14.8 14.8h3.8v3.8h-3.8z"/>`,
   };
 
+  // ── Madalyon silueti (GÖREV 24-fix, tasarım K2-2 birebir) ──────
+  // Rozet artık "yuvarlak köşeli kart" değil MADALYONDUR: sekizgen plaka
+  // (altın kenar) + merkeze giden faset çizgileri + iç halka + ortada rozetin
+  // simgesi. Geometri mockup'tan birebir alındı (512×512 viewBox).
+  // Simge yolları 24'lük viewBox'ta çizilidir (BADGE_ICONS); iç halkanın içine
+  // ortalanarak ölçeklenir: 24 × 9.17 ≈ 220 birim, 146..366 aralığı, merkez 256.
+  // Çizgi kalınlıkları da bu ölçekle büyür (görsel oran eski 24'lük kutuyla aynı).
+  const MEDAL_PLATE = "M256 22 418 96 492 258 418 420 256 494 94 420 20 258 94 96Z";
+  const MEDAL_FACET = "M256 22 256 258M418 96 256 258M492 258 256 258M418 420 256 258" +
+    "M256 494 256 258M94 420 256 258M20 258 256 258M94 96 256 258";
+  const MEDAL_RING = "M256 74 380 130 436 258 380 386 256 442 132 386 76 258 132 130Z";
   const badgeIcon = (key) =>
-    `<svg class="pb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${BADGE_ICONS[key]}</svg>`;
+    `<svg class="pb-icon" viewBox="0 0 512 512" aria-hidden="true" focusable="false">` +
+    `<path class="pb-plate" d="${MEDAL_PLATE}"/>` +
+    `<path class="pb-facet" d="${MEDAL_FACET}"/>` +
+    `<path class="pb-ring" d="${MEDAL_RING}"/>` +
+    `<g class="pb-gl" transform="translate(146 146) scale(9.17)">${BADGE_ICONS[key] || ""}</g>` +
+    `</svg>`;
 
-  // Yanıttaki rozetler → katalog sırasında, tanınmayanlar atılmış liste.
+  // Çarpan madeni (Teoman'ın açık isteği: "çarpan rahatça görülebilsin"):
+  // madalyonun sağ alt köşesinden DIŞA taşan yuvarlak pirinç sayaç. Plakanın
+  // dışına taşırılır ki gerçek PNG geldiğinde madalyonun üstünü kapatmasın.
+  // "×" işareti ayrı bir katmandır (sayı ile yarışmasın); erişilebilir metin
+  // sözlükten gelir (aria-label), görünen kısım salt biçimdir.
+  const badgeCoin = (n) =>
+    `<span class="pb-coin" role="img" aria-label="${esc(t("profile.badge_count_aria", { n }))}">` +
+    `<i aria-hidden="true">&times;</i><b>${n}</b></span>`;
+
+  // ── Madalyon görsel hattı (GÖREV 24, "ucu açık") ───────────────
+  // Rozet görselleri SONRADAN, teker teker eklenir: `webui/assets/badges/<ID>.png`
+  // (`.webp` de denenir). Kod/liste/manifest güncellemesi GEREKMEZ — dosyanın
+  // varlığı ÇALIŞMA ANINDA anlaşılır: <img> yüklenirse madalyon simgenin üstüne
+  // biner, yüklenemezse img DOM'dan kaldırılır ve altındaki SVG simge kalır
+  // (dd- varlık katmanındaki "yer tutucu altta, görsel üstte" deseninin aynısı;
+  // kırık görsel imkânsız, kullanıcıya hata gösterilmez, konsola BİZ yazmayız).
+  //
+  // Sonuç oturum boyunca ID başına ÖNBELLEKLENİR: aynı profil yeniden çizilince
+  // (dil değişimi, geri gelme) olmayan dosya bir daha istenmez. İki uzantı da
+  // denendikten sonra ID `null` işaretlenir; başarılı uzantı bir sonraki rozette
+  // İLK deneme olur (hepsi .webp ise tek istek yeter).
+  const BADGE_IMG_DIR = "assets/badges/";
+  const BADGE_IMG_EXT = ["png", "webp"];   // sıra: rozetler.md önerisi .png
+  let badgeImgPref = 0;                    // son BAŞARILI uzantının indeksi
+  const badgeImgSeen = new Map();          // ID -> çalışan src | null (ikisi de yok)
+
+  function badgeImgHtml(id) {
+    if (!id) return "";
+    const known = badgeImgSeen.get(id);
+    if (known === null) return "";          // bu oturumda denendi, dosya yok
+    const src = known || BADGE_IMG_DIR + id + "." + BADGE_IMG_EXT[badgeImgPref];
+    return `<img class="pb-img" alt="" src="${esc(src)}" data-bid="${id}"` +
+      (known ? ` data-known="1"` : ` data-tried="${BADGE_IMG_EXT[badgeImgPref]}"`) + `>`;
+  }
+
+  function badgeImgFail(img) {
+    const id = Number(img.dataset.bid);
+    // Daha önce YÜKLENMİŞ bir dosya düştüyse (geçici hata) işaretleme yapılmaz:
+    // yalnız bu çizimde simgeye düşülür, dosya "yok" sayılmaz.
+    if (img.dataset.known === "1") { img.remove(); return; }
+    const tried = (img.dataset.tried || "").split(",").filter(Boolean);
+    const next = BADGE_IMG_EXT.filter(x => tried.indexOf(x) === -1)[0];
+    if (!next) { badgeImgSeen.set(id, null); img.remove(); return; }
+    img.dataset.tried = tried.concat(next).join(",");
+    img.setAttribute("src", BADGE_IMG_DIR + id + "." + next);
+  }
+
+  function badgeImgOk(img) {
+    const id = Number(img.dataset.bid);
+    const src = img.getAttribute("src");
+    badgeImgSeen.set(id, src);
+    const i = BADGE_IMG_EXT.indexOf(String(src).split(".").pop());
+    if (i !== -1) badgeImgPref = i;
+    const medal = img.closest(".pb-medal");
+    if (medal) medal.classList.add("pb-has-img");
+  }
+
+  function badgeBindImages(root) {
+    root.querySelectorAll(".pb-img").forEach(img => {
+      img.addEventListener("error", () => badgeImgFail(img));
+      img.addEventListener("load", () => badgeImgOk(img));
+      // Dinleyici bağlanmadan önce sonuçlanmış olabilir (önbellek).
+      if (img.complete) {
+        if (img.naturalWidth === 0) badgeImgFail(img); else badgeImgOk(img);
+      }
+    });
+  }
+
+  // ── Rozet kataloğu (GET /badges) — nadirlik göstergesi ─────────
+  // Global ve oyuncudan bağımsız: oturumda BİR kez çekilir. Uç yoksa (eski
+  // backend) null kalır ve nadirlik satırı hiç basılmaz; yeniden denenmez.
+  let badgeCat = null;
+  let badgeCatTried = false;
+
+  async function fetchBadgeCatalog() {
+    if (badgeCatTried) return badgeCat;
+    badgeCatTried = true;
+    try {
+      badgeCat = await api("/badges");
+    } catch (err) {
+      badgeCat = null;
+    }
+    return badgeCat;
+  }
+
+  const badgeCatEntry = (key) => {
+    const rows = badgeCat && Array.isArray(badgeCat.badges) ? badgeCat.badges : [];
+    return rows.filter(x => x && x.key === key)[0] || null;
+  };
+
+  // Yanıttaki rozetler → KAZANILMIŞLAR önce, ardından İLERLEMESİ BAŞLAMIŞ
+  // kilitliler; her grup katalog sırasında, tanınmayan anahtarlar atılmış.
+  // Kazanılmamış rozetler vitrinde LİSTELENMEZ (Teoman kararı, GÖREV 24-fix):
+  // yalnızca `progress` var VE `progress.current > 0` olan kilitliler görünür
+  // (ör. "Demirbaş 22/50"). progress yoksa (maç-anı koşullu sınıflar) ya da
+  // current 0 ise ("Kumarbaz 0/5") kart hiç basılmaz. include_locked=true
+  // isteği KALIR — bu filtre istemcide uygulanır (backend'den ilerlemeli
+  // kilitliler yine gelmesi gerektiği için).
   function badgeList() {
     const raw = (state.badges && state.badges.badges) || [];
     return raw
       .filter(b => b && BADGE_KEYS.indexOf(b.key) !== -1)
-      .sort((a, b) => BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key));
+      .filter(badgeVisible)
+      .sort((a, b) =>
+        (badgeLocked(a) ? 1 : 0) - (badgeLocked(b) ? 1 : 0) ||
+        BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key));
   }
 
+  // count: 0 kayıt = KİLİTLİ (yalnız include_locked=true iken gelir).
+  const badgeLocked = (b) => !(Number(b.count) > 0);
+  // Kazanılmış rozet her zaman görünür; kilitli rozet YALNIZCA ilerlemesi
+  // başlamışsa (progress.current > 0) görünür. badgeProgress() zaten
+  // current/target'ı sayıya çevirip target > 0 şartını uygular; current 0
+  // dahil geçerli bir progress objesi döner, bu yüzden c > 0 burada ayrıca
+  // kontrol edilir (Number(null)===0 tuzağı badgeProgress içinde çözülmüştür).
+  const badgeVisible = (b) => {
+    if (!badgeLocked(b)) return true;
+    const p = badgeProgress(b);
+    return !!p && p.c > 0;
+  };
   const badgeCount = (b) => (typeof b.count === "number" && b.count > 1 ? b.count : 0);
-  // last_match_id contract'ta zorunlu ama ileri sürümde null gelebilir → satır düşer.
-  const badgeLast = (b) =>
-    Number.isFinite(Number(b.last_match_id))
-      ? t("profile.badge_last", { id: Number(b.last_match_id) })
-      : "";
+  // DİKKAT: Number(null) === 0 — bu yüzden null/undefined ayrıca süzülür, yoksa
+  // kilitli rozette maç kimliği "#0" olarak görünürdü.
+  const numOrNull = (v) =>
+    v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+  // last_match_id kazanılmış rozette doludur; count: 0 kayıtlarda null → satır düşer.
+  const badgeLast = (b) => {
+    const id = numOrNull(b.last_match_id);
+    return id == null ? "" : t("profile.badge_last", { id });
+  };
+  // best_match_id yalnız ölçülebilir sınıflarda (rekor/rol/kişisel) doludur.
+  const badgeBestId = (b) => numOrNull(b.best_match_id);
+  const badgeBest = (b) => {
+    const id = badgeBestId(b);
+    if (id == null) return "";
+    const v = numOrNull(b.best_value);
+    // best_value sınıfa göre ölçek değiştirir (oran 1.62 · vizyon 44 · hasar
+    // 30969): büyük değerlerde 2 ondalık gürültüdür, tam sayıya yuvarlanır.
+    return v == null
+      ? t("profile.badge_best", { id })
+      : t("profile.badge_best_value",
+        { id, v: Math.abs(v) >= 100 ? String(Math.round(v)) : num2(v) });
+  };
+  const badgeTier = (b) =>
+    BADGE_TIERS.indexOf(b.tier) !== -1 ? b.tier : null;
+  // Kademeli rozette bir üst kademenin ADI (altında yoktur).
+  const badgeNextTier = (b) => {
+    const i = BADGE_TIERS.indexOf(badgeTier(b));
+    return i >= 0 && i + 1 < BADGE_TIERS.length ? BADGE_TIERS[i + 1] : null;
+  };
+  // Vitrin sıralaması için kademe rütbesi; kademesiz rozet -1 (en sonda).
+  const badgeTierRank = (b) => BADGE_TIERS.indexOf(badgeTier(b));
+
+  // stellar_quest (api_contract §2, Teoman 2026-08-19): `stellar` ORANLA
+  // kazanılmaz — elmas eşiği + o rozeti ARDIŞIK 3 valid maçta kazanma görevi.
+  // Alan gelmiyorsa (eski backend) null döner ve baloncuk satırı SESSİZCE atlanır.
+  const badgeQuest = (b) => {
+    const q = b && b.stellar_quest;
+    if (!q) return null;
+    const target = numOrNull(q.target), best = numOrNull(q.best);
+    if (target == null || target <= 0 || best == null) return null;
+    return { target, best, met: q.met === true || best >= target };
+  };
+  const badgeProgress = (b) => {
+    const p = b && b.progress;
+    if (!p) return null;
+    const c = numOrNull(p.current), tg = numOrNull(p.target);
+    return c != null && tg != null && tg > 0 ? { c, tg } : null;
+  };
+
+  // Kademe hedefi: "Platin kademesine 3 rozet kaldı".
+  // [REVİZE — Teoman, 2026-08-19] Kademe artık ORAN DEĞİL KÜMÜLATİF SAYAÇTIR ve
+  // ASLA DÜŞMEZ; hedef de oran değil SAYAÇTIR (oran ifadesi "boğucu ve itici"
+  // bulundu, sayaç somut ve motive edici). Eşikler BURADA YAZILI DEĞİL — sayı
+  // backend'in `next_tier_count`'undan gelir (`next_tier_rate` KALDIRILDI).
+  // ELMASTA sayaç hedefi YOKTUR (next_tier_count null): sıradaki basamak sayaçla
+  // değil GÖREVLE açılır → onun yerine görev satırı basılır (badgeQuestText).
+  function badgeTierTargetText(b) {
+    const next = numOrNull(b.next_tier_count);
+    if (next == null) return "";
+    const have = numOrNull(b.count) || 0;
+    const left = next - have;
+    if (left <= 0) return "";
+    // Kilitli kademeli rozette tier null'dır: sıradaki basamak ilk kademedir.
+    const name = badgeNextTier(b) || (badgeTier(b) == null ? BADGE_TIERS[0] : null);
+    if (!name) return "";
+    return t("profile.badge_tier_next",
+      { tier: t("profile.badge_tier_" + name), n: left });
+  }
+
+  // Stellar görev satırı: elmasta "Stellar görevi: 3 maç üst üste — en iyi serin
+  // 2/3", stellar'da "Stellar görevi tamamlandı". Alt kademelerde (oran hedefi
+  // hâlâ anlamlı) ve alan yoksa hiç basılmaz.
+  function badgeQuestText(b) {
+    const q = badgeQuest(b);
+    if (!q) return "";
+    const tier = badgeTier(b);
+    if (tier === "stellar") return t("profile.badge_quest_done");
+    if (tier !== "diamond") return "";
+    return t("profile.badge_quest", { tg: q.target, best: q.best });
+  }
+
+  // Nadirlik: GET /badges kataloğundaki holders / holders_pct. Uç yoksa "".
+  function badgeHoldersText(key) {
+    const row = badgeCatEntry(key);
+    if (!row) return "";
+    const n = numOrNull(row.holders);
+    if (n == null) return "";
+    if (n <= 0) return t("profile.badge_holders_none");
+    const size = numOrNull(badgeCat.roster_size);
+    const given = numOrNull(row.holders_pct);
+    const pct = given != null ? given : (size != null && size > 0 ? (n / size) * 100 : null);
+    return pct == null ? t("profile.badge_holders", { n, p: "?" })
+      : t("profile.badge_holders", { n, p: pct.toFixed(1) });
+  }
+
+  // ── Profil vitrini (api_contract §2 "Profil vitrini", GÖREV 24) ─
+  // Seçim ölçütü artık "EN NADİR 3" DEĞİL, **EN YÜKSEK KADEMELİ 3** rozettir
+  // (Teoman'ın mentalitesi: "sayfayı açan kişi raf gibi duran Elmas/Stellar
+  // rozetleri görüp oyuncunun iyi olduğunu anlamalı"). Sıra:
+  //   kademe rütbesi BÜYÜK (stellar > … > bronze; kademesizler en sonda)
+  //   → holders_pct KÜÇÜK (grupta daha az kişide) → count BÜYÜK → katalog sırası.
+  // Kilitli rozet vitrine GİRMEZ. Katalog ucu yoksa nadirlik bilinmez: o rozet
+  // eşitlik kırılımında en sona düşer (101 > her yüzde), sıra yine deterministiktir.
+  const SHOWCASE_N = 3;
+  const badgeHoldersPct = (key) => {
+    const row = badgeCatEntry(key);
+    if (!row) return 101;
+    const v = numOrNull(row.holders_pct);
+    return v == null ? 101 : v;
+  };
+  function badgeShowcase() {
+    const raw = (state.badges && state.badges.badges) || [];
+    return raw
+      .filter(b => b && BADGE_KEYS.indexOf(b.key) !== -1 && !badgeLocked(b))
+      .sort((a, b) =>
+        badgeTierRank(b) - badgeTierRank(a) ||
+        badgeHoldersPct(a.key) - badgeHoldersPct(b.key) ||
+        Number(b.count) - Number(a.count) ||
+        BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key))
+      .slice(0, SHOWCASE_N);
+  }
+
+  // Ekran okuyucu metni (görsel baloncuk aria-hidden'dır: aynı bilgi düğmenin
+  // erişilebilir adına girer). Vitrin ve kuyruk AYNI metni kullanır.
+  function badgeSrText(b) {
+    const locked = badgeLocked(b);
+    const tier = locked ? null : badgeTier(b);
+    const prog = badgeProgress(b);
+    const n = badgeCount(b);
+    return [
+      t("profile.badge_" + b.key + "_desc"),
+      locked ? t("profile.badge_locked") : "",
+      tier ? t("profile.badge_tier_aria", { tier: t("profile.badge_tier_" + tier) }) : "",
+      n ? t("profile.badge_count_aria", { n }) : "",
+      locked && prog ? t("profile.badge_progress_aria", { c: prog.c, tg: prog.tg }) : "",
+      locked ? "" : badgeTierTargetText(b),
+      locked ? "" : badgeQuestText(b),
+      locked ? "" : badgeBest(b),
+      locked ? "" : badgeLast(b),
+    ].filter(Boolean).join(" ");
+  }
+
+  // "En iyi an" çipi: düğmenin İÇİNDE olamaz (button içinde button geçersizdir),
+  // hücreye kardeş olarak biner. Vitrinde de aynı çip kullanılır.
+  // Konseptte madalyonun üstünde yüzen bir çip YOKTUR: bağlantı sütunun
+  // ALTINDA, noktalı alt çizgili küçük bir satır olarak durur (nadirlik
+  // yüzdesinin kaldırılmasıyla boşalan yere oturur).
+  const badgeGoChip = (id) =>
+    `<button type="button" class="pb-go" data-match="${id}"
+       title="${esc(t("profile.badge_best_go", { id }))}"
+       aria-label="${esc(t("profile.badge_best_go", { id }))}">#${id}</button>`;
+
+  // ── Vitrin madalyonu (büyük) ───────────────────────────────────
+  // Kaidenin ortasındaki 3 rozet. Farklar (Teoman düzeltmeleri 3 ve 4):
+  //   · "EN NADİR 1/2/3" sıra etiketi YOK,
+  //   · "grupta %X kişide" nadirlik satırı YOK (baloncuğa taşındı),
+  //   · ÇARPAN (×N) madalyonun köşesine oturan pirinç sayaç madeni olarak
+  //     BELİRGİN okunur (kaç kez kazanıldığı birincil bilgidir).
+  // DOM sırası RÜTBE sırasıdır (ekran okuyucu 1-2-3 duyar); en iyisinin ortada
+  // ve yükseltilmiş durması yalnız CSS `order`/`transform` işidir.
+  function badgeBigCard(b) {
+    const id = badgeId(b.key);
+    const tier = badgeTier(b);
+    const n = typeof b.count === "number" && b.count > 0 ? b.count : 0;
+    const bestId = badgeBestId(b);
+    const cls = ["pb-big"];
+    if (tier) cls.push("pb-t-" + tier);
+    else if (BADGE_MUTED.indexOf(b.key) !== -1) cls.push("pb-bench");
+    return `<div class="pb-big-cell">
+      <button type="button" class="${cls.join(" ")}" data-key="${b.key}">
+        <span class="pb-glow">
+          <span class="pb-medal pb-medal-lg">${badgeIcon(b.key)}${badgeImgHtml(id)}</span>
+          ${n ? badgeCoin(n) : ""}
+        </span>
+        <span class="pb-name pb-big-name">${t("profile.badge_" + b.key)}</span>
+        ${tier ? `<span class="pb-tier" aria-hidden="true">${t("profile.badge_tier_" + tier)}</span>` : ""}
+        <span class="pb-sr">${badgeSrText(b)}</span>
+      </button>
+      ${bestId != null ? badgeGoChip(bestId) : ""}
+    </div>`;
+  }
 
   function badgeCard(b) {
-    // MVP vitrinin ilkidir (katalog sırası zaten öyle) ve pirinç vurgulu;
-    // bench_3 esprili olduğu için nötr gri tonda kalır.
-    const tone = b.key === "mvp" ? " pb-mvp" : b.key === "bench_3" ? " pb-bench" : "";
+    const id = badgeId(b.key);
+    const locked = badgeLocked(b);
+    const tier = locked ? null : badgeTier(b);
+    // Kademe rengi kartın çerçevesini/ışımasını belirler (AYRI GÖRSEL YOK —
+    // Teoman kararı); kademesiz esprili rozetler nötr gri kalır.
+    const cls = ["pb-card"];
+    if (locked) cls.push("pb-locked");
+    if (tier) cls.push("pb-t-" + tier);
+    else if (!locked && BADGE_MUTED.indexOf(b.key) !== -1) cls.push("pb-bench");
     const n = badgeCount(b);
-    const last = badgeLast(b);
-    // Görsel tooltip aria-hidden'dır; aynı bilgi ekran okuyucuya .pb-sr ile
-    // düğmenin erişilebilir adının parçası olarak zaten verilir.
-    const sr = [t("profile.badge_" + b.key + "_desc"),
-      n ? t("profile.badge_count_aria", { n }) : "", last].filter(Boolean).join(" ");
-    return `<button type="button" class="pb-card${tone}" data-key="${b.key}">
-        ${badgeIcon(b.key)}
+    const prog = badgeProgress(b);
+    const bestId = locked ? null : badgeBestId(b);
+    const pct = prog ? Math.max(0, Math.min(100, (prog.c / prog.tg) * 100)) : 0;
+    // .pb-cell sarmalayıcı: "en iyi maça git" çipi düğmenin İÇİNDE olamaz
+    // (button içinde button geçersizdir), kartın köşesine kardeş olarak biner.
+    // Kuyruktaki madalyon da vitrinle AYNI silueti taşır (mockup'ta da öyle);
+    // çarpan burada da madenin küçük halidir, kartın dibindeki metin satırı değil.
+    return `<div class="pb-cell">
+      <button type="button" class="${cls.join(" ")}" data-key="${b.key}">
+        <span class="pb-glow">
+          <span class="pb-medal">${badgeIcon(b.key)}${badgeImgHtml(id)}</span>
+          ${n ? badgeCoin(n) : ""}
+        </span>
         <span class="pb-name">${t("profile.badge_" + b.key)}</span>
-        ${n ? `<span class="pb-count" aria-hidden="true">${t("profile.badge_count", { n })}</span>` : ""}
-        <span class="pb-sr">${sr}</span>
-      </button>`;
+        ${tier ? `<span class="pb-tier" aria-hidden="true">${t("profile.badge_tier_" + tier)}</span>` : ""}
+        ${locked && prog ? `<span class="pb-prog" aria-hidden="true">
+             <span class="pb-bar"><span class="pb-bar-fill" style="width:${pct.toFixed(1)}%"></span></span>
+             <span class="pb-prog-txt">${t("profile.badge_progress", { c: prog.c, tg: prog.tg })}</span>
+           </span>` : ""}
+        <span class="pb-sr">${badgeSrText(b)}</span>
+      </button>
+      ${bestId != null ? badgeGoChip(bestId) : ""}
+    </div>`;
   }
 
   let badgeOpen = null;   // tooltip'i açık olan kartçık düğümü
 
   function renderBadges() {
     const sec = $("#prof-badges");
+    const plinth = $("#prof-showcase");
     if (!sec) return;
     badgeOpen = null;
     // Uç yoksa/düştüyse bölüm hiç görünmez (profilin kalanı etkilenmez).
-    if (!state.badges) { sec.hidden = true; sec.innerHTML = ""; return; }
-    sec.hidden = false;
-
-    const title = `<h3 class="ps-title">${t("profile.badges_title")}</h3>`;
-    const list = badgeList();
-    if (!list.length) {
-      sec.innerHTML = title + `<p class="ps-empty">${t("profile.badges_empty")}</p>`;
+    if (!state.badges) {
+      sec.hidden = true;
+      sec.innerHTML = "";
+      if (plinth) plinth.innerHTML = "";
       return;
     }
-    sec.innerHTML = title + `<div class="pb-grid">${list.map(badgeCard).join("")}</div>`;
+    sec.hidden = false;
 
-    sec.querySelectorAll(".pb-card").forEach(card => {
-      const b = list.find(x => x.key === card.dataset.key);
-      // Tıklama ve odak AÇAR (kapatmaz): fare tıklamasında odak+tık ard arda
-      // gelir, "toggle" olsaydı tooltip açılıp hemen kapanırdı.
+    const list = badgeList();
+    // Vitrin: en yüksek kademeli 3 rozet kaidenin ortasına. Kuyrukta TEKRAR
+    // listelenmezler (aynı rozeti iki kez göstermek raf hissini bozardı).
+    const top = badgeShowcase();
+    const topKeys = top.map(x => x.key);
+    if (plinth) {
+      plinth.innerHTML = top.map(badgeBigCard).join("");
+      badgeBindImages(plinth);
+      badgeBindCards(plinth, top);
+    }
+    // Bölüm başlığı konseptin .sec-hd kabuğudur: solda başlık, sağda not.
+    const head = (note) =>
+      `<div class="k2-sec-hd"><h3>${
+        t(topKeys.length ? "profile.badges_rest_title" : "profile.badges_title")}</h3>` +
+      (note ? `<span class="k2-note">${note}</span>` : "") + `</div>`;
+    if (!list.length) {
+      sec.innerHTML = head("") + `<p class="ps-empty">${t("profile.badges_empty")}</p>`;
+      return;
+    }
+    // Özet satırı vitrin/kuyruk ayrımından BAĞIMSIZDIR: n = kazanılmış sayısı,
+    // total = katalog toplamı (görünen kart sayısı değil).
+    const earned = list.filter(x => !badgeLocked(x)).length;
+    const sum = t("profile.badges_summary",
+      { n: earned, total: BADGE_KEYS.length });
+    const rest = list.filter(x => topKeys.indexOf(x.key) === -1);
+    // Kuyruğun altındaki kural notu (konsept: .gate): kilitli rozetlerin neden
+    // eksik göründüğünü açıklar — kazanılmamış ve ilerlemesi başlamamış rozet
+    // hiç listelenmez (Teoman kararı, GÖREV 24-fix).
+    sec.innerHTML = head(sum) +
+      (rest.length ? `<div class="pb-grid">${rest.map(badgeCard).join("")}</div>` : "") +
+      `<p class="k2-gate">${t("profile.badges_gate")}</p>`;
+    badgeBindImages(sec);
+    badgeBindCards(sec, rest);
+  }
+
+  // Baloncuk tetikleyicileri (GÖREV 24 düzeltme 6): HOVER, DOKUNMA (click) ve
+  // KLAVYE ODAĞI — üçü de açar. Vitrindeki büyük madalyonlar ile kuyruktaki
+  // kartçıklar aynı bağlayıcıyı kullanır, davranış tek yerde tanımlıdır.
+  // Tıklama ve odak AÇAR (kapatmaz): fare tıklamasında odak+tık ard arda gelir,
+  // "toggle" olsaydı baloncuk açılıp hemen kapanırdı. Fare çıkışında yalnız
+  // odak kartta DEĞİLSE kapanır (klavye kullanıcısının kutusu fareyle silinmesin).
+  function badgeBindCards(root, list) {
+    root.querySelectorAll(".pb-card, .pb-big").forEach(card => {
+      const b = list.filter(x => x.key === card.dataset.key)[0];
+      card.addEventListener("mouseenter", () => openBadgeTip(card, b));
+      card.addEventListener("mouseleave", () => {
+        if (badgeOpen === card && document.activeElement !== card) closeBadgeTip();
+      });
       card.addEventListener("click", () => openBadgeTip(card, b));
       card.addEventListener("focus", () => openBadgeTip(card, b));
       card.addEventListener("blur", () => { if (badgeOpen === card) closeBadgeTip(); });
+    });
+    // "En iyi an" çipi: maç detayına atlama deseni tarihçe grafiğiyle aynıdır
+    // (önbellekte varsa oradan, yoksa GET /matches/{id}).
+    root.querySelectorAll(".pb-go").forEach(go => {
+      go.addEventListener("click", () => {
+        closeBadgeTip();
+        openMatchFromHistory(Number(go.dataset.match));
+      });
     });
   }
 
   function openBadgeTip(card, b) {
     if (!card || !b || badgeOpen === card) return;
     closeBadgeTip();
-    const last = badgeLast(b);
+    const locked = badgeLocked(b);
+    const prog = badgeProgress(b);
+    const tier = locked ? null : badgeTier(b);
+    const n = badgeCount(b);
+    // İçerik (Teoman düzeltmeleri 4 ve 6): ad + ×N başlıkta, sonra açıklama,
+    // sonra kademe + oran/görev → ilerleme → NADİRLİK ("grupta 7 kişide" —
+    // kartın üstünde YAZMAZ, buraya taşındı) → en iyi an → son maç.
+    const rows = [
+      [tier ? t("profile.badge_tier_" + tier) : "", locked ? "" : badgeTierTargetText(b)]
+        .filter(Boolean).join(" · "),
+      locked ? "" : badgeQuestText(b),
+      locked && prog ? t("profile.badge_progress", { c: prog.c, tg: prog.tg }) : "",
+      badgeHoldersText(b.key),
+      locked ? "" : badgeBest(b),
+      locked ? "" : badgeLast(b),
+    ].filter(Boolean);
     card.insertAdjacentHTML("beforeend",
       `<span class="pb-tip" aria-hidden="true">
+         <span class="pb-tip-hd">
+           <span class="pb-tip-nm">${t("profile.badge_" + b.key)}</span>
+           ${n ? `<span class="pb-tip-x">${t("profile.badge_count", { n })}</span>` : ""}
+         </span>
          <span>${t("profile.badge_" + b.key + "_desc")}</span>
-         ${last ? `<span class="pb-tip-last">${last}</span>` : ""}
+         ${rows.map(x => `<span class="pb-tip-last">${x}</span>`).join("")}
        </span>`);
     badgeOpen = card;
-    // Kenardaki kartçıkta kutu ızgaranın dışına taşabilir: ölçüp içeri çekilir
-    // (320px'de yatay taşma yok kuralı; tarihçe popup'ındaki desenin aynısı).
+    // Kenardaki kartçıkta kutu kapsayıcının dışına taşabilir: ölçüp içeri
+    // çekilir (390px'de yatay taşma yok kuralı; tarihçe popup'ındaki desenin
+    // aynısı). Kapsayıcı kuyrukta ızgara, vitrinde kaidenin rozet sütunudur.
     const tip = card.querySelector(".pb-tip");
-    const grid = card.closest(".pb-grid");
-    if (!tip || !grid) return;
+    const box = card.closest(".pb-grid, .pb-plinth");
+    if (!tip || !box) return;
     const tr = tip.getBoundingClientRect();
-    const gr = grid.getBoundingClientRect();
+    const gr = box.getBoundingClientRect();
     const shift = tr.left < gr.left ? gr.left - tr.left
       : tr.right > gr.right ? gr.right - tr.right : 0;
     if (shift) tip.style.marginLeft = Math.round(shift) + "px";
@@ -2102,10 +2644,18 @@
 
   // Esc ile kapanır; odak kartçıkta KALIR (tetikleyici zaten kartçığın kendisi).
   function closeBadgeTip() {
-    const tip = document.querySelector("#prof-badges .pb-tip");
-    if (tip) tip.remove();
+    document.querySelectorAll(".pb-tip").forEach(tip => tip.remove());
     badgeOpen = null;
   }
+
+  // DOKUNMATİK: baloncuk hover'a bağımlı değildir (dokunuşta click ile açılır),
+  // rozetin DIŞINA dokunmak da kapatır — parmakla açılan kutu ekranda kalmasın
+  // (tarihçe künyesindeki desenin aynısı).
+  document.addEventListener("click", (e) => {
+    if (!badgeOpen) return;
+    if (e.target.closest && e.target.closest(".pb-card, .pb-big")) return;
+    closeBadgeTip();
+  });
 
   // ── 2c) Haftanın enleri (GÖREV 2) ─────────────────────────────
   // Salt-okur ekran: GET /highlights/weekly. Contract'taki her alan null olabilir;

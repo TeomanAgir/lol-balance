@@ -196,20 +196,76 @@ class RatingHistoryOut(BaseModel):
     points: list[RatingHistoryPointOut]
 
 
+class BadgeProgressOut(BaseModel):
+    # api_contract §2: yalnız ilerlemesi tanımlı sınıflarda (kilometre, kimlik,
+    # ilişkisel, blok, gambler). `current` hedefi AŞABİLİR (22/20 gibi).
+    current: int
+    target: int
+
+
+class StellarQuestOut(BaseModel):
+    # api_contract §2 "Kademe — ALTI SEVİYE" (Teoman revizyonu, 2026-08-19):
+    # `stellar` orana değil GÖREVE bağlıdır — o rozette kariyerdeki EN UZUN
+    # ardışık kazanım serisi (`best`) >= `target` (3) olmalı. Kademesiz
+    # rozetlerde bu alanın kendisi (BadgeOut.stellar_quest) null'dur.
+    target: int
+    best: int
+    met: bool
+
+
 class BadgeOut(BaseModel):
     # api_contract §2 "Rozetler": yalnız `key` taşınır — rozet adı/açıklaması
     # backend'de TUTULMAZ, çeviri web UI i18n sözlüklerindedir.
     # last_match_id: rozeti son kazandıran maç (blok rozetinde bloğun son maçı,
-    # eşik rozetinde eşiği tamamlayan maç).
+    # eşik rozetinde eşiği tamamlayan maç); count=0 kayıtlarda null.
+    # best_match_id/best_value: yalnız ölçülebilir sınıflar (record/role/personal).
+    # tier/rate/next_tier_count/stellar_quest: yalnız kademeli 7 rozet (GÖREV 24
+    # + perfect_quad revizyonu). Kademe KÜMÜLATİF SAYAÇLADIR (`count`) ve ASLA
+    # DÜŞMEZ — `rate` SALT BİLGİDİR, kademe hesabına GİRMEZ (Teoman, 2026-08-19).
     key: str
     count: int
-    last_match_id: int
+    last_match_id: Optional[int]
+    best_match_id: Optional[int]
+    best_value: Optional[float]
+    tier: Optional[
+        Literal["bronze", "silver", "gold", "platinum", "diamond", "stellar"]
+    ]
+    rate: Optional[float]
+    next_tier_count: Optional[int]
+    progress: Optional[BadgeProgressOut]
+    stellar_quest: Optional[StellarQuestOut]
 
 
 class PlayerBadgesOut(BaseModel):
-    # Yalnız count > 0 rozetler, SABİT katalog sırasında; rozetsiz oyuncuda [].
+    # Varsayılan (include_locked=false): yalnız count > 0 rozetler, SABİT katalog
+    # sırasında; rozetsiz oyuncuda []. include_locked=true → 28 anahtarın hepsi.
     player_id: int
+    matches_played: int
     badges: list[BadgeOut]
+
+
+class BadgeCatalogEntryOut(BaseModel):
+    # api_contract §2 "Rozet kataloğu ucu": `class` Python anahtar sözcüğü
+    # olduğu için alan adı badge_class, JSON'da alias ile `class` çıkar.
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    key: str
+    badge_class: str = Field(alias="class")
+    source: str
+    tiered: bool
+    # yalnız tiered=true iken dolu ("standard" | "rare"); kademesizlerde null.
+    tier_scale: Optional[Literal["standard", "rare"]]
+    one_time: bool
+    holders: int
+    # roster boşken oran tanımsızdır → null.
+    holders_pct: Optional[float]
+
+
+class BadgeCatalogOut(BaseModel):
+    # roster_size = en az 1 VALID maçı olan oyuncu sayısı.
+    roster_size: int
+    badges: list[BadgeCatalogEntryOut]
 
 
 class HighlightsWindowOut(BaseModel):

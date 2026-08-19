@@ -1,48 +1,107 @@
-"""Oyuncu rozetleri (api_contract §2 "Rozetler (GÖREV 11+12)").
+"""Oyuncu rozetleri (api_contract §2 "Rozetler"; katalog GÖREV 24'te 27'ye,
+Teoman'ın `perfect_quad` revizyonuyla 28'e çıktı).
 
 SALT-OKUR gösterim katmanıdır: hiçbir tablo yazılmaz, hiçbir şema/migration
 eklenmez, rating hesabına etkisi yoktur. Her rozet mevcut `matches` /
-`match_participants` / `rating_history` satırlarından türetilir; yalnız
-`status='valid'` maçlar sayılır.
+`match_participants` / `rating_history` (+ rulet üçlüsü için `roulette_*`)
+satırlarından türetilir.
 
-Determinizm: kronoloji gerektiren rozetler (win_streak_5, bench_3, versatile
-ve veteran_* eşiklerinin `last_match_id`'si) maçları `ratings.replay_order_by`
-ile sıralar — replay'in sort-key'i burada KOPYALANMAZ, paylaşılır. Bu yüzden
-`POST /admin/replay` sonrası yanıt bit-bit aynı kalır.
+## Toplu çekirdek (GÖREV 24)
+`GET /badges` tüm oyuncuların rozetlerini ister; oyuncu başına ayrı sorgu naif
+olurdu. Bu yüzden TEK doğruluk noktası `compute_badges`: valid maçları ve TÜM
+katılımcılarını iki sorguda okur, kronolojik TEK geçişte bütün oyuncuların
+sayaçlarını birlikte doldurur (maç bazlı ortak hesaplar — rekor tabloları, MVP,
+bench/tragic, comeback, koridor düelloları — maç başına BİR kez yapılır ve o
+maçın 10 oyuncusu için paylaşılır). `GET /players/{id}/badges` de aynı
+çekirdeği çağırır; rozet mantığı İKİ KEZ YAZILMAZ.
 
-perf_score bağımlı rozetler (mvp, bench_3) AKTİF engine'in `rating_history`
-satırlarını okur (leaderboard / rating tarihçesi hangi version'ı kullanıyorsa
-onu); ham (yuvarlanmamış) değerle karşılaştırılır.
+## Determinizm (api_contract §2)
+Kronoloji gerektiren her rozet maçları `ratings.replay_order_by` ile sıralar —
+replay'in sort-key'i burada KOPYALANMAZ, paylaşılır. Hiçbir tanım `now()`,
+rastgelelik ya da İLERİYE BAKMA kullanmaz: rol rekoru ve kişisel rekorlar
+MAÇ-ÖNCESİ snapshot'la karşılaştırılır, snapshot maç işlendikten sonra
+güncellenir. "Gece" tanımı duvar saati değil `played_at - 6 saat`in tarihidir
+(SQLite `date(played_at,'-6 hours')`, UTC). Bu yüzden `POST /admin/replay`
+sonrası yanıt bit-bit aynı kalır.
+
+perf_score bağımlı rozetler AKTİF engine'in `rating_history` satırlarını HAM
+(yuvarlanmamış) okur — backend perf HESAPLAMAZ; yuvarlama yalnız yanıt
+katmanındadır.
 """
 from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import dataclass
 
 from rating import ROLES
 
 from .ratings import replay_order_by
 from .roulette import assignment_bought
 
-# api_contract §2: yanıt sırası SABİT katalog sırasıdır; rulet rozetleri
-# (GÖREV 23) katalog sırasının SONUNDADIR.
-BADGE_KEYS = (
-    "mvp",
-    "vision",
-    "damage",
-    "cs_per_min",
-    "gold",
-    "deathless",
-    "comeback",
-    "win_streak_5",
-    "bench_3",
-    "versatile",
-    "veteran_10",
-    "veteran_25",
-    "veteran_50",
-    "roulette_complete",
-    "roulette_winner",
-    "gambler",
+
+@dataclass(frozen=True)
+class BadgeDef:
+    """Katalog kaydı (api_contract §2 `GET /badges`).
+
+    `id` görsel dosya adıdır (`webui/assets/badges/<id>.png`) ve sıra
+    DONDURULMUŞTUR — yeni rozet yalnız SONA eklenir (badges/rozetler.md).
+    """
+
+    id: int
+    key: str
+    cls: str  # record|role|personal|narrative|streak|relational|identity|milestone|roulette
+    source: str  # valid | roulette
+    tiered: bool
+    one_time: bool
+
+
+# api_contract §2: yanıt sırası SABİT katalog sırasıdır (badges/rozetler.md ID'leri).
+CATALOG: tuple[BadgeDef, ...] = (
+    BadgeDef(1, "mvp", "record", "valid", True, False),
+    BadgeDef(2, "vision", "record", "valid", True, False),
+    BadgeDef(3, "damage", "record", "valid", True, False),
+    BadgeDef(4, "cs_per_min", "record", "valid", True, False),
+    BadgeDef(5, "gold", "record", "valid", True, False),
+    BadgeDef(6, "role_duel", "role", "valid", True, False),
+    BadgeDef(7, "role_record", "role", "valid", False, False),
+    BadgeDef(8, "pr_perf", "personal", "valid", False, False),
+    BadgeDef(9, "pr_damage", "personal", "valid", False, False),
+    BadgeDef(10, "kill_20", "narrative", "valid", False, False),
+    BadgeDef(11, "kda_10", "narrative", "valid", False, False),
+    BadgeDef(12, "deathless", "narrative", "valid", False, False),
+    BadgeDef(13, "comeback", "narrative", "valid", False, False),
+    BadgeDef(14, "tragic_hero", "narrative", "valid", False, False),
+    BadgeDef(15, "marathon_5", "narrative", "valid", False, False),
+    BadgeDef(16, "win_streak_3", "streak", "valid", False, False),
+    BadgeDef(17, "lose_streak_3", "streak", "valid", False, False),
+    BadgeDef(18, "bench_2", "streak", "valid", False, False),
+    BadgeDef(19, "nemesis_6", "relational", "valid", False, True),
+    BadgeDef(20, "duo_6", "relational", "valid", False, True),
+    BadgeDef(21, "versatile", "identity", "valid", False, True),
+    BadgeDef(22, "veteran_10", "milestone", "valid", False, True),
+    BadgeDef(23, "veteran_20", "milestone", "valid", False, True),
+    BadgeDef(24, "veteran_50", "milestone", "valid", False, True),
+    BadgeDef(25, "roulette_complete", "roulette", "roulette", False, False),
+    BadgeDef(26, "roulette_winner", "roulette", "roulette", False, False),
+    BadgeDef(27, "gambler", "roulette", "roulette", False, True),
+    # Teoman, 2026-08-19: katalog SONUNA eklendi (sıra dondurulmuş — görsel
+    # dosya adı ID'ye bağlı). "narrative" sınıfı: dört bileşenin (mvp/damage/
+    # gold/cs_per_min) BİRLEŞİMİdir, kendi başına ölçülebilir bir değeri yoktur
+    # (best_value/best_match hep null kalır — BEST_VALUE_CLASSES dışında).
+    BadgeDef(28, "perfect_quad", "narrative", "valid", True, False),
+)
+
+BADGE_KEYS: tuple[str, ...] = tuple(d.key for d in CATALOG)
+BADGE_DEFS: dict[str, BadgeDef] = {d.key: d for d in CATALOG}
+
+# api_contract §2 "Kademe": bu 7 rozet kademelidir (6 STANDART + perfect_quad NADİR).
+TIERED_KEYS = frozenset(d.key for d in CATALOG if d.tiered)
+
+# `best_match_id`/`best_value` yalnız ölçülebilir değeri olan sınıflarda.
+BEST_VALUE_CLASSES = frozenset(("record", "role", "personal"))
+BEST_VALUE_KEYS = frozenset(
+    d.key for d in CATALOG if d.cls in BEST_VALUE_CLASSES
 )
 
 # Rekor rozetleri: rozet anahtarı → match_participants stat kolonu.
@@ -55,85 +114,210 @@ RECORD_STATS = {
 }
 
 # Blok rozetleri: tamamlanan her N'lik ardışık blok 1 rozet (bloklar ayrık).
-WIN_STREAK_BLOCK = 5
-BENCH_BLOCK = 3
+WIN_STREAK_BLOCK = 3  # GÖREV 24: 5 → 3 (en uzun seri 4'tü, rozet ÖLÜYDÜ)
+LOSE_STREAK_BLOCK = 3  # GÖREV 24 YENİ: win_streak'in aynası
+BENCH_BLOCK = 2  # GÖREV 24: 3 → 2
 
 # Eşik rozetleri: valid maç sayısı; her biri tek seferlik ve bağımsız.
-VETERAN_THRESHOLDS = {"veteran_10": 10, "veteran_25": 25, "veteran_50": 50}
+VETERAN_THRESHOLDS = {"veteran_10": 10, "veteran_20": 20, "veteran_50": 50}
 
 # gambler (GÖREV 23): roulette_winner sayısı eşiği — tek seferlik.
 GAMBLER_THRESHOLD = 5
+
+# GÖREV 24 eşikleri (kalibrasyon: CHANGE_REQUESTS 2026-08-19).
+ROLE_DUEL_RATIO = 1.5  # kendi rolündeki rakibin >= 1.5 katı perf
+ROLE_RECORD_MIN_PRIOR = 10  # o rolde en az 10 önceki karşılaştırılabilir slot
+PERSONAL_RECORD_MIN_PRIOR = 5  # kişisel rekor: en az 5 önceki hesaplanabilir maç
+KILL_THRESHOLD = 20
+KDA_THRESHOLD = 10.0
+MARATHON_MIN_MATCHES = 5
+RELATIONAL_THRESHOLD = 6  # nemesis_6 / duo_6
+
+# Kademe eşikleri (api_contract §2 "Kademe — ALTI SEVİYE", Teoman revizyonu
+# 2026-08-19: ORAN → KÜMÜLATİF SAYAÇ). Ölçüt artık `count`tur (rozetin kaç kez
+# kazanıldığı) — `rate` SALT BİLGİDİR, kademe hesabına GİRMEZ. `matches_played`
+# şartı KALDIRILDI (sayaç bazlı sistemde gereksiz). `count` ve `tier_best`
+# (ardışık seri) kariyer boyunca yalnız ARTAR — bu yüzden `_tier(count,
+# best_streak)`'in kendisi de monoton artar: kademe kendiliğinden ASLA DÜŞMEZ,
+# ayrı bir "en yüksek kademe" ratchet'i GEREKMEZ.
+#
+# İki eşik ÖLÇEĞİ vardır (rozetin dağılım sıklığına göre): STANDART (her maçta
+# ~1 kez dağılan 6 rozet) ve NADİR (`perfect_quad` gibi seyrek olaylar).
+# DİKKAT: `stellar` bu tablolarda YOKTUR, sayaçla kazanılmaz — tavan `diamond`;
+# `stellar` = diamond sayacı + ayrı bir GÖREV (bkz. STELLAR_QUEST_TARGET ve
+# `_PlayerState.tier_streak/tier_best`, `_tier`, `_stellar_quest`).
+TIER_LEVELS_STANDARD: tuple[tuple[str, int], ...] = (
+    ("bronze", 1),
+    ("silver", 3),
+    ("gold", 5),
+    ("platinum", 8),
+    ("diamond", 12),
+)
+TIER_LEVELS_RARE: tuple[tuple[str, int], ...] = (
+    ("bronze", 1),
+    ("silver", 2),
+    ("gold", 3),
+    ("platinum", 4),
+    ("diamond", 6),
+)
+TIER_SCALE_STANDARD = "standard"
+TIER_SCALE_RARE = "rare"
+
+# Rozet anahtarı → ölçek; yalnız TIERED_KEYS'te anlamlıdır (bkz. `GET /badges`
+# katalogundaki `tier_scale`, kademesizlerde `None`).
+TIER_SCALES: dict[str, str] = {
+    "mvp": TIER_SCALE_STANDARD,
+    "vision": TIER_SCALE_STANDARD,
+    "damage": TIER_SCALE_STANDARD,
+    "cs_per_min": TIER_SCALE_STANDARD,
+    "gold": TIER_SCALE_STANDARD,
+    "role_duel": TIER_SCALE_STANDARD,
+    "perfect_quad": TIER_SCALE_RARE,
+}
+
+STELLAR_TIER = "stellar"
+
+
+def _tier_levels(key: str) -> tuple[tuple[str, int], ...]:
+    """Rozet anahtarına göre eşik tablosu (STANDART varsayılan)."""
+    if TIER_SCALES.get(key) == TIER_SCALE_RARE:
+        return TIER_LEVELS_RARE
+    return TIER_LEVELS_STANDARD
+
+
+# stellar görevi: kademeli 7 rozetten HERHANGİ birinde kariyer boyunca en az bir
+# kez ardışık 3 valid maçta kazanmak (api_contract §2, bench_2 deseniyle
+# tutarlı: kapsam dışı/kazanılmayan maç seriyi kırar — 0'a döner; GERİ ALINMAZ).
+STELLAR_QUEST_TARGET = 3
+
+# `progress` tanımlı sınıflar (kilometre, kimlik, ilişkisel, blok, gambler);
+# maç-anı koşullu sınıflarda (rekor, anlatısal, kişisel, rol) progress YOKTUR.
+PROGRESS_TARGETS = {
+    "win_streak_3": WIN_STREAK_BLOCK,
+    "lose_streak_3": LOSE_STREAK_BLOCK,
+    "bench_2": BENCH_BLOCK,
+    "nemesis_6": RELATIONAL_THRESHOLD,
+    "duo_6": RELATIONAL_THRESHOLD,
+    "versatile": len(ROLES),
+    "veteran_10": 10,
+    "veteran_20": 20,
+    "veteran_50": 50,
+    "gambler": GAMBLER_THRESHOLD,
+}
 
 TEAM_SIZE = 5
 
 _SECONDS_PER_MINUTE = 60.0
 
 
-class _Tally:
-    """Rozet sayacı: `count` ve rozeti SON kazandıran maç.
+# ---------------------------------------------------------------------------
+# Oyuncu durumu
+# ---------------------------------------------------------------------------
+class _PlayerState:
+    """Bir oyuncunun rozet sayaçları + kronolojik yürüyüş durumu.
 
-    Blok rozetlerinde bloğun son maçı, eşik rozetlerinde eşiği tamamlayan maç
-    kaydedilir; `award` kronolojik sırada çağrıldığı için son çağrı doğal
-    olarak en son maçtır.
+    `award` kronolojik sırada çağrıldığı için `last_match` doğal olarak rozeti
+    SON kazandıran maçtır (blok rozetinde bloğun son maçı, eşik rozetinde eşiği
+    tamamlayan maç). `best_*` yalnız ölçülebilir sınıflarda dolar ve KESİN
+    aşmayla güncellenir → eşitlikte replay sırasında İLK gelen maç kalır.
     """
+
+    __slots__ = (
+        "counts", "last_match", "best_match", "best_value",
+        "matches_played", "win_streak", "lose_streak", "bench_streak",
+        "roles", "nights", "wins_vs", "wins_with",
+        "pr_max", "pr_count", "roulette_winners",
+        "tier_streak", "tier_best",
+    )
 
     def __init__(self) -> None:
         self.counts: dict[str, int] = {}
         self.last_match: dict[str, int] = {}
+        self.best_match: dict[str, int] = {}
+        self.best_value: dict[str, float] = {}
+        self.matches_played = 0
+        self.win_streak = 0
+        self.lose_streak = 0
+        self.bench_streak = 0
+        self.roles: set[str] = set()
+        # gece (date(played_at,'-6 hours')) → o gecenin maç id'leri, kronolojik
+        self.nights: dict[str, list[int]] = {}
+        self.wins_vs: dict[int, int] = {}  # rakip player_id → galibiyet
+        self.wins_with: dict[int, int] = {}  # takım arkadaşı → birlikte galibiyet
+        self.pr_max: dict[str, float] = {}  # kişisel rekor metriği → en iyi değer
+        self.pr_count: dict[str, int] = {}  # metriği hesaplanabilir maç sayısı
+        self.roulette_winners = 0
+        # stellar görevi (kademeli 6 rozet): AÇIK ardışık kazanım serisi ve
+        # kariyerdeki EN UZUN seri (bench_2 deseniyle — kazanılmayan/kapsam dışı
+        # maç 0'a döner). yalnız TIERED_KEYS için doldurulur.
+        self.tier_streak: dict[str, int] = {}
+        self.tier_best: dict[str, int] = {}
 
-    def award(self, key: str, match_id: int) -> None:
+    def award(self, key: str, match_id: int, value: float | None = None) -> None:
         self.counts[key] = self.counts.get(key, 0) + 1
         self.last_match[key] = match_id
+        if value is None or key not in BEST_VALUE_KEYS:
+            return
+        best = self.best_value.get(key)
+        if best is None or value > best:
+            self.best_value[key] = value
+            self.best_match[key] = match_id
 
     def has(self, key: str) -> bool:
         return key in self.counts
 
-    def to_list(self) -> list[dict]:
-        """Katalog sırasında, yalnız count > 0 olan rozetler."""
-        return [
-            {
-                "key": key,
-                "count": self.counts[key],
-                "last_match_id": self.last_match[key],
-            }
-            for key in BADGE_KEYS
-            if self.counts.get(key, 0) > 0
-        ]
+    def count(self, key: str) -> int:
+        return self.counts.get(key, 0)
 
 
-def _ordered_matches(conn: sqlite3.Connection, player_id: int) -> list[sqlite3.Row]:
-    """Oyuncunun valid maçları, replay sort-key'iyle kronolojik sırada."""
+class _States(dict):
+    """player_id → _PlayerState (ilk erişimde oluşturur)."""
+
+    def state(self, player_id: int) -> _PlayerState:
+        st = self.get(player_id)
+        if st is None:
+            st = _PlayerState()
+            self[player_id] = st
+        return st
+
+
+# ---------------------------------------------------------------------------
+# Veri yükleme (TOPLU: oyuncu süzgeci YOK)
+# ---------------------------------------------------------------------------
+def _valid_matches(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """TÜM valid maçlar, replay sort-key'iyle kronolojik.
+
+    `night`: api_contract §2 marathon_5 tanımı — `played_at` (UTC) eksi 6 saatin
+    TARİHİ (sabaha kadar süren oturum tek gece sayılır). Hesap SQLite'ta yapılır
+    (tek yerde, deterministik); ayrıştırılamayan `played_at` NULL gece verir ve
+    o maç marathon dışında kalır.
+    """
     return conn.execute(
-        "SELECT m.id AS match_id, m.duration_s, m.winner_team "
-        "FROM matches m "
-        "JOIN match_participants mp ON mp.match_id = m.id AND mp.player_id = ? "
-        f"WHERE m.status = 'valid' {replay_order_by('m')}",
-        (player_id,),
+        "SELECT m.id AS match_id, m.duration_s, m.winner_team,"
+        " date(m.played_at, '-6 hours') AS night "
+        f"FROM matches m WHERE m.status = 'valid' {replay_order_by('m')}"
     ).fetchall()
 
 
-def _participants(
-    conn: sqlite3.Connection, player_id: int, engine_version: str
+def _valid_participants(
+    conn: sqlite3.Connection, engine_version: str
 ) -> dict[int, list[sqlite3.Row]]:
     """match_id → o maçın TÜM katılımcıları (stat + aktif engine perf_score).
 
-    Rekor/mvp/bench/comeback rozetleri oyuncuyu takım arkadaşları ve
-    rakipleriyle karşılaştırdığı için maçın 10 satırının hepsi gerekir.
     `rating_history` LEFT JOIN'dir: satırı olmayan katılımcının perf'i NULL
     sayılır (aday değildir), maç yine de değerlendirilir.
     """
     rows = conn.execute(
-        "SELECT mp.match_id, mp.player_id, mp.team,"
+        "SELECT mp.match_id, mp.player_id, mp.team, mp.position,"
         " mp.kills, mp.deaths, mp.assists, mp.gold, mp.cs,"
         " mp.damage_to_champs, mp.vision_score, rh.perf_score "
         "FROM match_participants mp "
         "JOIN matches m ON m.id = mp.match_id "
         "LEFT JOIN rating_history rh ON rh.match_id = mp.match_id"
         " AND rh.player_id = mp.player_id AND rh.engine_version = ? "
-        "WHERE m.status = 'valid' AND mp.match_id IN ("
-        "  SELECT match_id FROM match_participants WHERE player_id = ?) "
+        "WHERE m.status = 'valid' "
         "ORDER BY mp.match_id, mp.id",
-        (engine_version, player_id),
+        (engine_version,),
     ).fetchall()
     by_match: dict[int, list[sqlite3.Row]] = {}
     for row in rows:
@@ -141,17 +325,30 @@ def _participants(
     return by_match
 
 
-def _positions(conn: sqlite3.Connection, player_id: int) -> dict[int, str | None]:
-    """match_id → oyuncunun o maçtaki position'ı (versatile için)."""
-    rows = conn.execute(
-        "SELECT mp.match_id, mp.position FROM match_participants mp "
-        "JOIN matches m ON m.id = mp.match_id "
-        "WHERE mp.player_id = ? AND m.status = 'valid'",
-        (player_id,),
+def _roulette_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """TÜM rulet maçlarının katılımcı+atama satırları, kronolojik.
+
+    Kaynak yalnız `status='roulette'` + `linked` oturum maçlarıdır (katalogdaki
+    TEK istisna — rulet maçları valid süzgeçli diğer tüm rozetlerin zaten
+    dışındadır). Linked oturumda oyuncu kümesi maçınkiyle birebir aynı
+    olduğundan atama her zaman vardır.
+    """
+    return conn.execute(
+        "SELECT m.id AS match_id, m.winner_team, mp.player_id, mp.team,"
+        " mp.items_json, ra.item_ids_json "
+        "FROM matches m "
+        "JOIN match_participants mp ON mp.match_id = m.id "
+        "JOIN roulette_sessions rs ON rs.match_id = m.id"
+        " AND rs.status = 'linked' "
+        "JOIN roulette_assignments ra ON ra.session_id = rs.id"
+        " AND ra.player_id = mp.player_id "
+        f"WHERE m.status = 'roulette' {replay_order_by('m')}"
     ).fetchall()
-    return {row["match_id"]: row["position"] for row in rows}
 
 
+# ---------------------------------------------------------------------------
+# Maç bazlı ortak hesaplar (maç başına BİR kez; 10 oyuncu paylaşır)
+# ---------------------------------------------------------------------------
 def _mvp_key(row: sqlite3.Row) -> tuple:
     """MVP kırılımı: perf ↓ → kills ↓ → assists ↓ → deaths ↑ → player_id ↑.
 
@@ -168,11 +365,10 @@ def _mvp_key(row: sqlite3.Row) -> tuple:
     )
 
 
-def _is_mvp(participants: list[sqlite3.Row], winner_team: int, player_id: int) -> bool:
-    """Kazanan takımın en yüksek perf_score'lusu bu oyuncu mu?
+def _mvp_player(participants: list[sqlite3.Row], winner_team: int) -> int | None:
+    """Kazanan takımın en yüksek perf_score'lusu; perf'i NULL satır aday değil.
 
-    perf_score'u NULL olan satır aday değildir; kazanan takımda hiç perf yoksa
-    o maçta MVP yoktur.
+    Kazanan takımda hiç perf yoksa o maçta MVP yoktur.
     """
     candidates = [
         row
@@ -180,19 +376,30 @@ def _is_mvp(participants: list[sqlite3.Row], winner_team: int, player_id: int) -
         if row["team"] == winner_team and row["perf_score"] is not None
     ]
     if not candidates:
-        return False
-    return min(candidates, key=_mvp_key)["player_id"] == player_id
+        return None
+    return min(candidates, key=_mvp_key)["player_id"]
 
 
-def _holds_record(player_id: int, values: dict[int, float]) -> bool:
-    """Maçtaki en yüksek değere sahip mi? Eşitlikte HERKES rozeti alır.
+def _sole_extreme(
+    participants: list[sqlite3.Row], team: int, highest: bool
+) -> int | None:
+    """Takımın TEK BAŞINA en yüksek/en düşük perf'lisi (bench_2 / tragic_hero).
 
-    `values` yalnız non-null statlıları içerir; oyuncu içinde yoksa (kendi
-    statı NULL) ya da hiç aday yoksa rozet çıkmaz.
+    Karşılaştırılabilirlik şartı: takımın 5 oyuncusunun da perf'i non-null
+    olmalı. Şart sağlanmıyorsa ya da uçta eşitlik varsa None döner (kırılım
+    UYGULANMAZ — bench_2 için bu seriyi kıran durumla aynı sonuçtur).
     """
-    if player_id not in values:
-        return False
-    return values[player_id] == max(values.values())
+    own = [row for row in participants if row["team"] == team]
+    if len(own) != TEAM_SIZE:
+        return None
+    if any(row["perf_score"] is None for row in own):
+        return None
+    pick = max if highest else min
+    target = pick(row["perf_score"] for row in own)
+    at_target = [row["player_id"] for row in own if row["perf_score"] == target]
+    if len(at_target) > 1:
+        return None
+    return at_target[0]
 
 
 def _stat_values(
@@ -224,18 +431,35 @@ def _cs_per_min_values(
     }
 
 
-def _is_comeback(
-    participants: list[sqlite3.Row], winner_team: int, team: int
-) -> bool:
-    """Kazanan takımda + iki takımın da 5 gold'u dolu + kazananın toplamı KÜÇÜK."""
-    if team != winner_team:
-        return False
+def _record_tables(
+    participants: list[sqlite3.Row], duration_s: int | None
+) -> dict[str, dict[int, float]]:
+    """Rekor rozeti → {player_id: değer} (maç başına bir kez kurulur)."""
+    tables = {
+        key: _stat_values(participants, column)
+        for key, column in RECORD_STATS.items()
+    }
+    tables["cs_per_min"] = _cs_per_min_values(participants, duration_s)
+    return tables
+
+
+def _leaders(values: dict[int, float]) -> set[int]:
+    """Maçın en yüksek değerli oyuncuları — EŞİTLİKTE hepsi rozeti alır."""
+    if not values:
+        return set()
+    top = max(values.values())
+    return {pid for pid, value in values.items() if value == top}
+
+
+def _is_comeback(participants: list[sqlite3.Row], winner_team: int) -> bool:
+    """İki takımın da 5 gold'u non-null + KAZANANIN toplamı küçük mü?
+
+    Oyuncu bazlı ek şart (kazanan takımda olmak) çağırandadır.
+    """
     totals = {100: 0, 200: 0}
     sizes = {100: 0, 200: 0}
     for row in participants:
-        if row["team"] not in totals:
-            return False
-        if row["gold"] is None:
+        if row["team"] not in totals or row["gold"] is None:
             return False
         totals[row["team"]] += row["gold"]
         sizes[row["team"]] += 1
@@ -245,51 +469,288 @@ def _is_comeback(
     return totals[winner_team] < totals[loser_team]
 
 
-def _is_bench(participants: list[sqlite3.Row], player_id: int, team: int) -> bool:
-    """Oyuncu KENDİ takımının TEK BAŞINA en düşük perf_score'lusu mu?
+def _role_duel_ratios(participants: list[sqlite3.Row]) -> dict[int, float]:
+    """player_id → kendi rolündeki rakibine göre perf oranı (role_duel).
 
-    Karşılaştırılabilirlik şartı: kendi takımının 5 oyuncusunun da perf'i
-    non-null olmalı. Şart sağlanmıyorsa ya da en düşükte eşitlik varsa maç
-    bench SAYILMAZ (çağıran için seriyi kıran durum ile aynı sonuç).
+    Şartlar (api_contract §2): o maçta ilgili rolde KARŞI takımlarda tam 2
+    non-NULL `position` slotu olmalı (aksi hâlde o maç×rol bu rozetin
+    dışındadır; diğer roller etkilenmez), iki oyuncunun da perf'i non-NULL
+    olmalı, rakip perf'i <= 0 ise oran tanımsızdır → kayıt yok.
     """
-    own = [row for row in participants if row["team"] == team]
-    if len(own) != TEAM_SIZE:
-        return False
-    if any(row["perf_score"] is None for row in own):
-        return False
-    lowest = min(row["perf_score"] for row in own)
-    at_lowest = [row["player_id"] for row in own if row["perf_score"] == lowest]
-    if len(at_lowest) > 1:
-        return False
-    return at_lowest[0] == player_id
+    by_role: dict[str, list[sqlite3.Row]] = {}
+    for row in participants:
+        if row["position"] is not None:
+            by_role.setdefault(row["position"], []).append(row)
+    ratios: dict[int, float] = {}
+    for pair in by_role.values():
+        if len(pair) != 2:
+            continue
+        first, second = pair
+        if first["team"] == second["team"]:
+            continue
+        for me, opponent in ((first, second), (second, first)):
+            if me["perf_score"] is None or opponent["perf_score"] is None:
+                continue
+            if opponent["perf_score"] <= 0:
+                continue
+            ratios[me["player_id"]] = me["perf_score"] / opponent["perf_score"]
+    return ratios
 
 
-def _roulette_rows(
-    conn: sqlite3.Connection, player_id: int
-) -> list[sqlite3.Row]:
-    """Oyuncunun rulet maçları (GÖREV 23), replay sort-key'iyle kronolojik.
+def _kda(row: sqlite3.Row) -> float | None:
+    """(kills + assists) / max(1, deaths); k/d/a üçü de non-NULL olmalı."""
+    if row["kills"] is None or row["deaths"] is None or row["assists"] is None:
+        return None
+    return (row["kills"] + row["assists"]) / max(1, row["deaths"])
 
-    Kaynak yalnız `status='roulette'` + `linked` oturum maçlarıdır (katalogdaki
-    TEK istisna — rulet maçları valid süzgeçli diğer tüm rozetlerin zaten
-    dışındadır). Oyuncunun o oturumdaki ataması JOIN'lenir; linked oturumda
-    oyuncu kümesi maçınkiyle birebir aynı olduğundan atama her zaman vardır.
+
+def _damage_per_min(row: sqlite3.Row, duration_s: int | None) -> float | None:
+    """pr_damage metriği: damage_to_champs / (duration_s/60); yoksa None."""
+    if row["damage_to_champs"] is None or duration_s is None or duration_s <= 0:
+        return None
+    return row["damage_to_champs"] / (duration_s / _SECONDS_PER_MINUTE)
+
+
+# ---------------------------------------------------------------------------
+# Kronolojik tek geçiş
+# ---------------------------------------------------------------------------
+def _personal_record(
+    st: _PlayerState, key: str, value: float | None, match_id: int
+) -> None:
+    """Kişisel rekor sınıfı (pr_perf / pr_damage), api_contract §2.
+
+    Kesin aşma (`>`) yeter (marj yok), ancak en az PERSONAL_RECORD_MIN_PRIOR
+    önceki HESAPLANABİLİR maç gerekir — aksi hâlde ilk maçlar otomatik rekor
+    olurdu. Metriği hesaplanamayan maç ne rekor adayıdır ne de sayaca girer.
+    Karşılaştırma MAÇ-ÖNCESİ snapshot'ladır: snapshot bu maçtan SONRA güncellenir.
     """
-    return conn.execute(
-        "SELECT m.id AS match_id, m.winner_team, mp.team, mp.items_json,"
-        " ra.item_ids_json "
-        "FROM matches m "
-        "JOIN match_participants mp ON mp.match_id = m.id AND mp.player_id = ? "
-        "JOIN roulette_sessions rs ON rs.match_id = m.id"
-        " AND rs.status = 'linked' "
-        "JOIN roulette_assignments ra ON ra.session_id = rs.id"
-        " AND ra.player_id = mp.player_id "
-        f"WHERE m.status = 'roulette' {replay_order_by('m')}",
-        (player_id,),
-    ).fetchall()
+    if value is None:
+        return
+    best = st.pr_max.get(key)
+    if st.pr_count.get(key, 0) >= PERSONAL_RECORD_MIN_PRIOR and (
+        best is None or value > best
+    ):
+        st.award(key, match_id, value)
+    st.pr_count[key] = st.pr_count.get(key, 0) + 1
+    if best is None or value > best:
+        st.pr_max[key] = value
+
+
+def _award_relational(
+    st: _PlayerState,
+    counters: dict[int, int],
+    others: list[int],
+    key: str,
+    match_id: int,
+) -> None:
+    """nemesis_6 / duo_6: aynı rakibe/arkadaşa karşı N galibiyet — TEK SEFERLİK.
+
+    `last_match_id` eşiği İLK dolduran maçtır (aynı maçta birden çok kişi eşiği
+    doldurursa maç aynıdır, rozet bir kez verilir).
+    """
+    reached = False
+    for other in others:
+        counters[other] = counters.get(other, 0) + 1
+        if counters[other] >= RELATIONAL_THRESHOLD:
+            reached = True
+    if reached and not st.has(key):
+        st.award(key, match_id)
+
+
+def compute_badges(
+    conn: sqlite3.Connection, engine_version: str
+) -> dict[int, _PlayerState]:
+    """TÜM oyuncuların rozetleri — tek toplu geçiş (player_id → _PlayerState).
+
+    Valid maçlar kronolojik yürünür; her maçta ortak hesaplar (rekor tabloları,
+    MVP, bench/tragic uçları, comeback, koridor düelloları) BİR kez yapılır ve
+    o maçın katılımcıları için paylaşılır. Rol rekoru snapshot'ı maç bittikten
+    SONRA güncellenir (ileriye bakma yasağı). Rulet üçlüsü ayrı geçiştedir:
+    kaynağı yalnız `status='roulette'` maçlardır, valid sayaçlarına dokunmaz.
+    """
+    states = _States()
+    matches = _valid_matches(conn)
+    by_match = _valid_participants(conn, engine_version)
+
+    # role_record için grup snapshot'ı: rol → (karşılaştırılabilir slot sayısı,
+    # görülmüş en yüksek perf). MAÇ-ÖNCESİ okunur, maç sonrası yazılır.
+    role_prior_count: dict[str, int] = {}
+    role_prior_max: dict[str, float] = {}
+
+    for match in matches:
+        match_id = match["match_id"]
+        duration_s = match["duration_s"]
+        winner_team = match["winner_team"]
+        loser_team = 200 if winner_team == 100 else 100
+        participants = by_match.get(match_id, [])
+
+        records = _record_tables(participants, duration_s)
+        leaders = {key: _leaders(values) for key, values in records.items()}
+        mvp_id = _mvp_player(participants, winner_team)
+        tragic_id = _sole_extreme(participants, loser_team, highest=True)
+        bench_by_team = {
+            team: _sole_extreme(participants, team, highest=False)
+            for team in (100, 200)
+        }
+        comeback = _is_comeback(participants, winner_team)
+        duels = _role_duel_ratios(participants)
+        by_team: dict[int, list[int]] = {100: [], 200: []}
+        for row in participants:
+            if row["team"] in by_team:
+                by_team[row["team"]].append(row["player_id"])
+
+        for row in participants:
+            player_id = row["player_id"]
+            st = states.state(player_id)
+            st.matches_played += 1
+            won = row["team"] == winner_team
+            perf = row["perf_score"]
+
+            # --- Rekor rozetleri (kademeli sınıf) ---
+            tiered_earned: set[str] = set()
+            if player_id == mvp_id:
+                st.award("mvp", match_id, perf)
+                tiered_earned.add("mvp")
+            for key, winners in leaders.items():
+                if player_id in winners:
+                    st.award(key, match_id, records[key][player_id])
+                    tiered_earned.add(key)
+
+            # --- Rol sınıfı ---
+            ratio = duels.get(player_id)
+            if ratio is not None and ratio >= ROLE_DUEL_RATIO:
+                st.award("role_duel", match_id, ratio)
+                tiered_earned.add("role_duel")
+
+            # --- perfect_quad ("Kusursuz Dörtlük"): AYNI maçta mvp + damage +
+            # gold + cs_per_min DÖRDÜ BİRDEN (her biri kendi rozetinin kuralıyla
+            # — mvp tekliği, cs_per_min'in duration_s şartı birebir geçerli).
+            # Dördünden biri bu maçta hesaplanamıyorsa (mvp_id None, ya da
+            # leaders[key] boş/oyuncu içinde değil) rozet YOK.
+            if (
+                player_id == mvp_id
+                and player_id in leaders.get("damage", ())
+                and player_id in leaders.get("gold", ())
+                and player_id in leaders.get("cs_per_min", ())
+            ):
+                st.award("perfect_quad", match_id)
+                tiered_earned.add("perfect_quad")
+
+            # --- stellar görevi: TIERED_KEYS'in her biri için ardışık kazanım
+            # serisi (bench_2 deseniyle — kazanılmayan/kapsam dışı maç 0'a
+            # döner: cs_per_min'de duration_s NULL → `leaders["cs_per_min"]`
+            # boş küme, role_duel'de eksik slot → `ratio` None; ikisi de bu
+            # döngüde doğal olarak "kazanılmadı" sayılır, ek özel durum GEREKMEZ).
+            for tiered_key in TIERED_KEYS:
+                if tiered_key in tiered_earned:
+                    streak = st.tier_streak.get(tiered_key, 0) + 1
+                    st.tier_streak[tiered_key] = streak
+                    if streak > st.tier_best.get(tiered_key, 0):
+                        st.tier_best[tiered_key] = streak
+                else:
+                    st.tier_streak[tiered_key] = 0
+
+            position = row["position"]
+            if position is not None and perf is not None:
+                prior_best = role_prior_max.get(position)
+                if (
+                    role_prior_count.get(position, 0) >= ROLE_RECORD_MIN_PRIOR
+                    and prior_best is not None
+                    and perf > prior_best
+                ):
+                    st.award("role_record", match_id, perf)
+
+            # --- Kişisel rekorlar ---
+            _personal_record(st, "pr_perf", perf, match_id)
+            _personal_record(
+                st, "pr_damage", _damage_per_min(row, duration_s), match_id
+            )
+
+            # --- Anlatısal rozetler ---
+            if row["kills"] is not None and row["kills"] >= KILL_THRESHOLD:
+                st.award("kill_20", match_id)
+            kda = _kda(row)
+            if kda is not None and kda >= KDA_THRESHOLD:
+                st.award("kda_10", match_id)
+            if row["deaths"] == 0:
+                st.award("deathless", match_id)
+            if won and comeback:
+                st.award("comeback", match_id)
+            if player_id == tragic_id:
+                st.award("tragic_hero", match_id)
+            if match["night"] is not None:
+                st.nights.setdefault(match["night"], []).append(match_id)
+
+            # --- Blok rozetleri (ayrık bloklar; kronoloji şart) ---
+            if won:
+                st.lose_streak = 0
+                st.win_streak += 1
+                if st.win_streak == WIN_STREAK_BLOCK:
+                    st.award("win_streak_3", match_id)
+                    st.win_streak = 0
+            else:
+                st.win_streak = 0
+                st.lose_streak += 1
+                if st.lose_streak == LOSE_STREAK_BLOCK:
+                    st.award("lose_streak_3", match_id)
+                    st.lose_streak = 0
+
+            if player_id == bench_by_team.get(row["team"]):
+                st.bench_streak += 1
+                if st.bench_streak == BENCH_BLOCK:
+                    st.award("bench_2", match_id)
+                    st.bench_streak = 0
+            else:
+                st.bench_streak = 0
+
+            # --- İlişkisel rozetler (tek seferlik) ---
+            if won:
+                _award_relational(
+                    st, st.wins_vs, by_team[loser_team], "nemesis_6", match_id
+                )
+                _award_relational(
+                    st,
+                    st.wins_with,
+                    [pid for pid in by_team[winner_team] if pid != player_id],
+                    "duo_6",
+                    match_id,
+                )
+
+            # --- Kimlik / kilometre taşları ---
+            if position is not None:
+                st.roles.add(position)
+            if len(st.roles) >= len(ROLES) and not st.has("versatile"):
+                st.award("versatile", match_id)
+            for key, threshold in VETERAN_THRESHOLDS.items():
+                if st.matches_played == threshold:
+                    st.award(key, match_id)
+
+        # Rol rekoru snapshot'ı maç İŞLENDİKTEN SONRA güncellenir: aynı maçtaki
+        # iki slot da maç-öncesi rekorla karşılaştırılır (ileriye bakma yasak).
+        for row in participants:
+            position = row["position"]
+            perf = row["perf_score"]
+            if position is None or perf is None:
+                continue
+            role_prior_count[position] = role_prior_count.get(position, 0) + 1
+            prior_best = role_prior_max.get(position)
+            if prior_best is None or perf > prior_best:
+                role_prior_max[position] = perf
+
+    # --- marathon_5: gece bazlı, geçiş sonrası (nitelikli her gece 1 rozet) ---
+    # `nights` kronolojik eklendiği için sıra doğaldır; last_match_id o gecenin
+    # replay sırasındaki SON maçıdır.
+    for st in states.values():
+        for night_matches in st.nights.values():
+            if len(night_matches) >= MARATHON_MIN_MATCHES:
+                st.award("marathon_5", night_matches[-1])
+
+    _award_roulette_badges(conn, states)
+    return states
 
 
 def _award_roulette_badges(
-    conn: sqlite3.Connection, player_id: int, tally: _Tally
+    conn: sqlite3.Connection, states: _States
 ) -> None:
     """roulette_complete / roulette_winner / gambler (api_contract §2, GÖREV 23).
 
@@ -299,29 +760,157 @@ def _award_roulette_badges(
     doğrulanamaz → rozet yok. winner = complete + oyuncunun MAÇTAKİ takımı
     kazanan; gambler = 5. winner'ı tamamlayan maçta tek seferlik.
     """
-    winners = 0
-    for row in _roulette_rows(conn, player_id):
+    for row in _roulette_rows(conn):
         bought = assignment_bought(
             json.loads(row["item_ids_json"]), row["items_json"]
         )
         if bought is not True:
             continue
-        tally.award("roulette_complete", row["match_id"])
+        st = states.state(row["player_id"])
+        st.award("roulette_complete", row["match_id"])
         if row["team"] == row["winner_team"]:
-            tally.award("roulette_winner", row["match_id"])
-            winners += 1
-            if winners == GAMBLER_THRESHOLD:
-                tally.award("gambler", row["match_id"])
+            st.award("roulette_winner", row["match_id"])
+            st.roulette_winners += 1
+            if st.roulette_winners == GAMBLER_THRESHOLD:
+                st.award("gambler", row["match_id"])
+
+
+# ---------------------------------------------------------------------------
+# Yanıt katmanı (yuvarlama YALNIZ burada)
+# ---------------------------------------------------------------------------
+def _tier(
+    count: int, levels: tuple[tuple[str, int], ...], best_streak: int = 0
+) -> str | None:
+    """bronze..diamond KÜMÜLATİF SAYAÇLA (`count`), `stellar` GÖREVLE
+    (api_contract §2 "ALTI SEVİYE", Teoman revizyonu 2026-08-19); kazanılmamışsa
+    None. `matches_played` şartı KALDIRILDI — sayaç zaten geriye gitmez, bu
+    yüzden `_tier`in kendisi de `count`/`best_streak` arttıkça monoton artar:
+    kademe hiç DÜŞMEZ, ayrı bir "en yüksek kademe" ratchet'i gerekmez.
+
+    `levels` STANDART ya da NADİR ölçek tablosudur (bkz. `_tier_levels`),
+    ARTAN sırada taranır — son sağlanan eşik kademedir (tavanı `diamond`).
+    `diamond` eşiğine ulaşan VE `best_streak >= STELLAR_QUEST_TARGET` olan
+    oyuncu `stellar`a yükselir; görev de kalıcıdır (geri alınmaz).
+    """
+    if count <= 0:
+        return None
+    tier: str | None = None
+    for name, threshold in levels:
+        if count >= threshold:
+            tier = name
+    if tier == "diamond" and best_streak >= STELLAR_QUEST_TARGET:
+        return STELLAR_TIER
+    return tier
+
+
+def _next_tier_count(
+    tier: str | None, levels: tuple[tuple[str, int], ...]
+) -> int | None:
+    """Bir üst kademenin SAYAÇ eşiği; `diamond`/`stellar`da None.
+
+    `diamond`dan sonraki hedef bir sayaç DEĞİL GÖREVDİR (bkz. `stellar_quest`)
+    — bu yüzden SAYAÇ TABLOSU `diamond`'da biter. Kazanılmamış/kilitli rozette
+    (`tier is None`) hedef bronz eşiğidir (`levels[0]`).
+    """
+    if tier is None:
+        return levels[0][1]
+    if tier == STELLAR_TIER:
+        return None
+    names = [name for name, _count in levels]
+    next_idx = names.index(tier) + 1
+    if next_idx >= len(levels):
+        return None
+    return levels[next_idx][1]
+
+
+def _stellar_quest(st: _PlayerState, key: str) -> dict[str, int | bool]:
+    """`stellar_quest` (api_contract §2): kariyerdeki EN UZUN ardışık kazanım
+    serisi ve görev tamamlandı mı — yalnız TIERED_KEYS için anlamlıdır.
+    """
+    best = st.tier_best.get(key, 0)
+    return {
+        "target": STELLAR_QUEST_TARGET,
+        "best": best,
+        "met": best >= STELLAR_QUEST_TARGET,
+    }
+
+
+def _progress(st: _PlayerState, key: str) -> dict[str, int] | None:
+    """`{"current","target"}` — yalnız ilerlemesi tanımlı sınıflarda."""
+    target = PROGRESS_TARGETS.get(key)
+    if target is None:
+        return None
+    if key == "versatile":
+        current = len(st.roles)
+    elif key == "win_streak_3":
+        current = st.win_streak
+    elif key == "lose_streak_3":
+        current = st.lose_streak
+    elif key == "bench_2":
+        current = st.bench_streak
+    elif key == "nemesis_6":
+        current = max(st.wins_vs.values(), default=0)
+    elif key == "duo_6":
+        current = max(st.wins_with.values(), default=0)
+    elif key == "gambler":
+        current = st.count("roulette_winner")
+    else:  # veteran_*
+        current = st.matches_played
+    return {"current": current, "target": target}
+
+
+def _badge_entry(st: _PlayerState, definition: BadgeDef) -> dict:
+    """Tek rozetin yanıt kaydı (api_contract §2 örneğiyle birebir alanlar).
+
+    `rate` (`count / matches_played`) yalnız BİLGİ amaçlıdır — kademe hesabına
+    girmez; kademe `count` (+ `stellar` için ardışık seri) üzerinden belirlenir.
+    """
+    key = definition.key
+    count = st.count(key)
+    best_value = st.best_value.get(key)
+    tier = rate = next_count = stellar_quest = None
+    if definition.tiered:
+        if st.matches_played > 0:
+            rate = count / st.matches_played
+        levels = _tier_levels(key)
+        best_streak = st.tier_best.get(key, 0)
+        tier = _tier(count, levels, best_streak)
+        next_count = _next_tier_count(tier, levels)
+        stellar_quest = _stellar_quest(st, key)
+    return {
+        "key": key,
+        "count": count,
+        "last_match_id": st.last_match.get(key),
+        "best_match_id": st.best_match.get(key),
+        "best_value": None if best_value is None else round(best_value, 2),
+        "tier": tier,
+        "rate": None if rate is None else round(rate, 2),
+        "next_tier_count": next_count,
+        "progress": _progress(st, key),
+        "stellar_quest": stellar_quest,
+    }
+
+
+def _badge_list(st: _PlayerState, include_locked: bool) -> list[dict]:
+    """Katalog sırasında rozet listesi; kilitliler yalnız istenirse."""
+    return [
+        _badge_entry(st, definition)
+        for definition in CATALOG
+        if include_locked or st.count(definition.key) > 0
+    ]
 
 
 def player_badges(
-    conn: sqlite3.Connection, player_id: int, engine_version: str
+    conn: sqlite3.Connection,
+    player_id: int,
+    engine_version: str,
+    include_locked: bool = False,
 ) -> dict | None:
     """Oyuncunun rozetleri (api_contract §2); bilinmeyen oyuncuda None.
 
-    Tek geçişte kronolojik olarak yürünür: maç bazlı rozetler o maçta
-    değerlendirilir, blok rozetleri sayaçla, eşik/tek-seferlik rozetler ilk
-    tamamlandıkları maçla kaydedilir.
+    `include_locked=False` (varsayılan) yalnız `count > 0` rozetleri döndürür —
+    mevcut yanıt şekli korunur; `True` katalogdaki 27 anahtarın hepsini döndürür
+    (kilitli rozetin ilerlemesini göstermek için).
     """
     if (
         conn.execute(
@@ -330,76 +919,42 @@ def player_badges(
         is None
     ):
         return None
+    states = compute_badges(conn, engine_version)
+    st = states.get(player_id) or _PlayerState()
+    return {
+        "player_id": player_id,
+        "matches_played": st.matches_played,
+        "badges": _badge_list(st, include_locked),
+    }
 
-    matches = _ordered_matches(conn, player_id)
-    by_match = _participants(conn, player_id, engine_version)
-    positions = _positions(conn, player_id)
 
-    tally = _Tally()
-    win_streak = 0
-    bench_streak = 0
-    played_roles: set[str] = set()
+def badge_catalog(conn: sqlite3.Connection, engine_version: str) -> dict:
+    """`GET /badges` (api_contract §2): katalog + `holders` nadirliği.
 
-    for played, match in enumerate(matches, start=1):
-        match_id = match["match_id"]
-        participants = by_match.get(match_id, [])
-        me = next(
-            (row for row in participants if row["player_id"] == player_id), None
+    Salt-okur ve türetilmiştir; per-player hesapların SAF TOPLAMI olduğu için
+    replay-deterministiktir. `roster_size` = en az 1 VALID maçı olan oyuncu
+    sayısı (hiç oynamamış kayıt nadirliği şişirmesin). Roster boşken oran
+    tanımsızdır → `holders_pct` NULL (yalnız rulet maçı olan oyuncu rozet
+    taşıyabilir ama roster'a girmez).
+    """
+    states = compute_badges(conn, engine_version)
+    roster_size = sum(1 for st in states.values() if st.matches_played > 0)
+    badges = []
+    for definition in CATALOG:
+        holders = sum(1 for st in states.values() if st.count(definition.key) > 0)
+        badges.append(
+            {
+                "id": definition.id,
+                "key": definition.key,
+                "class": definition.cls,
+                "source": definition.source,
+                "tiered": definition.tiered,
+                "tier_scale": TIER_SCALES.get(definition.key),
+                "one_time": definition.one_time,
+                "holders": holders,
+                "holders_pct": (
+                    round(holders * 100 / roster_size, 1) if roster_size else None
+                ),
+            }
         )
-        if me is None:  # savunma amaçlı; _ordered_matches zaten katılımı şart koşar
-            continue
-        team = me["team"]
-        winner_team = match["winner_team"]
-
-        # --- Maç bazlı rozetler ---
-        if _is_mvp(participants, winner_team, player_id):
-            tally.award("mvp", match_id)
-
-        for key, column in RECORD_STATS.items():
-            if _holds_record(player_id, _stat_values(participants, column)):
-                tally.award(key, match_id)
-
-        if _holds_record(
-            player_id, _cs_per_min_values(participants, match["duration_s"])
-        ):
-            tally.award("cs_per_min", match_id)
-
-        if me["deaths"] == 0:
-            tally.award("deathless", match_id)
-
-        if _is_comeback(participants, winner_team, team):
-            tally.award("comeback", match_id)
-
-        # --- Blok rozetleri (ayrık bloklar; kronoloji şart) ---
-        if team == winner_team:
-            win_streak += 1
-            if win_streak == WIN_STREAK_BLOCK:
-                tally.award("win_streak_5", match_id)
-                win_streak = 0
-        else:
-            win_streak = 0
-
-        if _is_bench(participants, player_id, team):
-            bench_streak += 1
-            if bench_streak == BENCH_BLOCK:
-                tally.award("bench_3", match_id)
-                bench_streak = 0
-        else:
-            bench_streak = 0
-
-        # --- Tek seferlik / eşik rozetleri ---
-        position = positions.get(match_id)
-        if position is not None:
-            played_roles.add(position)
-        if len(played_roles) == len(ROLES) and not tally.has("versatile"):
-            tally.award("versatile", match_id)
-
-        for key, threshold in VETERAN_THRESHOLDS.items():
-            if played == threshold:
-                tally.award(key, match_id)
-
-    # --- Rulet rozetleri (GÖREV 23) --- valid akışından bağımsız ayrı geçiş:
-    # kaynağı yalnız roulette maçlarıdır, valid sayaçlarını etkilemez.
-    _award_roulette_badges(conn, player_id, tally)
-
-    return {"player_id": player_id, "badges": tally.to_list()}
+    return {"roster_size": roster_size, "badges": badges}

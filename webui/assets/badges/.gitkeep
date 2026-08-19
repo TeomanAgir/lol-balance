@@ -1,0 +1,12 @@
+# Rozet madalyon gorselleri (GOREV 24, "ucu acik" hat)
+#
+# Dosya adi = rozetin KATALOG ID'si (badges/rozetler.md sirasi):
+#   webui/assets/badges/1.png ... 27.png    (.webp de kabul edilir)
+#
+# Oneri: kare, seffaf zeminli PNG, ~512x512, koyu arayuzde okunakli.
+# Kod/liste/manifest guncellemesi GEREKMEZ: web UI dosyanin varligini calisma
+# aninda anlar (yuklenemezse sessizce mevcut SVG simge gorunumune duser).
+# Kademe (bronz/gumus/altin) icin AYRI gorsel cizilmez — kademe ayrimini
+# arayuz cerceve + isima + etiketle verir.
+#
+# Bu dosya klasorun git'te durabilmesi icindir; gorseller buraya konur.

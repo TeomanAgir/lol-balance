@@ -1,6 +1,35 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-08-19 (orkestratör)
+Son güncelleme: 2026-08-19 (orkestratör, gece turu)
+
+## 2026-08-19 gece: fix-3 + GÖREV 22 + GÖREV 24 (PR #68, #69, #70)
+- **fix-3 (PR #68, CANLIDA):** idari yüzey sertleştirme — `roulette/unlink` + `POST/PATCH
+  /players` admin'e alındı (`positions`/`items` BİLİNÇLİ AÇIK: collector `backfill-*`
+  bağımlılığı, arayüz panele taşındı); ASCII olmayan `ADMIN_KEY` teşhis edici 503
+  (ampirik: Türkçe karakterli doğru anahtar bile 403 — header latin-1); hız sınırı
+  (IP başına 60 sn/10 deneme → 429 + Retry-After, 250 ms sabit gecikme); void/unvoid/
+  unlink'te durum yazımı + iki evren replay TEK transaction. Kontrol Paneli sekmeli
+  (Maçlar/Oyuncular/Bakım), tüm maçlar + arama + durum filtresi; rol düzeltme ve unlink
+  arayüzü panele taşındı.
+- **GÖREV 22 (PR #69, CANLIDA):** sinerji yeniden tanımlandı — eski ölçüt ölçülebilir
+  gürültüydü (split-half −0.216, permütasyon p=0.70, %78 asimetri). Yeni: perf + W/L
+  LIFT karması, shrinkage, eşik n≥4, yalnız pozitif skorlar; başlık "Birlikte en iyi
+  oynadıkların"; boşsa "kayda değer sinerji yok". Karşılıklılık %22→%44.
+- **GÖREV 24 (PR #70):** rozet sistemi rework — katalog **16 → 27**, hepsi canlı veriyle
+  kalibre (2-12 sahip bandı; ölü rozet 0, tek-sahipli 0). 11 yeni rozet (anlatısal +
+  ilişkisel + kişisel rekor + rol bazlı), 3 eşik düştü, `veteran_50` hedef olarak kaldı.
+  Kademe YALNIZ 6 rekor rozetinde ve **maç başına orana** bağlı (gümüş 0.20 / altın 0.32,
+  ≥8 maç şartı). Yeni alanlar: `matches_played`, `best_match_id`/`best_value`,
+  `tier`/`rate`/`next_tier_rate`, `progress`, `?include_locked=`; YENİ `GET /badges`
+  (katalog + `holders` nadirliği). Motor: 3 sorgu + tek kronolojik geçiş, per-player uç
+  ile katalog ucu aynı çekirdeği kullanır.
+  **GÖRSEL HATTI "UCU AÇIK" (Teoman, birkaç gün içinde çizecek):** madalyonlar
+  `webui/assets/badges/<ID>.png|.webp`; ID = `badges/rozetler.md` sırası (DONDURULMUŞ).
+  Dosya konur → deploy → rozet otomatik madalyona döner; görsel yoksa basit simge kalır.
+  Kod/manifest güncellemesi GEREKMEZ. Bu tur basit simgelerle çalışır.
+  **Rafta bekleyen:** vitrin konsept turu (4 mockup, `modules/g24-konsept/`) — görseller
+  geldikten sonraki UI/UX turunda Teoman seçecek (worker önerisi: K2 Vitrin+Dolap).
+- Test tabanı: **backend 406 · webui 32 · collector 479 · rating 156**.
 
 ## 2026-08-19: fix-2 — Kontrol Paneli + isim tazeleme + mobil stack (PR #64/#65/#66)
 - Görev listesi artık `modules/` klasöründe (yerel-only; new_modules.md kalktı).
