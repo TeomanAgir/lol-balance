@@ -2,13 +2,42 @@
 
 Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (tek shared secret; arkadaş grubu ölçeği için yeterli, kullanıcı bazlı auth bilinçli olarak kapsam dışı).
 
-**Admin anahtarı (fix-2, Teoman 2026-08-19):** İdari uçlar (`/matches/{id}/void`,
-`/matches/{id}/unvoid`, `/admin/replay`, `/admin/ping`) `X-API-Key`'e EK olarak
-`X-Admin-Key` header'ı ister. Değer backend'e `ADMIN_KEY` env değişkeniyle verilir
-(k8s secret; REPOYA ASLA YAZILMAZ — repo public). `ADMIN_KEY` yapılandırılmamışsa bu
-uçlar 503 döner (Türkçe `detail`: admin anahtarı yapılandırılmamış); header yok/yanlışsa
-403. Web UI'daki giriş noktası "Kontrol Paneli" sayfasıdır: sayfa şifreyi her ziyarette
-sorar, yalnız bellekte tutar (localStorage'a YAZILMAZ) ve `GET /admin/ping` ile doğrular.
+**Admin anahtarı (fix-2, Teoman 2026-08-19; kapsam fix-3'te genişletildi):** İdari uçlar
+`X-API-Key`'e EK olarak `X-Admin-Key` header'ı ister. Değer backend'e `ADMIN_KEY` env
+değişkeniyle verilir (k8s secret; REPOYA ASLA YAZILMAZ — repo public). `ADMIN_KEY`
+yapılandırılmamışsa bu uçlar 503 döner (Türkçe `detail`: admin anahtarı
+yapılandırılmamış); header yok/yanlışsa 403. Web UI'daki giriş noktası "Kontrol Paneli"
+sayfasıdır: sayfa şifreyi her ziyarette sorar, yalnız bellekte tutar (localStorage'a
+YAZILMAZ) ve `GET /admin/ping` ile doğrular.
+
+**Korunan uçların TAM listesi (fix-3, Teoman 2026-08-19):**
+`POST /matches/{id}/void` · `POST /matches/{id}/unvoid` ·
+`POST /matches/{id}/roulette/unlink` · `POST /players` · `PATCH /players/{id}` ·
+`POST /admin/replay` · `GET /admin/ping`.
+
+**Bilinçli olarak AÇIK kalanlar** (yalnız `X-API-Key`) ve gerekçeleri:
+- `PUT /matches/{id}/positions` ve `PUT /matches/{id}/items` — **collector bağımlılığı**:
+  `backfill-positions` ve `backfill-items` komutları bu uçları arkadaşların PC'sinden
+  çağırır (collector/backfill_positions.py, backfill_items.py). Admin'e alınsalardı
+  arkadaşların exe'si 403 alırdı ve düzeltmenin tek yolu admin şifresini herkese dağıtmak
+  olurdu — bu, şifrenin varlık sebebini yok ederdi. Karar: uç açık kalır, ancak WEB UI'daki
+  rol düzeltme düğmesi Geçmiş'ten KALDIRILIP Kontrol Paneli'ne taşınır (asıl risk olan
+  "yanlış tıklayan arkadaş" senaryosu böyle kapanır).
+- `POST /roulette` ve `POST /roulette/clear` — eğlence modu yüzeyi, Teoman kararı.
+- `POST /balance`, `POST /balance/nemesis` — salt hesap, veri değiştirmez.
+
+**ADMIN_KEY yalnız ASCII olabilir (fix-3):** HTTP header'ları latin-1 ile taşınır ve
+tarayıcı `fetch`'i kod birimi > 255 olan karakterde TypeError atar; ASCII olmayan anahtar
+(ör. `ş`, `ğ`, `ı`) doğru girilse bile 403'e düşer ve panel sessizce kilitli kalır.
+Backend, `ADMIN_KEY` ASCII olmayan karakter içeriyorsa idari uçlarda **503** döner ve
+`detail` bunu açıkça söyler (uygulama BAŞLAMAYA devam eder — site geri kalanıyla ayakta
+kalır). Yapılandıranın gördüğü mesaj teşhis edici olmalıdır.
+
+**Hız sınırı (fix-3):** Admin doğrulaması başarısız olan istek en az ~250 ms geciktirilir
+(sabit gecikme, sızıntısız) ve istemci IP'si başına kayan 60 sn penceresinde 10 başarısız
+denemeden sonra uç **429** döner (`Retry-After` saniye cinsinden). Başarılı doğrulama
+sayacı sıfırlar. Sayaç süreç belleğindedir (tek replica; kalıcılık gerekmez). Amaç
+`GET /admin/ping`'in sınırsız bir şifre oracle'ı olmasını engellemektir.
 
 ## 1. Ingest
 `POST /ingest/match` — bkz. `ingest_contract.md` (tek doğruluk kaynağı orası).
@@ -25,10 +54,14 @@ GET  /players                      → [{id, display_name, riot_id, puuid,
                                      -- eşleştirir; riot_id değişebilir, puuid kalıcıdır.
                                      -- (CHANGE_REQUESTS: lcu-collector 2026-08-11)
 POST /players                      → {display_name, riot_id?}  → 201 {id}
+                                     -- X-Admin-Key İSTER (fix-3; Kontrol Paneli)
                                      -- oyuncuyu ilk maçından önce roster'a eklemek için;
                                      -- ilk maçında puuid, riot_id eşleşmesiyle bu kayda bağlanır
                                      -- (bkz. db_schema "Yeni oyuncu")
 PATCH /players/{id}                → kısmi güncelleme (display_name)
+                                     -- X-Admin-Key İSTER (fix-3; ad düzeltme yalnız
+                                     -- Kontrol Paneli'nden yapılır). Collector bu ucu
+                                     -- KULLANMAZ (yalnız GET /players okur).
 ```
 `ordinal = mu - 3*sigma` (W/L çekirdeğinin muhafazakâr tahmini). `perf_avg` ve `score`
 harman engine alanlarıdır (bkz. rating_contract.md "Harman Engine"): aktif version bir
@@ -252,6 +285,9 @@ Kurallar (salt-okur; Teoman kararları 2026-08-12, CHANGE_REQUESTS):
 ## 3. Maçlar
 ```
 GET  /matches?limit=20             → son maçlar, katılımcılar ve rating değişimleriyle
+                                     (`limit` 1..200; Kontrol Paneli "tüm maçlar" için
+                                     üst sınırı kullanır — maç sayısı 200'ü aşarsa
+                                     sayfalama AYRI karardır, fix-3)
 GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı şekil,
                                      bilinmeyen id → 404 (GÖREV 10: profil grafiğinden
                                      maç detayına atlama)
@@ -414,7 +450,7 @@ GET /roulette/current
 → 200 {"session": null}  |  {"session": {"session_id": 5, "created_at": "...",
                                           "assignments": ["POST gövdesindeki 10 kayıt"]}}
 
-POST /matches/{id}/roulette/unlink
+POST /matches/{id}/roulette/unlink          # X-Admin-Key İSTER (fix-3)
 → 200 {"status": "valid", "matches_replayed": 19, "role_matches_replayed": 19}
 
 POST /roulette/clear
@@ -462,6 +498,12 @@ GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
                                      (harman olmayan version'da score = ordinal;
                                       role_ratings alanı burada da döner, bkz. §2)
 ```
+**Durum değişimi + replay ATOMİKTİR (fix-3):** `void`, `unvoid` ve `roulette/unlink`
+uçlarında `matches.status` yazımı ile her iki evrenin replay'i TEK transaction'da yapılır.
+Replay hata verirse durum yazımı da geri alınır — aksi hâlde maç `void` görünürken
+rating'ler void öncesine dönmüş olur ve leaderboard sessizce yanlış kalırdı (istemci 500
+görür, veri tutarlı kalır).
+
 `replay`, engine parametresi/versiyonu değiştiğinde ve `void` işlemlerinden sonra çağrılır. Ingest sırasındaki normal akışta replay DEĞİL, incremental update yapılır (son rating'in üstüne tek maç uygulanır) — replay O(n_maç) olduğundan sadece gerektiğinde koşar.
 
 **Sıra-dışı ingest auto-replay (2026-08-13):** Duplicate olmayan bir maç, rating'e girmiş mevcut en yeni valid maçtan daha ESKİ `played_at` ile gelirse (geriye dönük backfill senaryosu), backend incremental yerine HER İKİ evreni otomatik replay eder — sonuç, tüm maçlar kronolojik gelmiş gibi bire bir aynıdır (determinizm). Tetik koşulu, "incremental == replay" değişmezini koruyacak şekilde replay'in sıralama anahtarıyla hizalıdır. Ingest yanıt şekli DEĞİŞMEZ; elle `POST /admin/replay` yalnız engine değişimi ve olağandışı durumlar için kalır.
