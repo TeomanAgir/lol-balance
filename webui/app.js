@@ -145,6 +145,56 @@
     return cells ? `<div class="role-strip">${cells}</div>` : "";
   }
 
+  // ── Rol sıralaması: ORTAK türetim (harita pop-up'ı + profil penceresi) ──
+  // Yeni endpoint YOKTUR: sıralama, oyuncu listesindeki `role_ratings` alanından
+  // İSTEMCİDE türetilir. Kaynak liste çağıranındır — harita ekranı state.board
+  // (GET /leaderboard), profil state.roster (GET /players) verir; contract §2'ye
+  // göre role_ratings İKİ uçta da aynı şekilde döner, sıralamayı zaten burada
+  // biz kuruyoruz, dolayısıyla iki ekran BİREBİR aynı sırayı görür.
+  //
+  // Kural (api_contract §2 + CHANGE_REQUESTS 2026-08-19): o rolde ≥1 maçı
+  // olanlar; rol score azalan → o roldeki maç azalan → ad alfabetik.
+  // matches === 0 default prior'dır (gerçek veri değil) → sıralamaya girmez.
+  function roleRanking(rows, role) {
+    return rows
+      .map(p => ({ p, r: (p.role_ratings || {})[role] }))
+      .filter(x => x.r && typeof x.r.score === "number" && x.r.matches > 0)
+      .sort((a, b) =>
+        b.r.score - a.r.score ||
+        b.r.matches - a.r.matches ||
+        a.p.display_name.localeCompare(b.p.display_name, window.I18n.getLang()));
+  }
+
+  // Profil penceresinin satır planı (Teoman, CHANGE_REQUESTS 2026-08-19):
+  //   lider → silik ayraç → oyuncunun ±RR_R komşuluğu → silik ayraç → sonuncu
+  // SAF fonksiyon: n = sıralamadaki oyuncu sayısı, idx = oyuncunun 0-tabanlı
+  // sırası. Dönen dizi 0-tabanlı satır indeksleri ve "gap" (ayraç) taşır.
+  //
+  // Kenar durumları — hepsi TEK kuralın doğal sonucudur, özel dal değil:
+  //   · idx ≤ RR_R  → lo = 0: lider zaten pencerede, tepede TEKRARLANMAZ ve
+  //     üst ayraç çizilmez (1., 2., 3. ve 4. sıradaki oyuncu).
+  //   · lo === 1    → lider komşuluğa BİTİŞİK: satır var ama ayraç yok
+  //     (ayraç "atlanan satır" demektir; atlanan yoksa çizilmez).
+  //   · hi ≥ n-2    → sonuncu pencerede ya da bitişik: alt ayraç/tekrar yok.
+  //   · n ≤ RR_MAX  → pencereye zaten sığıyor: liste TAM, hiç ayraç yok.
+  const RR_R = 3;                // komşuluk yarıçapı (±3)
+  const RR_MAX = 2 * RR_R + 3;   // en çok satır: lider + 7 komşu + sonuncu = 9
+  function roleRankPlan(n, idx) {
+    const out = [];
+    if (n <= RR_MAX) {
+      for (let i = 0; i < n; i++) out.push(i);
+      return out;
+    }
+    const lo = Math.max(0, idx - RR_R);
+    const hi = Math.min(n - 1, idx + RR_R);
+    if (lo > 0) out.push(0);
+    if (lo > 1) out.push("gap");
+    for (let i = lo; i <= hi; i++) out.push(i);
+    if (hi < n - 2) out.push("gap");
+    if (hi < n - 1) out.push(n - 1);
+    return out;
+  }
+
   // ── Data Dragon varlıkları (GÖREV 14) ─────────────────────────
   // api_contract §8: eşya/şampiyon görselleri ve adları DEPLOY sırasında
   // webui/assets/ddragon/ altına indirilir; tarayıcı dışarı istek atmaz.
@@ -401,6 +451,9 @@
 
   function showView(name, forceReload = false) {
     currentView = name;
+    // Açık kutular görünüm değişimini/yeniden çizimi atlatmamalı: profil yeniden
+    // kurulduğunda pencerenin düğümü zaten silinir, durumu da burada sıfırlanır.
+    closeRoleRank(false);
     // Görünüm-bazlı genişlik istisnası (GÖREV 21): Seçim ekranı iki sütunlu
     // analiz paneli için 1080px kullanır, diğer görünümler 720px'te kalır.
     // fix-3: Kontrol Paneli de geniştir — maç satırı (#id + tarih + durum +
@@ -1485,6 +1538,30 @@
   // ── 2) Leaderboard ────────────────────────────────────────────
   // Oyuncu adı artık profili açar (GÖREV 1). Eski satır-içi rol açılırı kaldırıldı:
   // rol şeridi profilde daha geniş biçimde zaten var, iki ayrı açılır tekrar olurdu.
+  // Sira degisimi gostergesi (api_contract §5 `rank_delta`; V1 "Ince Chevron").
+  // Rakam ve chevron adin SAGINDA, cercevesiz; yukselis --ok, dusus --red.
+  // Gorsel kisim aria-hidden, anlami sr-only metin tasir (i18n).
+  const RD_CHEVRON = {
+    up: '<svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M1.6 6.6 L5 3.2 L8.4 6.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    down: '<svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M1.6 3.4 L5 6.8 L8.4 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+
+  const rdSpan = (cls, visual, label) =>
+    `<span class="rd ${cls}"><span class="rd-vis" aria-hidden="true">${visual}</span>` +
+    `<span class="sr-only">${esc(label)}</span></span>`;
+
+  // rank_delta: pozitif = yukseldi, negatif = dustu, 0 = degismedi,
+  // null = karsilastirilamaz (ilk maciyla giren ya da hic maci olmayan oyuncu).
+  // null ve 0 AYNI notr gorunumu (soluk tire) paylasir — yer tutar, satir kaymaz —
+  // ama ekran okuyucuda ayrilir: "degismedi" ile "hesaplanamadi" ayni sey degildir.
+  function rankDeltaHtml(delta) {
+    const n = typeof delta === "number" && isFinite(delta) ? delta : null;
+    if (n === null) return rdSpan("rd-flat", "&mdash;", t("leaderboard.rank_delta_none"));
+    if (n > 0) return rdSpan("rd-up", RD_CHEVRON.up + n, t("leaderboard.rank_up", { n }));
+    if (n < 0) return rdSpan("rd-down", RD_CHEVRON.down + -n, t("leaderboard.rank_down", { n: -n }));
+    return rdSpan("rd-flat", "&mdash;", t("leaderboard.rank_same"));
+  }
+
   async function loadLeaderboard() {
     const rows = await api("/leaderboard"); // backend score'a göre sıralı döner
     const body = $("#board-body");
@@ -1493,7 +1570,7 @@
       const subHtml = sub ? `<span class="rating-sub">` + sub + `</span>` : "";
       return `<tr>
          <td class="rank">${i + 1}</td>
-         <td><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button></td>
+         <td class="player"><span class="pname"><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button>${rankDeltaHtml(p.rank_delta)}</span></td>
          <td class="num strong">${fmtRating(p.rating.score)}${subHtml}</td>
          <td class="num">${p.matches_played}</td>
        </tr>`;
@@ -1644,15 +1721,24 @@
     const cells = rows.map(({ r, v }) => {
       const off = !v.matches;
       const f = off || !(top > 0) ? 0 : Math.max(0, Math.min(1, v.score / top));
-      return `<div class="k2-gg${off ? " k2-off" : ""}"><div class="k2-gg-w">
-          <svg class="k2-gg-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      const dial =
+        `<svg class="k2-gg-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
             <g transform="rotate(135 32 32)">
               <circle class="k2-g-bg" cx="32" cy="32" r="${R}" stroke-dasharray="${ARC.toFixed(1)} 999"/>
               <circle class="k2-g-fg" cx="32" cy="32" r="${R}" stroke-dasharray="${(ARC * f).toFixed(1)} 999"/>
             </g>
           </svg>
-          <span class="k2-gg-ic">${posIconHtml(r, roleAbbr(r), "k2-ri")}</span>
-        </div>
+          <span class="k2-gg-ic">${posIconHtml(r, roleAbbr(r), "k2-ri")}</span>`;
+      // SİMGE TIKLANIR (2026-08-19): o roldeki sıralama penceresini açar.
+      // Oynanmamış rolde (matches === 0) sıralama YOKTUR → düğme hiç kurulmaz,
+      // kutu düz bir div kalır: aria-disabled + imleç bunu belli eder (devre dışı
+      // bir <button> odak sırasında sessiz bir tuzak olurdu).
+      const wrap = off
+        ? `<div class="k2-gg-w" aria-disabled="true" title="${esc(t("profile.role_rank_none"))}">${dial}</div>`
+        : `<button type="button" class="k2-gg-w k2-gg-btn" data-role="${r}"
+             aria-haspopup="dialog" aria-expanded="false"
+             aria-label="${esc(t("profile.role_rank_open", { role: roleName(r) }))}">${dial}</button>`;
+      return `<div class="k2-gg${off ? " k2-off" : ""}">${wrap}
         <span class="k2-gg-v">${off ? "—" : fmtRating(v.score)}</span>
         <span class="k2-gg-n">${off ? t("profile.role_unplayed") : t("common.n_matches", { n: v.matches })}</span>
       </div>`;
@@ -1660,6 +1746,117 @@
     return `<div class="k2-gauges">${cells}</div>` +
       `<p class="k2-role-foot">${t("profile.role_ratings_hint")}</p>`;
   }
+
+  // ── Rol sıralaması penceresi (Teoman, 2026-08-19) ──────────────
+  // Rol simgesine basınca SAYFA DEĞİŞMEZ: tıklanan simgenin altından küçük bir
+  // pencere açılır ve oyuncunun O ROLDEKİ yerini gösterir (plan: roleRankPlan).
+  //
+  // Veri: YENİ UÇ YOK. state.roster (GET /players) zaten profil için çekilmiştir
+  // ve contract §2 gereği role_ratings'i taşır → ek istek atılmaz, harita
+  // ekranıyla ORTAK roleRanking() kullanılır (sıra birebir aynı).
+  //
+  // Etkileşim deseni rozet baloncuğundan (openBadgeTip) DEVRALINDI: kenar
+  // taşması ölçülüp içeri çekilir, Esc / dışına tıklama / tekrar tıklama kapatır,
+  // aynı anda tek kutu açık kalır. Tek fark: bu kutu TIKLANABİLİR (satırdaki ad
+  // o oyuncunun profiline gider), yani pointer-events kapalı DEĞİLDİR.
+  let roleRankOpen = null;   // penceresi açık olan rol düğmesi (yoksa null)
+
+  function roleRankHtml(role, list, idx) {
+    const rows = roleRankPlan(list.length, idx).map(x => {
+      if (x === "gap") return `<li class="rrp-gap" aria-hidden="true"></li>`;
+      const { p } = list[x];
+      const me = x === idx;
+      // Kendi satırı bağlantı DEĞİLDİR (zaten o profildeyiz); diğer adlar o
+      // oyuncunun profiline gider.
+      const name = me
+        ? `<span class="rrp-name rrp-name-me">${esc(p.display_name)}` +
+          `<span class="rrp-sr"> (${t("profile.role_rank_you")})</span></span>`
+        : `<button type="button" class="rrp-name" data-player="${p.id}">${esc(p.display_name)}</button>`;
+      return `<li class="rrp-row${me ? " rrp-me" : ""}"${me ? ' aria-current="true"' : ""}>
+          <span class="rrp-rank">${x + 1}</span>${name}
+        </li>`;
+    }).join("");
+    return `<div class="rrp" role="dialog" aria-label="${esc(t("map.role_ranking_title", { role: roleName(role) }))}">
+        <div class="rrp-hd">${t("map.role_ranking_title", { role: roleName(role) })}</div>
+        <ul class="rrp-list">${rows}</ul>
+      </div>`;
+  }
+
+  function openRoleRank(btn) {
+    const role = btn.dataset.role;
+    const list = roleRanking(state.roster, role);
+    let idx = -1;
+    for (let i = 0; i < list.length; i++) if (list[i].p.id === state.profileId) idx = i;
+    // O rolde hiç oynayan yoksa (ya da oyuncu listede değilse) pencere AÇILMAZ.
+    if (!list.length || idx === -1) return;
+    closeRoleRank(false);
+    closeBadgeTip();    // aynı anda tek kutu: rozet baloncuğu açıksa kapanır
+    closeHistPopup(false);
+    closeBuildTip();
+    const cell = btn.closest(".k2-gg");
+    if (!cell) return;
+    cell.insertAdjacentHTML("beforeend", roleRankHtml(role, list, idx));
+    btn.setAttribute("aria-expanded", "true");
+    roleRankOpen = btn;
+    // Satırdaki ad → o oyuncunun profili. openProfile profilden çağrıldığında
+    // geri yığınını ve "nereden gelindi" bilgisini KORUR (bkz. openProfile),
+    // yani sinerji bağlantılarıyla aynı geçiş; geri düğmesi bozulmaz.
+    const box = cell.querySelector(".rrp");
+    box.querySelectorAll(".rrp-name[data-player]").forEach(a =>
+      a.addEventListener("click", () => {
+        const id = Number(a.dataset.player);
+        closeRoleRank(false);
+        openProfile(id);
+      }));
+    // Kenar taşması: kutu simgeden geniştir, ızgaranın kenarındaki rolde kartın
+    // dışına taşabilir → ölçülüp içeri çekilir (rozet baloncuğundaki desen).
+    // Referans kutu kartın kendisidir; kart her zaman ekranın içinde olduğu için
+    // bu, 390px'de de yatay taşmayı imkânsız kılar.
+    const ref = cell.closest(".k2-card") || cell.closest(".k2-gauges");
+    if (!ref) return;
+    const br = box.getBoundingClientRect();
+    const rr = ref.getBoundingClientRect();
+    const shift = br.left < rr.left ? rr.left - br.left
+      : br.right > rr.right ? rr.right - br.right : 0;
+    if (shift) box.style.marginLeft = Math.round(shift) + "px";
+  }
+
+  function closeRoleRank(restoreFocus = true) {
+    if (!roleRankOpen) return;
+    document.querySelectorAll(".rrp").forEach(x => x.remove());
+    const btn = roleRankOpen;
+    roleRankOpen = null;
+    btn.setAttribute("aria-expanded", "false");
+    if (restoreFocus && document.contains(btn)) btn.focus();
+  }
+
+  // innerHTML sonrası çağrılır (profil her çizimde yeniden kurulur).
+  function bindRoleRankButtons(root) {
+    root.querySelectorAll(".k2-gg-btn").forEach(btn => {
+      // Tıklama TEKRARDA kapatır (Teoman: "tekrar tıklama kapatır").
+      btn.addEventListener("click", () => {
+        if (roleRankOpen === btn) closeRoleRank();
+        else openRoleRank(btn);
+      });
+      // Klavye odağı da açar. FARE odağı açmaz: fare tıklamasında focus + click
+      // ard arda gelir, ikisi de açsaydı toggle hemen kapatırdı (rozet
+      // baloncuğundaki tuzağın aynısı) — ayrımı :focus-visible yapar.
+      btn.addEventListener("focus", () => {
+        if (roleRankOpen === btn) return;
+        let kb = false;
+        try { kb = btn.matches(":focus-visible"); } catch { kb = false; }
+        if (kb) openRoleRank(btn);
+      });
+    });
+  }
+
+  // DIŞINA TIKLAMA kapatır. Düğmenin kendi dinleyicisi önce koştuğu için
+  // (olay ondan buraya kabarır) burada düğme ve kutu içi tıklamalar es geçilir.
+  document.addEventListener("click", (e) => {
+    if (!roleRankOpen) return;
+    if (e.target.closest && e.target.closest(".rrp, .k2-gg-btn")) return;
+    closeRoleRank(false);
+  });
 
   // s = GET /players/{id}/stats yanıtı. kda / favoriler null, synergy boş,
   // winrate null olabilir — hepsi "—" ya da kısa notla gösterilir.
@@ -1828,6 +2025,7 @@
       // Sinerji listesindeki isimler o oyuncunun profiline geçer.
       box.querySelectorAll(".syn-link").forEach(btn =>
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
+      bindRoleRankButtons(box); // rol simgesi → o roldeki sıralama penceresi
     } catch (e) {
       box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
       throw e; // toast'ı showView gösterir
@@ -2603,6 +2801,7 @@
   function openBadgeTip(card, b) {
     if (!card || !b || badgeOpen === card) return;
     closeBadgeTip();
+    closeRoleRank(false); // aynı anda tek kutu: rol sıralaması penceresi kapanır
     const locked = badgeLocked(b);
     const prog = badgeProgress(b);
     const tier = locked ? null : badgeTier(b);
@@ -2826,17 +3025,9 @@
     TOP: [24, 15], JUNGLE: [22, 42], MIDDLE: [50, 50], BOTTOM: [80, 80], UTILITY: [48, 86],
   };
 
-  // O rolde ≥1 maçı olanlar; rol score azalan → o roldeki maç azalan → ad alfabetik.
-  // matches === 0 default prior'dır (gerçek veri değil) → sıralamaya girmez.
-  function roleRanking(rows, role) {
-    return rows
-      .map(p => ({ p, r: (p.role_ratings || {})[role] }))
-      .filter(x => x.r && typeof x.r.score === "number" && x.r.matches > 0)
-      .sort((a, b) =>
-        b.r.score - a.r.score ||
-        b.r.matches - a.r.matches ||
-        a.p.display_name.localeCompare(b.p.display_name, window.I18n.getLang()));
-  }
+  // Sıralama kuralı burada DEĞİL, ortak roleRanking() yardımcısındadır (bölüm 1):
+  // profildeki rol sıralaması penceresi de aynı fonksiyonu çağırır, iki ekranın
+  // sırası kopyalanmış iki mantıkla ayrışamaz (2026-08-19).
 
   function riftBubble(role, top) {
     const [x, y] = RIFT_SPOTS[role];
@@ -2936,6 +3127,7 @@
     closeHistPopup();   // GÖREV 10: tarihçe popup'ı da Esc ile kapanır
     closeBadgeTip();    // GÖREV 11+12: rozet tooltip'i (klavye erişimi)
     closeBuildTip();    // GÖREV 14: build ikonu tooltip'i (klavye erişimi)
+    closeRoleRank();    // 2026-08-19: profildeki rol sıralaması penceresi
   });
 
   // ── 2f) META: şampiyon kademeleri (GÖREV 16) ──────────────────

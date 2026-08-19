@@ -9,6 +9,7 @@ from rating import ROLES, Engine, Rating
 from ..config import Settings, get_settings
 from ..deps import get_db, require_admin_key
 from ..schemas import (
+    LeaderboardPlayerOut,
     PlayerBadgesOut,
     PlayerCreate,
     PlayerOut,
@@ -20,6 +21,7 @@ from ..schemas import (
 )
 from ..services.badges import player_badges
 from ..services.player_stats import player_stats
+from ..services.rank_delta import leaderboard_order, rank_deltas
 from ..services.rating_history import rating_history
 from ..services.ratings import (
     current_ratings,
@@ -130,12 +132,19 @@ def list_players(
 def leaderboard(
     conn: sqlite3.Connection = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> list[PlayerOut]:
+) -> list[LeaderboardPlayerOut]:
     # api_contract §5: score'a göre sıralanır (harman olmayan version'da
-    # score = ordinal olduğundan eski davranışla aynıdır).
+    # score = ordinal olduğundan eski davranışla aynıdır). Sıralama kuralı
+    # `leaderboard_order`da tek noktada durur — "önceki an" sıralaması da
+    # (rank_delta) aynı fonksiyonu kullanır.
     players = _player_list(conn, settings.engine_version)
-    players.sort(key=lambda p: p.rating.score, reverse=True)
-    return players
+    scores = {p.id: p.rating.score for p in players}
+    deltas = rank_deltas(conn, settings.engine_version, scores)
+    by_id = {p.id: p for p in players}
+    return [
+        LeaderboardPlayerOut(**by_id[pid].model_dump(), rank_delta=deltas[pid])
+        for pid in leaderboard_order(scores.items())
+    ]
 
 
 @router.get("/players/{player_id}/stats")

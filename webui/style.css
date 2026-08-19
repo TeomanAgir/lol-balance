@@ -465,6 +465,55 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 }
 .name-link:hover { color: var(--brass); border-bottom-color: var(--brass-dim); }
 
+/* ── Sıra değişimi göstergesi (api_contract §5 `rank_delta`) ──
+   V1 "İnce Chevron" (Teoman seçimi, 2026-08-19): adın SAĞINDA çerçevesiz
+   12px kalın rakam + 9px chevron. Satır yüksekliğine etkisi YOKTUR
+   (line-height:1, adın 23px'lik satırının içinde kalır) ve tabloya sütun
+   eklemez — sıralama sayfasının teması olduğu gibi korunur.
+
+   Dar ekranda AD kırpılır, gösterge ASLA kırpılmaz: ad hücresi esner
+   (max-width:0 + width:100% = tablo ellipsis kalıbı), gösterge flex:none. */
+.board td.player { max-width: 0; width: 100%; }
+.board .pname { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.board .pname .name-link {
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rd { display: inline-flex; align-items: center; flex: 0 0 auto; }
+.rd-vis {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.rd svg { display: block; }
+.rd-up { color: var(--ok); }
+.rd-down { color: var(--red); }
+/* Değişim yok / karşılaştırılamaz: soluk gri tire — YER TUTAR, satır kaymaz. */
+.rd-flat { color: var(--muted); opacity: 0.45; }
+.rd-flat .rd-vis { font-weight: 400; }
+
+/* Yalnız ekran okuyucuya görünen metin (gösterge anlamının taşıyıcısı). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── Oyuncu profili (GÖREV 1) ── */
 .back-btn {
   font-size: 13px;
@@ -713,7 +762,8 @@ main.pa-full #view-profile > .back-btn { margin: 16px 0 0 20px; }
    Simge konseptin çizimi DEĞİL, ortak posIconHtml varlığıdır (Teoman
    düzeltmesi 2); ölçüler ve %46'lık oran konseptten birebir. */
 .k2-gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 12px 8px; }
-.k2-gg { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; min-width: 0; }
+/* position: relative — rol sıralaması penceresi (.rrp) hücrenin altından açılır. */
+.k2-gg { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; min-width: 0; }
 .k2-gg-w { position: relative; width: clamp(62px, 18vw, 78px); aspect-ratio: 1; }
 .k2-gg-svg { display: block; width: 100%; height: 100%; }
 .k2-gg-svg .k2-g-bg { fill: none; stroke: var(--line); stroke-width: 6; stroke-linecap: round; }
@@ -741,6 +791,117 @@ main.pa-full #view-profile > .back-btn { margin: 16px 0 0 20px; }
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
+}
+
+/* ── Rol sıralaması penceresi (Teoman, 2026-08-19) ──
+   Rol SİMGESİ bir düğmedir; pencere simgenin altından açılır — yerleşim ve
+   kenar-taşması telafisi rozet baloncuğundakinin (.pb-tip) aynısıdır. Tek
+   fark: bu kutu TIKLANABİLİR (satırdaki ad profile gider), o yüzden
+   pointer-events KAPATILMAZ. */
+.k2-gg-btn {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.k2-gg-btn:hover .k2-g-bg { stroke: var(--brass-dim); }
+.k2-gg-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+/* Hiç oynanmamış rol: düğme DEĞİL (odak sırasına da girmez), imleç de tıklama
+   vaat etmez. Soluk görünüm zaten .k2-off kuralından gelir. */
+.k2-gg-w[aria-disabled="true"] { cursor: default; }
+
+.rrp {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: calc(100% - 2px);
+  transform: translateX(-50%);
+  width: max-content;
+  min-width: 170px;
+  max-width: min(264px, 78vw);
+  padding: 9px 0 7px;
+  text-align: left;
+  font-family: var(--body);
+  background: var(--surface-3);
+  border: 1px solid var(--brass-dim);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+}
+.rrp-hd {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 11px 7px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.rrp-list { list-style: none; }
+.rrp-row {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 2px 11px;
+}
+.rrp-rank {
+  flex: 0 0 auto;
+  min-width: 24px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.rrp-rank::after { content: "."; }
+.rrp-name {
+  min-width: 0;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.rrp-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.rrp-name:hover, button.rrp-name:focus-visible { color: var(--brass-hi); }
+/* Oyuncunun KENDİ satırı: pirinç vurgu. Renk tek başına taşıyıcı değildir —
+   satır aria-current tasır ve ad "(sen)" ekiyle okunur. */
+.rrp-me {
+  background: rgba(200, 161, 90, 0.13);
+  border-left: 2px solid var(--brass);
+  padding-left: 9px;
+}
+.rrp-me .rrp-rank { color: var(--brass); }
+.rrp-me .rrp-name { color: var(--brass-hi); font-weight: 600; }
+/* SİLİK ayraç: atlanan satırların yerini tutan saç teli çizgi. Rengi --line
+   DEĞİL soluk pirinçtir: kutunun yüzeyi (--surface-3) --line'a çok yakın,
+   çizgi görünmez kalıyordu; opaklık onu yine "silik" tutar. */
+.rrp-gap {
+  height: 1px;
+  margin: 5px 12px;
+  opacity: 0.5;
+  background: linear-gradient(90deg, transparent, var(--brass-dim) 22%, var(--brass-dim) 78%, transparent);
+}
+/* Ekran okuyucu eki ("sen") — .pb-sr ile aynı desen. */
+.rrp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ══════════ sinerji ══════════ */

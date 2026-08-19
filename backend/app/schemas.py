@@ -98,6 +98,13 @@ class PlayerOut(BaseModel):
     role_ratings: dict[str, RoleRatingOut]
 
 
+class LeaderboardPlayerOut(PlayerOut):
+    # api_contract §5 "Sıra değişimi": `rank_delta` YALNIZ /leaderboard'da döner
+    # (GET /players şekli değişmez). Salt-okur türetilmiştir, DB'ye yazılmaz.
+    # Pozitif = yükseldi, negatif = düştü, 0 = değişmedi, None = karşılaştırılamaz.
+    rank_delta: Optional[int]
+
+
 class StatsPlayerOut(BaseModel):
     id: int
     display_name: str
