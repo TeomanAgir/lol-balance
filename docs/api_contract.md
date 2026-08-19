@@ -269,7 +269,9 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   `perf_score` rekorunu kırarsa 1 rozet. Rekor MAÇ-ÖNCESİ snapshot'tır: kronolojik sırada
   o maçtan ÖNCEKİ tüm valid maçlarda aynı rolde görülmüş en yüksek perf, kesin olarak (`>`)
   aşılmalıdır. Şart: o rolde ≥10 önceki slot bulunmalı (yeterli tarih olmadan "grup rekoru"
-  anlamsızdır). Tekrarlanabilir; `best_value` = yeni rekor değeri.
+  anlamsızdır) — bu sayım YALNIZ `perf_score`'u non-NULL olan slotları içerir (perf'i
+  olmayan slot "görülmüş en yüksek perf"in parçası olamaz; `pr_*` kuralının aynısı).
+  Tekrarlanabilir; `best_value` = yeni rekor değeri.
 - **pr_perf** ("Yeni Zirve") / **pr_damage** ("Kişisel Hasar Rekoru") — GÖREV 24 YENİ,
   KİŞİSEL REKOR sınıfı: oyuncu, kendi kronolojik geçmişindeki en iyi değeri kesin olarak
   (`>`) aşarsa 1 rozet. Metrikler: `pr_perf` → `perf_score`; `pr_damage` →
@@ -309,9 +311,15 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   `last_match_id` = 5.'yi tamamlayan maç. Kronoloji replay sort-key'iyle aynıdır;
   determinizm kuralı (replay sonrası aynı yanıt) bu üçü için de geçerlidir.
 - Rozet adları/açıklamaları backend'de TUTULMAZ (yanıt yalnız `key` taşır); çeviri
-  web UI i18n sözlüklerindedir (i18n_contract kuralı). Görseller `webui/assets/badges/<ID>.png`
-  (ID = katalog sırası, bkz. `badges/rozetler.md`); görseli olmayan rozet mevcut
-  metin/simge görünümüne düşer (kademeli geçiş).
+  web UI i18n sözlüklerindedir (i18n_contract kuralı).
+- **Görsel hattı (GÖREV 24, "ucu açık" — Teoman kararı 2026-08-19):** madalyon görselleri
+  `webui/assets/badges/<ID>.png` (ID = katalog sırası, bkz. `badges/rozetler.md`; `.webp`
+  de kabul). Görseller SONRADAN ve TEKER TEKER eklenir; arayüz görselin varlığını ÇALIŞMA
+  ANINDA anlar (yükleme hatasında sessizce mevcut simge/metin görünümüne düşer) — yani
+  yeni görsel eklemek için kod, liste veya manifest güncellemesi GEREKMEZ, dosyayı koyup
+  deploy etmek yeterlidir. Backend bu görselleri BİLMEZ (yanıt yalnız `key` taşır);
+  ID↔key eşlemesi web UI'da tek bir sabittedir. Şu an görseller HENÜZ YOK: sistem basit
+  simge görünümüyle çalışır, madalyonlar geldikçe kendiliğinden devreye girer.
 
 #### Kademe (GÖREV 24, Teoman kararı)
 Yalnız **6 rozet kademelidir**: `mvp`, `vision`, `damage`, `cs_per_min`, `gold`, `role_duel`.
@@ -324,6 +332,9 @@ otomatik altın olurdu): `rate = count / matches_played`.
   gümüş bunun 2 katı, altın ~3.2 katıdır (yani "grup beklentisinin üstü").
 - `rate` yanıtta 2 ondalığa yuvarlanır (karşılaştırma HAM değerle); `next_tier_rate` =
   bir üst kademenin eşiği (altındaysa `null`).
+- **Kilitli kademeli rozet** (`include_locked=true` ile gelen `count: 0` kaydı): `tier`
+  `null`, `rate` `0.0` (oyuncunun hiç valid maçı yoksa `null`), `next_tier_rate` `0.20`
+  (ilk hedef gümüş). Kademe yalnız KAZANILMIŞ rozette anlamlıdır.
 - Kademe GÖRSEL GEREKTİRMEZ: her rozet için tek madalyon görseli vardır, kademe ayrımını
   web UI çerçeve/ışıma/etiketle verir (Teoman kararı — görsel yükü 27'de kalır).
 - Diğer sınıflar (kişisel rekor, rol rekoru, anlatısal, blok, ilişkisel, kimlik, kilometre,
@@ -346,7 +357,8 @@ GET /badges
   milestone | roulette`. `source`: `valid | roulette`.
 - `holders` = o rozetten en az 1 taşıyan oyuncu sayısı; `holders_pct` = `holders / roster_size`
   (1 ondalık). **`roster_size` = en az 1 valid maçı olan oyuncu sayısı** (hiç oynamamış kayıt
-  nadirliği şişirmesin).
+  nadirliği şişirmesin). `roster_size == 0` ise `holders_pct` `null`'dır (yalnız rulet maçı
+  olan oyuncu rozet taşıyabilir ama kadroda sayılmaz — sıfıra bölme yok).
 - Amaç iki yönlü: (a) web UI'da "bu rozet grupta N kişide" nadirlik göstergesi, (b) ileride
   "MVP kapışması" gibi modların makinece okunur katalog + sahiplik sorgusu (module-24-PLAN
   Faz C'nin karşılığı; ayrı bir `holders` listesi ucu GEREKMEDİ — mod, oyuncu bazlı uçla

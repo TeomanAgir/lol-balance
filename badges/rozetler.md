@@ -1,8 +1,19 @@
 # Rozet Kataloğu — NİHAİ (GÖREV 24, Teoman onayı 2026-08-19)
 
-**Görsel dosya adı = ID.** Bu klasöre `1.png` … `27.png` olarak konur (numarayı ID ile
-birebir eşleştir; `01.png` biçimi de kabul — tümünde aynı kalıbı kullan).
-Öneri: kare, şeffaf zeminli PNG, ~512×512, koyu arayüzde okunaklı.
+## Görselleri nasıl ekliyorsun (ucu açık hat — kod değişikliği GEREKMEZ)
+
+**Görsel dosya adı = ID**, konum **`webui/assets/badges/`**:
+`webui/assets/badges/1.png` … `27.png` (öneri: kare, şeffaf zeminli PNG, ~512×512,
+koyu arayüzde okunaklı; `.webp` de desteklenir).
+
+Akış: dosyayı bu klasöre koy → commit + push (main'e merge = otomatik deploy) → rozet
+sitede o görselle çıkar. **Arayüz görselin varlığını çalışma anında anlar**: dosya yoksa
+rozet mevcut basit simge/metin görünümünde kalır, dosya varsa madalyon otomatik devreye
+girer. Yani 27'sini birden bitirmen gerekmez, teker teker ekleyebilirsin ve hiçbir
+aşamada kod/liste güncellemesi gerekmez (ID sırası dondurulmuş olduğu için eşleşme sabit).
+
+`badges/rozetler.md` (bu dosya) yalnız KATALOG REFERANSIDIR — görseller buraya değil,
+`webui/assets/badges/` altına konur.
 
 **Kademe (bronz/gümüş/altın) GÖRSEL GEREKTİRMEZ.** 01-06 arası rozetler kademelidir;
 kademe ayrımını web arayüzü çerçeve + ışıma + etiketle verir (Teoman kararı). Yani

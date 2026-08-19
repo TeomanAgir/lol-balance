@@ -1,4 +1,9 @@
-"""GET /players/{id}/badges (api_contract §2 "Rozetler (GÖREV 11+12)").
+"""GET /players/{id}/badges (api_contract §2 "Rozetler") — GÖREV 11+12 tabanı.
+
+GÖREV 24'te eklenen 11 rozet, kademe, `include_locked` ve `GET /badges`
+testleri `test_badges_g24.py`'dedir; bu dosya ilk 13 rozetin (eşikleri GÖREV
+24'te güncellenenler dahil: win_streak_3, bench_2, veteran_20) davranışını
+korur.
 
 Rozetler SALT-OKUR türetilmiş veridir: testler hiçbir yeni tablo/kolon
 beklemez. Kurgu deseni:
@@ -8,7 +13,7 @@ beklemez. Kurgu deseni:
 - `BASE_STATS` tüm katılımcılarda AYNIDIR: bu, rekor rozetlerinde bilinçli bir
   "herkes eşit" zemini kurar (eşitlikte herkes alır) ve perf_score'u nötrler —
   senaryolar yalnız ilgilendikleri alanı bozar.
-- perf_score bağımlı rozetlerde (mvp, bench_3) değerler `_set_perf` ile
+- perf_score bağımlı rozetlerde (mvp, bench_2) değerler `_set_perf` ile
   doğrudan `rating_history`'ye yazılır; böylece kırılım zincirleri ve NULL
   kuralları rating matematiğine bağlı kalmadan, bit-bit test edilir
   (aynı desen test_rating_history'de de kullanılır).
@@ -186,9 +191,12 @@ def test_badges_follow_fixed_catalog_order(client, ids, db):
     match_id = _ingest(client, ids, "b-order", _day(1), stats=stats)
     _set_perf(db, match_id, ids, {name: 1.0 for name in NAMES} | {"P0": 2.0})
 
+    # GÖREV 24: aynı maç role_duel (perf 2.0 vs rakip TOP 1.0 → oran 2.0) ve
+    # kda_10 ((5+5)/max(1,0) = 10) da kazandırır — ikisi de katalog sırasında.
     keys = [b["key"] for b in _badges(client, ids["P0"])]
     assert keys == [
-        "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback"
+        "mvp", "vision", "damage", "cs_per_min", "gold", "role_duel",
+        "kda_10", "deathless", "comeback",
     ]
     assert [k for k in BADGE_KEYS if k in keys] == keys
 
@@ -396,104 +404,104 @@ def test_mvp_tiebreak_falls_back_to_smallest_player_id(client, ids, db):
 
 
 # --------------------------------------------------------------------------
-# win_streak_5 — ayrık bloklar
+# win_streak_3 (GÖREV 24: eşik 5 → 3) — ayrık bloklar
 # --------------------------------------------------------------------------
 def test_win_streak_blocks_are_disjoint(client, ids):
-    """10 galibiyet = 2 rozet; last_match_id ikinci bloğun SON maçıdır."""
-    matches = _series(client, ids, "b-ws", 10, winner_team=100)
-    badge = _by_key(client, ids["P0"])["win_streak_5"]
+    """6 galibiyet = 2 rozet; last_match_id ikinci bloğun SON maçıdır."""
+    matches = _series(client, ids, "b-ws", 6, winner_team=100)
+    badge = _by_key(client, ids["P0"])["win_streak_3"]
     assert badge["count"] == 2
-    assert badge["last_match_id"] == matches[9]
-    # Kaybeden taraf hiç blok tamamlamaz.
-    assert _count(client, ids["P5"], "win_streak_5") == 0
+    assert badge["last_match_id"] == matches[5]
+    # Kaybeden taraf hiç blok tamamlamaz (ama lose_streak_3 alır).
+    assert _count(client, ids["P5"], "win_streak_3") == 0
 
 
 def test_win_streak_reset_by_a_loss(client, ids):
-    """4 galibiyet + 1 mağlubiyet + 4 galibiyet → tamamlanan blok yok."""
-    for n in range(1, 10):
+    """2 galibiyet + 1 mağlubiyet + 2 galibiyet → tamamlanan blok yok."""
+    for n in range(1, 6):
         _ingest(
             client, ids, f"b-wsr-{n}", _day(n),
-            winner_team=200 if n == 5 else 100,
+            winner_team=200 if n == 3 else 100,
         )
-    assert _count(client, ids["P0"], "win_streak_5") == 0
+    assert _count(client, ids["P0"], "win_streak_3") == 0
 
 
 def test_win_streak_last_match_id_is_block_end(client, ids):
-    matches = _series(client, ids, "b-wsl", 5, winner_team=100)
-    badge = _by_key(client, ids["P0"])["win_streak_5"]
+    matches = _series(client, ids, "b-wsl", 3, winner_team=100)
+    badge = _by_key(client, ids["P0"])["win_streak_3"]
     assert badge["count"] == 1
-    assert badge["last_match_id"] == matches[4]
+    assert badge["last_match_id"] == matches[2]
 
 
 # --------------------------------------------------------------------------
-# bench_3 — ayrık bloklar, karşılaştırılabilirlik kuralları
+# bench_2 (GÖREV 24: blok 3 → 2) — ayrık bloklar, karşılaştırılabilirlik
 # --------------------------------------------------------------------------
 def _bench_perf(low="P0"):
     """Kendi takımında (team100) `low` tek başına en düşük."""
     return {**{n: 1.0 for n in NAMES}, low: 0.5}
 
 
-def test_bench_three_consecutive_matches_earn_one_badge(client, ids, db):
-    matches = _series(client, ids, "b-bench", 3)
+def test_bench_two_consecutive_matches_earn_one_badge(client, ids, db):
+    matches = _series(client, ids, "b-bench", 2)
     for match_id in matches:
         _set_perf(db, match_id, ids, _bench_perf())
-    badge = _by_key(client, ids["P0"])["bench_3"]
+    badge = _by_key(client, ids["P0"])["bench_2"]
     assert badge["count"] == 1
-    assert badge["last_match_id"] == matches[2]
+    assert badge["last_match_id"] == matches[1]
 
 
 def test_bench_blocks_are_disjoint(client, ids, db):
-    matches = _series(client, ids, "b-bench6", 6)
+    matches = _series(client, ids, "b-bench4", 4)
     for match_id in matches:
         _set_perf(db, match_id, ids, _bench_perf())
-    badge = _by_key(client, ids["P0"])["bench_3"]
+    badge = _by_key(client, ids["P0"])["bench_2"]
     assert badge["count"] == 2
-    assert badge["last_match_id"] == matches[5]
+    assert badge["last_match_id"] == matches[3]
 
 
 def test_bench_tie_at_lowest_breaks_the_streak(client, ids, db):
     """En düşükte eşitlik: o maç bench SAYILMAZ ve seriyi kırar."""
-    matches = _series(client, ids, "b-bench-tie", 5)
+    matches = _series(client, ids, "b-bench-tie", 3)
     for i, match_id in enumerate(matches):
-        if i == 2:
+        if i == 1:
             _set_perf(
                 db, match_id, ids,
                 {**{n: 1.0 for n in NAMES}, "P0": 0.5, "P1": 0.5},
             )
         else:
             _set_perf(db, match_id, ids, _bench_perf())
-    # 2 + 2 maçlık iki parça kaldı → tamamlanan 3'lük blok yok.
-    assert _count(client, ids["P0"], "bench_3") == 0
+    # 1 + 1 maçlık iki parça kaldı → tamamlanan 2'lik blok yok.
+    assert _count(client, ids["P0"], "bench_2") == 0
 
 
 def test_bench_null_perf_in_own_team_breaks_the_streak(client, ids, db):
     """Kendi takımında tek NULL perf → maç karşılaştırılamaz, seri kırılır."""
-    matches = _series(client, ids, "b-bench-null", 5)
+    matches = _series(client, ids, "b-bench-null", 3)
     for i, match_id in enumerate(matches):
         perf = _bench_perf()
-        if i == 2:
+        if i == 1:
             perf["P3"] = None
         _set_perf(db, match_id, ids, perf)
-    assert _count(client, ids["P0"], "bench_3") == 0
+    assert _count(client, ids["P0"], "bench_2") == 0
 
 
 def test_bench_ignores_opposing_team_perf(client, ids, db):
     """Karşılaştırma yalnız KENDİ takımı içindedir."""
-    matches = _series(client, ids, "b-bench-opp", 3)
+    matches = _series(client, ids, "b-bench-opp", 2)
     for match_id in matches:
         perf = _bench_perf()
         perf["P7"] = 0.1  # rakip takımda daha düşük perf; P0'ı etkilemez
         perf["P8"] = None  # rakip takımda NULL; karşılaştırılabilirliği bozmaz
         _set_perf(db, match_id, ids, perf)
-    assert _count(client, ids["P0"], "bench_3") == 1
+    assert _count(client, ids["P0"], "bench_2") == 1
 
 
 def test_bench_not_awarded_when_not_the_lowest(client, ids, db):
-    matches = _series(client, ids, "b-bench-no", 3)
+    matches = _series(client, ids, "b-bench-no", 2)
     for match_id in matches:
         _set_perf(db, match_id, ids, _bench_perf(low="P1"))
-    assert _count(client, ids["P0"], "bench_3") == 0
-    assert _count(client, ids["P1"], "bench_3") == 1
+    assert _count(client, ids["P0"], "bench_2") == 0
+    assert _count(client, ids["P1"], "bench_2") == 1
 
 
 # --------------------------------------------------------------------------
@@ -528,14 +536,26 @@ def test_versatile_ignores_null_positions(client, ids):
 
 
 def test_veteran_thresholds_are_independent_with_own_last_match_id(client, ids):
-    matches = _series(client, ids, "b-vet", 25)
+    """GÖREV 24: eşik 25 → 20; veteran_50 KORUNDU (kilitli hedef).
+
+    Yanıt kaydı GÖREV 24 alanlarını da taşır: kilometre sınıfında `progress`
+    doludur, `best_*` ve kademe alanları NULL'dur.
+    """
+    matches = _series(client, ids, "b-vet", 20)
     badges = _by_key(client, ids["P0"])
     assert badges["veteran_10"] == {
-        "key": "veteran_10", "count": 1, "last_match_id": matches[9]
+        "key": "veteran_10", "count": 1, "last_match_id": matches[9],
+        "best_match_id": None, "best_value": None,
+        "tier": None, "rate": None, "next_tier_rate": None,
+        "progress": {"current": 20, "target": 10},
     }
-    assert badges["veteran_25"] == {
-        "key": "veteran_25", "count": 1, "last_match_id": matches[24]
+    assert badges["veteran_20"] == {
+        "key": "veteran_20", "count": 1, "last_match_id": matches[19],
+        "best_match_id": None, "best_value": None,
+        "tier": None, "rate": None, "next_tier_rate": None,
+        "progress": {"current": 20, "target": 20},
     }
+    assert "veteran_25" not in badges
     assert "veteran_50" not in badges
 
 
