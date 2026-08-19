@@ -4343,6 +4343,11 @@
     status: "all",     // durum süzgeci: CP_FILTERS elemanı
     pq: "",            // oyuncu araması
     roleOpen: null,    // rol düzenleyicisi açık maç id'si (aynı anda tek satır)
+    // Kaydedilmemiş rol seçimleri: maç id → { player_id: rol } ("" = rolsüz).
+    // DOM'da DEĞİL burada yaşarlar; panelin her yeniden çizimi (arama, süzgeç,
+    // sekme, idari eylem sonrası tazeleme, dil değişimi) düzenleyiciyi baştan
+    // basar ve seçimler sessizce sıfırlanırdı (fix: "roller kaydedilmiyor").
+    roleDraft: {},
     matches: [],
     players: [],
     busy: false,       // panel düzeyinde meşgul kilidi
@@ -4564,15 +4569,21 @@
   // gönderilir (kısmi güncelleme serbest). Yalnız açık satır için çizilir —
   // 200 maç × 10 <select> baştan basılsaydı liste ağırlaşırdı.
   function cpRoleEditorHtml(m) {
+    // data-original SUNUCUDAKİ değerdir (kısmi güncellemenin ölçütü); seçili
+    // görünen değer varsa taslaktan gelir — yeniden çizim seçimi yutmasın.
+    const draft = cp.roleDraft[m.id] || {};
     const rows = [...m.participants]
       .sort((a, b) => (a.team - b.team) || (roleOrder(a.position) - roleOrder(b.position)))
       .map(p => {
         const cur = p.position == null ? "" : p.position;
-        const opts = `<option value=""${cur === "" ? " selected" : ""}>—</option>` +
-          ROLES.map(r => `<option value="${r}"${cur === r ? " selected" : ""}>${esc(roleName(r))}</option>`).join("");
+        const sel = Object.prototype.hasOwnProperty.call(draft, p.player_id)
+          ? draft[p.player_id] : cur;
+        const opts = `<option value=""${sel === "" ? " selected" : ""}>—</option>` +
+          ROLES.map(r => `<option value="${r}"${sel === r ? " selected" : ""}>${esc(roleName(r))}</option>`).join("");
         return `<li class="re-row ${p.team === 100 ? "blue" : "red"}">
             <span class="p-who">${esc(p.display_name)}</span>
-            <select data-player="${p.player_id}" data-original="${esc(cur)}"
+            <select class="${sel === cur ? "" : "re-dirty"}"
+                    data-player="${p.player_id}" data-original="${esc(cur)}"
                     aria-label="${esc(t("matches.role_select_aria", { name: p.display_name }))}">${opts}</select>
           </li>`;
       }).join("");
@@ -4698,8 +4709,42 @@
       .some(i => i.value.trim() !== (i.dataset.original || ""));
   }
 
+  // Rol taslağı: bir katılımcının SUNUCUDAKİ rolü ("" = rolsüz). Taslak DOM'a
+  // değil cp.matches'e karşı ölçülür — düzenleyici o an çizili olmasa bile
+  // (başka sekmedeyken) "kaydedilmemiş değişiklik var mı?" sorusu yanıtlanır.
+  function cpRoleOriginal(matchId, playerId) {
+    const m = cp.matches.find(x => String(x.id) === String(matchId));
+    const p = m && (m.participants || [])
+      .find(pt => String(pt.player_id) === String(playerId));
+    return p && p.position != null ? p.position : "";
+  }
+
+  function cpHasUnsavedRoles() {
+    return Object.keys(cp.roleDraft).some(mid =>
+      Object.keys(cp.roleDraft[mid])
+        .some(pid => cp.roleDraft[mid][pid] !== cpRoleOriginal(mid, pid)));
+  }
+
+  // Yalnız rol seçimleri için onay (düzenleyiciyi kapatma / başka maçın
+  // düzenleyicisini açma). Onaylanırsa taslak atılır, iptalde yerinde kalır.
+  function cpConfirmDropRoles() {
+    if (!cpHasUnsavedRoles()) return true;
+    if (!confirm(t("control.unsaved_roles_confirm"))) return false;
+    cp.roleDraft = {};
+    return true;
+  }
+
+  // Bölümü terk etme (sekme değişimi, paneli kilitleme): ad kutuları ve rol
+  // seçimleri aynı onay kapısından geçer; hangisi kaydedilmemişse o söylenir.
   function cpConfirmLeave(box) {
-    return !cpHasUnsavedNames(box) || confirm(t("control.unsaved_confirm"));
+    const names = cpHasUnsavedNames(box);
+    const roles = cpHasUnsavedRoles();
+    if (!names && !roles) return true;
+    const key = names && roles ? "control.unsaved_both_confirm"
+      : roles ? "control.unsaved_roles_confirm" : "control.unsaved_confirm";
+    if (!confirm(t(key))) return false;
+    cp.roleDraft = {};
+    return true;
   }
 
   // ── Eylemler ──────────────────────────────────────────────────
@@ -4798,7 +4843,8 @@
         { method: "PUT", body: { positions } });
       toast(t("matches.roles_saved",
         { updated: res.updated, replayed: res.role_matches_replayed }), "ok");
-      cp.roleOpen = null;   // kaydedilen düzenleyici kapanır
+      cp.roleOpen = null;               // kaydedilen düzenleyici kapanır
+      delete cp.roleDraft[matchId];     // taslak sunucuya geçti → artık yok
     });
   }
 
@@ -4872,6 +4918,9 @@
       cpUnlink(btn, Number(btn.dataset.match), box);
     } else if (btn.classList.contains("cp-rolebtn")) {
       const id = Number(btn.dataset.match);
+      // Düzenleyiciyi kapatmak da BAŞKA maçınkini açmak da açık seçimleri
+      // atar → ad düzenlemesindeki desenle önce onay sorulur.
+      if (!cpConfirmDropRoles()) return;
       cp.roleOpen = cp.roleOpen === id ? null : id;
       cpRenderList(box);
       cpRestoreFocus(box, "roles-" + id);
@@ -4895,10 +4944,26 @@
 
   $("#control-body").addEventListener("change", (e) => {
     const el = e.target;
-    if (el.classList && el.classList.contains("cp-filter")) {
+    if (!el.classList) return;
+    if (el.classList.contains("cp-filter")) {
       cp.status = el.value;
       cpRenderList($("#control-body"));
+      return;
     }
+    // Rol seçimi ANINDA taslağa yazılır: bir sonraki yeniden çizim (arama,
+    // süzgeç, sekme, idari eylem) seçimi buradan geri yükler.
+    const row = el.closest && el.closest(".cp-row");
+    if (!row || !el.matches(".role-editor select[data-player]")) return;
+    const mid = row.dataset.match;
+    const pid = el.dataset.player;
+    const draft = cp.roleDraft[mid] || (cp.roleDraft[mid] = {});
+    const original = el.dataset.original || "";
+    // Sunucudaki değere geri dönüldüyse taslaktan DÜŞER: yoksa hiçbir şeyi
+    // değiştirmemiş kullanıcıya "kaydedilmemiş değişiklik" onayı sorulurdu.
+    if (el.value === original) delete draft[pid];
+    else draft[pid] = el.value;
+    if (!Object.keys(draft).length) delete cp.roleDraft[mid];
+    el.classList.toggle("re-dirty", el.value !== original);
   });
 
   $("#control-body").addEventListener("keydown", (e) => {

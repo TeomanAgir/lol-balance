@@ -363,7 +363,7 @@ window.I18N_DICTS.en = {
   "matches.close_editor": "Close editor",
   "matches.save_roles": "Save Roles",
   "matches.role_select_aria": "{name} role",
-  "matches.no_changes": "No roles changed.",
+  "matches.no_changes": "No role changed: nothing differs from the saved roles.",
   "matches.roles_saved": "{updated} roles updated · {replayed} matches replayed in the role universe.",
   "matches.open_detail": "Open match detail",
   "matchdetail.title": "Match #{id}",
@@ -473,5 +473,7 @@ window.I18N_DICTS.en = {
   "control.name_saved": "Name updated: {name}",
   "control.name_unchanged": "The name did not change.",
   "control.name_empty": "The name cannot be empty.",
-  "control.unsaved_confirm": "There is an unsaved name change. Continue without saving?"
+  "control.unsaved_confirm": "There is an unsaved name change. Continue without saving?",
+  "control.unsaved_roles_confirm": "There are unsaved role selections. Continue without saving? (The selections will be discarded.)",
+  "control.unsaved_both_confirm": "There are an unsaved name change and unsaved role selections. Continue without saving?"
 };
