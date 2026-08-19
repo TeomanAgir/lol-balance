@@ -1,4 +1,4 @@
-"""Maç listesi ve void işlemi (api_contract §3)."""
+"""Maç listesi, void ve unvoid işlemleri (api_contract §3)."""
 from __future__ import annotations
 
 import sqlite3
@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from rating import ROLES, Engine
 
 from ..config import Settings, get_settings
-from ..deps import get_db
+from ..deps import get_db, require_admin_key
 from ..schemas import (
     ItemsUpdate,
     ItemsUpdateResponse,
@@ -169,12 +169,20 @@ def get_match(
     return _serialize_match(conn, match, settings.engine_version)
 
 
-@router.post("/matches/{match_id}/void")
+@router.post(
+    "/matches/{match_id}/void", dependencies=[Depends(require_admin_key)]
+)
 def void_match(
     match_id: int,
     conn: sqlite3.Connection = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> dict:
+    """Maçı rating dışına alır (api_contract §3).
+
+    fix-2: `X-Admin-Key` İSTER — herkese açık void kaldırıldı, düğme yalnız
+    web UI'ın Kontrol Paneli'ndedir. Simetriği `/unvoid`'tir.
+    Durum kuralları: bilinmeyen id 404, `roulette` maç 409, zaten `void` 422.
+    """
     row = conn.execute(
         "SELECT id, status FROM matches WHERE id = ?", (match_id,)
     ).fetchone()
@@ -192,6 +200,11 @@ def void_match(
                 "çözmek için unlink kullanın."
             ),
         )
+    if row["status"] == "void":
+        # api_contract §3: zaten void maçta 422. İşlem NO-OP değildir, HATADIR:
+        # sessizce 200 dönmek replay'i boşuna koştururdu ve "void geri alındı
+        # mı" karışıklığı yaratırdı (geri alma ayrı uçtur: /unvoid).
+        raise HTTPException(422, detail="Bu maç zaten void işaretli.")
     with conn:
         conn.execute(
             "UPDATE matches SET status = 'void' WHERE id = ?", (match_id,)
@@ -203,6 +216,49 @@ def void_match(
     return {
         "match_id": match_id,
         "status": "void",
+        "matches_replayed": matches_replayed,
+        "role_matches_replayed": role_matches_replayed,
+        "engine_version": settings.engine_version,
+    }
+
+
+@router.post(
+    "/matches/{match_id}/unvoid", dependencies=[Depends(require_admin_key)]
+)
+def unvoid_match(
+    match_id: int,
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Void'un SİMETRİĞİ (api_contract §3, fix-2): void maçı `valid`'e döndürür.
+
+    Yalnız `status='void'` maçta çalışır — `valid`/`roulette` maçta 409
+    (unlink'in ayna kuralı: durum-dışı çağrı sessizce yutulmaz). Başarıda
+    HER İKİ evren replay edilir; ham `ingest_events` DEĞİŞMEZ, rating türetilmiş
+    veri olduğu için tarihçe void öncesiyle bit-bit aynı yeniden kurulur.
+    """
+    row = conn.execute(
+        "SELECT id, status FROM matches WHERE id = ?", (match_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+    if row["status"] != "void":
+        raise HTTPException(
+            409,
+            detail=(
+                f"Maç void değil (durum: {row['status']}); unvoid yalnız void "
+                "maçlarda çalışır."
+            ),
+        )
+    with conn:
+        conn.execute(
+            "UPDATE matches SET status = 'valid' WHERE id = ?", (match_id,)
+        )
+    matches_replayed = replay(conn, settings.engine_version)
+    role_matches_replayed = replay_roles(conn, settings.engine_version)
+    return {
+        "match_id": match_id,
+        "status": "valid",
         "matches_replayed": matches_replayed,
         "role_matches_replayed": role_matches_replayed,
         "engine_version": settings.engine_version,

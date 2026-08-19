@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 
-from conftest import API_KEY, make_payload
+from conftest import ADMIN_KEY, API_KEY, make_payload
 
 GOOD_STATS = {
     "kills": 15, "deaths": 1, "assists": 12,
@@ -62,6 +62,7 @@ def _history_rows(db_path):
 def _client(db_path, monkeypatch, engine_version: str | None = None):
     """conftest.client'ın ENGINE_VERSION seçilebilen kopyası."""
     monkeypatch.setenv("API_KEY", API_KEY)
+    monkeypatch.setenv("ADMIN_KEY", ADMIN_KEY)
     monkeypatch.setenv("DB_PATH", str(db_path))
     monkeypatch.setenv("WEBUI_DIR", str(db_path.parent / "_no_webui_"))
     if engine_version is None:
@@ -78,7 +79,7 @@ def _client(db_path, monkeypatch, engine_version: str | None = None):
     app = create_app()
     try:
         with TestClient(app) as c:
-            c.headers.update({"X-API-Key": API_KEY})
+            c.headers.update({"X-API-Key": API_KEY, "X-Admin-Key": ADMIN_KEY})
             yield c
     finally:
         get_settings.cache_clear()

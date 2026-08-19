@@ -41,6 +41,8 @@
     <div class="sb-gap" aria-hidden="true"></div>
     <button class="sb-item"        data-view="faq"         type="button" data-i18n="common.tab_faq"></button>
     <button class="sb-item"        data-view="health"      type="button" data-i18n="common.tab_health"></button>
+    <!-- Kontrol Paneli (fix-2): satır herkese görünür, İÇERİK şifre ister. -->
+    <button class="sb-item"        data-view="control"     type="button" data-i18n="common.tab_control"></button>
   </nav>
   <div class="sb-bottom">
     <!-- Dil düğmesi hedef dili gösterir: tr sözlüğünde "EN", en sözlüğünde "TR" —
@@ -342,6 +344,18 @@
               data-i18n="health.refresh"></button>
     </div>
     <div id="health-body" aria-live="polite"></div>
+  </section>
+
+  <!-- ═══ Kontrol Paneli (fix-2) — şifre korumalı idari yüzey ═══ -->
+  <!-- Sayfa girişte şifre sorar; şifre YALNIZ bellekte tutulur (localStorage'a
+       YAZILMAZ) ve her sayfa yenilemesinde yeniden istenir. Doğrulama yan
+       etkisiz GET /admin/ping (204) iledir; idari çağrılar X-API-Key'e EK
+       olarak X-Admin-Key taşır (api_contract "Admin anahtarı"). İçerik tamamen
+       app.js'te kurulur (loadControl → renderControlGate | renderControlPanel):
+       maç listesi + Void/Geri Al, tam replay, oyuncu adı düzeltme. -->
+  <section id="view-control" class="view" hidden>
+    <p class="view-hint" data-i18n="control.hint"></p>
+    <div id="control-body" aria-live="polite"></div>
   </section>
 
 </main>

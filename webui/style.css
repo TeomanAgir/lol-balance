@@ -1429,7 +1429,9 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   .match-teams .pos-ico { --pos-ico: 16px; }
 }
 .match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.btn-void, .btn-roles {
+/* fix-2: .btn-void kaldırıldı — herkese açık void düğmesi Geçmiş kartından
+   çıktı, eylem yalnız Kontrol Paneli'ndedir (.cp-btn.cp-danger). */
+.btn-roles {
   font-size: 13px;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -1437,7 +1439,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   padding: 8px 14px;
   min-height: 40px;
 }
-.btn-void:hover { color: var(--red); border-color: var(--red); }
 .btn-roles:hover { color: var(--brass); border-color: var(--brass-dim); }
 
 /* ── Rol düzeltme paneli (PUT /matches/{id}/positions) ── */
@@ -2868,10 +2869,152 @@ main.pa-wide { max-width: 1080px; }
 .btn-rlt-unlink:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
 .btn-rlt-unlink:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Kontrol Paneli (fix-2) ──
+   Şifre korumalı idari yüzey. Sınıflar cp- öneklidir (global ad alanı dersi).
+   Görsel dil bilerek SAKİN ve idari: pirinç vurgu yalnız yetkili rozetinde,
+   yıkıcı eylem (void) tek kırmızı düğmedir. */
+.cp-gate {
+  max-width: 420px;
+  margin: 24px auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 18px;
+  display: grid;
+  gap: 10px;
+}
+.cp-gate-title { font-family: var(--display); font-size: 18px; letter-spacing: 0.04em; }
+.cp-gate-desc { font-size: 13px; color: var(--muted); }
+.cp-gate-input {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 16px;
+  padding: 10px 12px;
+  min-height: 44px;
+  width: 100%;
+}
+.cp-gate-err { font-size: 13px; color: var(--red); }
+
+.cp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.cp-badge {
+  font-family: var(--display);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+  border: 1px solid var(--brass-dim);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.cp-lock {
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 40px;
+}
+.cp-lock:hover { color: var(--text); border-color: var(--brass-dim); }
+
+.cp-sec { margin-bottom: 28px; }
+.cp-sec-title {
+  font-family: var(--display);
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--brass);
+  margin-bottom: 4px;
+}
+.cp-sec-note { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.cp-none { font-size: 14px; color: var(--muted); }
+
+.cp-btn {
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 40px;
+}
+.cp-btn:hover:not(:disabled) { color: var(--brass); border-color: var(--brass-dim); }
+.cp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cp-btn.cp-danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
+
+.cp-list { display: grid; gap: 8px; }
+.cp-row {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.cp-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.cp-mid { font-family: var(--display); color: var(--brass); }
+.cp-date { color: var(--muted); }
+.cp-status {
+  font-family: var(--display);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: var(--muted);
+}
+.cp-status.cp-st-valid { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.cp-status.cp-st-roulette { color: var(--brass); border-color: var(--brass-dim); }
+/* Takım özeti: dar ekranda alt alta, geniş ekranda yan yana. min-width:0
+   şart — aksi halde uzun ad listesi grid çocuğunu taşırır (fix-2 dersi). */
+.cp-teams { display: grid; gap: 2px; font-size: 13px; }
+.cp-team { min-width: 0; overflow-wrap: anywhere; }
+.cp-team.blue { color: var(--blue); }
+.cp-team.red { color: var(--red); }
+.cp-vs { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.cp-row-act { display: flex; justify-content: flex-end; }
+.cp-no-act { font-size: 12px; color: var(--muted); align-self: center; }
+
+.cp-players { list-style: none; display: grid; gap: 8px; }
+.cp-prow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.cp-pid { font-family: var(--display); font-size: 13px; color: var(--muted); flex: 0 0 auto; }
+.cp-pname {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 15px;
+  padding: 8px 10px;
+  min-height: 40px;
+}
+
 /* ── Geniş ekran ── */
 @media (min-width: 768px) {
   main { padding: 24px 24px 48px; }
   .roster-grid { grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); }
+  /* Kontrol Paneli maç satırı: takım özeti tek satıra, eylem sağa yaslanır. */
+  .cp-row { grid-template-columns: 1fr auto; align-items: center; }
+  .cp-row-head { grid-column: 1 / -1; }
+  .cp-teams { grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

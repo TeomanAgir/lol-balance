@@ -17,6 +17,12 @@ class Settings:
     db_path: str
     engine_version: str
     webui_dir: str
+    # İdari uçların İKİNCİ anahtarı (api_contract "Admin anahtarı", fix-2).
+    # None = yapılandırılmamış → o uçlar 503 döner (API_KEY'in aksine
+    # yokluğu uygulamayı başlatmaz, yalnız idari yüzeyi kapatır).
+    # Değer YALNIZ ortamdan gelir; repo public olduğu için hiçbir dosyada
+    # varsayılan/örnek gerçek değer bulunmaz.
+    admin_key: str | None = None
 
 
 @lru_cache
@@ -33,4 +39,7 @@ def get_settings() -> Settings:
         db_path=os.environ.get("DB_PATH", str(BACKEND_DIR / "data" / "lol_balance.db")),
         engine_version=os.environ.get("ENGINE_VERSION", "openskill-pl-blend20-v1"),
         webui_dir=os.environ.get("WEBUI_DIR", str(BACKEND_DIR.parent / "webui")),
+        # Boş string de "yapılandırılmamış" sayılır (k8s secret'ta anahtar
+        # tanımlı ama değeri boşsa idari uçlar herkese açılmasın).
+        admin_key=os.environ.get("ADMIN_KEY", "").strip() or None,
     )

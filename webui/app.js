@@ -15,6 +15,10 @@
 
   const state = {
     apiKey: localStorage.getItem("apiKey") || "",
+    // Kontrol Paneli şifresi (fix-2). BİLEREK localStorage/sessionStorage'a
+    // YAZILMAZ: yalnız bu sekmenin belleğinde yaşar, sayfa yenilenince silinir
+    // ve panel şifreyi yeniden sorar (api_contract "Admin anahtarı").
+    adminKey: "",
     roster: [],                 // GET /players sonucu
     board: [],                  // GET /leaderboard sonucu (harita ekranı, GÖREV 4)
     selected: new Set(),        // dengeleme seçimi (player_id)
@@ -41,8 +45,12 @@
   };
 
   // ── API istemcisi ─────────────────────────────────────────────
-  async function api(path, { method = "GET", body } = {}) {
+  // admin:true → idari uç (api_contract "Admin anahtarı"): X-API-Key'in ÜSTÜNE
+  // X-Admin-Key eklenir. adminKey argümanı yalnız şifre doğrulama anında
+  // (henüz state'e yazılmamış aday şifre için) verilir.
+  async function api(path, { method = "GET", body, admin = false, adminKey } = {}) {
     const headers = { "X-API-Key": state.apiKey };
+    if (admin) headers["X-Admin-Key"] = adminKey !== undefined ? adminKey : state.adminKey;
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const doFetch = CONFIG.USE_MOCK ? window.mockFetch : window.fetch.bind(window);
     let res;
@@ -66,6 +74,8 @@
       e.status = res.status;
       throw e;
     }
+    // GET /admin/ping 204'tür (gövdesiz) — res.json() burada patlardı.
+    if (res.status === 204) return null;
     return res.json();
   }
 
@@ -355,6 +365,7 @@
     map: loadMap, matches: loadMatches, profile: loadProfile,
     matchdetail: loadMatchDetail, health: loadHealth, meta: loadMeta,
     faq: loadFaq, faqdetail: loadFaqDetail, pick: loadPick, matchup: loadMatchup,
+    control: loadControl,
   };
   // Sekmesi olmayan "detay" görünümleri (GÖREV 1: profil, GÖREV 4: harita) hangi sekmeyi
   // aktif tutar. İkisi de birden çok yerden açılır → geldiği görünümün sekmesi yanar,
@@ -2940,9 +2951,10 @@
           </div>`;
       };
       // GÖREV 23: status üç değerlidir (valid | void | roulette). Rulet maçı
-      // geçmişte RULET rozetiyle + kazanan etiketiyle görünür; void düğmesi
-      // rulet maçında ÇİZİLMEZ (maç zaten rating dışıdır, ayrılmış eylemi
-      // detaydaki "Rulet bağlantısını çöz"dür).
+      // geçmişte RULET rozetiyle + kazanan etiketiyle görünür.
+      // fix-2: HERKESE AÇIK void düğmesi bu karttan KALDIRILDI (yanlışlıkla
+      // void'lanan maç olayı) — void/unvoid artık yalnız şifre korumalı
+      // Kontrol Paneli'ndedir. Rol düzenleyici herkese açık kalır.
       const isRoulette = m.status === "roulette";
       const winTag = `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
       const headBadge = voided
@@ -2950,9 +2962,6 @@
         : isRoulette
           ? `<span class="mh-badges"><span class="rlt-badge">${t("roulette.badge")}</span>${winTag}</span>`
           : winTag;
-      const voidBtn = (voided || isRoulette)
-        ? ""
-        : `<button class="btn-void" type="button">${t("matches.void_btn")}</button>`;
       const card = document.createElement("article");
       card.className = "match-card" + (voided ? " voided" : "");
       card.innerHTML =
@@ -2963,12 +2972,11 @@
          <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>
          <div class="match-actions">
            <button class="btn-roles" type="button" aria-expanded="false">${t("matches.edit_roles")}</button>
-           ${voidBtn}
          </div>` +
         roleEditor();
 
       // Karta tıklama maç detayını açar (GÖREV 8). Düğmeler ve rol düzenleyici
-      // içindeki tıklamalar detayı AÇMAZ: aksi halde "Rolleri düzenle"/"void"/
+      // içindeki tıklamalar detayı AÇMAZ: aksi halde "Rolleri düzenle" ve
       // <select> her tıklamada görünüm değiştirirdi. Klavye erişimi başlıktaki
       // .md-open düğmesindedir (kartın kendisi odaklanabilir bir öğe değildir).
       card.addEventListener("click", (e) => {
@@ -3007,21 +3015,6 @@
         }
       });
 
-      if (!voided && !isRoulette) {
-        card.querySelector(".btn-void").addEventListener("click", async (e) => {
-          const ok = confirm(t("matches.void_confirm"));
-          if (!ok) return;
-          e.target.disabled = true;
-          try {
-            await api(`/matches/${m.id}/void`, { method: "POST" });
-            toast(t("matches.void_done"), "ok");
-            loadMatches().catch(err => toast(err.message));
-          } catch (err) {
-            e.target.disabled = false;
-            toast(err.message);
-          }
-        });
-      }
       box.appendChild(card);
     }
     // Portrelerin 404/geçici hata yolu (tek retry → yer tutucu) build satırlarıyla
@@ -3601,6 +3594,276 @@
   // Elle yenileme: görünüm zaten açık, sekme değiştirmeden aynı yükleyici koşar.
   $("#btn-health-refresh").addEventListener("click", () =>
     loadHealth().catch(e => toast(e.message)));
+
+  // ── 5) Kontrol Paneli (fix-2) ─────────────────────────────────
+  // Şifre korumalı İDARİ yüzey (api_contract "Admin anahtarı"). Geçmiş
+  // kartlarındaki herkese açık void düğmesi bu ekran uğruna kaldırıldı.
+  //
+  // Şifre YALNIZ bellekte (state.adminKey) yaşar: localStorage/sessionStorage'a
+  // BİLEREK yazılmaz, sayfa her yenilendiğinde yeniden sorulur. Doğrulama
+  // yan etkisiz GET /admin/ping (204) iledir; 503 = sunucuda ADMIN_KEY hiç
+  // yapılandırılmamış (şifre yanlış DEĞİL — ayrı mesaj), 403 = şifre yanlış.
+  //
+  // İçerik v1: (a) maç listesi + duruma göre Void / Geri Al, (b) tam replay,
+  // (c) oyuncu adı düzeltme (PATCH /players/{id}; normal X-API-Key yeter,
+  // idari anahtar İSTEMEZ — panel yalnız erişim kapısıdır).
+  const CP_STATUS_KEY = {
+    valid: "control.status_valid",
+    void: "control.status_void",
+    roulette: "control.status_roulette",
+  };
+  const cpStatusLabel = (s) => (CP_STATUS_KEY[s] ? t(CP_STATUS_KEY[s]) : s);
+
+  async function loadControl() {
+    const box = $("#control-body");
+    if (!state.adminKey) { renderControlGate(box); return; }
+    await renderControlPanel(box);
+  }
+
+  // Yetki hatasında panel KİLİTLENİR: bellekteki şifre artık geçerli değildir
+  // (anahtar döndü ya da sunucu yapılandırması değişti) → giriş ekranına dön.
+  function cpFail(e) {
+    if (e.status === 403 || e.status === 503) {
+      state.adminKey = "";
+      toast(e.status === 503 ? t("control.err_not_configured") : t("control.err_wrong"));
+      renderControlGate($("#control-body"));
+      return;
+    }
+    toast(e.message);
+  }
+
+  function renderControlGate(box) {
+    box.innerHTML = `<form class="cp-gate" autocomplete="off">
+        <h2 class="cp-gate-title">${t("control.gate_title")}</h2>
+        <p class="cp-gate-desc">${t("control.gate_desc")}</p>
+        <input class="cp-gate-input" type="password" autocomplete="off"
+               placeholder="${esc(t("control.gate_placeholder"))}"
+               aria-label="${esc(t("control.gate_placeholder"))}" required>
+        <button class="btn-primary cp-gate-btn" type="submit">${t("control.gate_btn")}</button>
+        <p class="cp-gate-err" role="alert" hidden></p>
+      </form>`;
+    const form = box.querySelector(".cp-gate");
+    const input = box.querySelector(".cp-gate-input");
+    const btn = box.querySelector(".cp-gate-btn");
+    const errBox = box.querySelector(".cp-gate-err");
+    input.focus();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const candidate = input.value;
+      if (!candidate) return;
+      btn.disabled = true;
+      btn.textContent = t("control.gate_checking");
+      errBox.hidden = true;
+      try {
+        // Aday şifre state'e YAZILMADAN denenir: yanlışsa bellekte iz kalmaz.
+        await api("/admin/ping", { admin: true, adminKey: candidate });
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = t("control.gate_btn");
+        errBox.hidden = false;
+        errBox.textContent =
+          err.status === 503 ? t("control.err_not_configured")
+            : err.status === 403 ? t("control.err_wrong")
+            : err.message;
+        input.select();
+        return;
+      }
+      state.adminKey = candidate;
+      input.value = "";           // DOM'da da kalmasın
+      toast(t("control.unlocked"), "ok");
+      renderControlPanel(box).catch(cpFail);
+    });
+  }
+
+  // Takım özeti: rol sırasına göre adlar (maç kartlarındaki sırayla aynı kural).
+  function cpTeamNames(m, team) {
+    return m.participants
+      .filter(p => p.team === team)
+      .sort((a, b) => roleOrder(a.position) - roleOrder(b.position))
+      .map(p => p.display_name)
+      .join(", ");
+  }
+
+  function cpMatchRow(m) {
+    // Rulet maçında ne void ne unvoid anlamlıdır (backend ikisine de 409 verir)
+    // → düğme yerine kısa bir not basılır.
+    const action = m.status === "void"
+      ? `<button class="cp-btn cp-unvoid" type="button" data-match="${m.id}">${t("control.unvoid_btn")}</button>`
+      : m.status === "roulette"
+        ? `<span class="cp-no-act">${t("control.roulette_note")}</span>`
+        : `<button class="cp-btn cp-danger cp-void" type="button" data-match="${m.id}">${t("control.void_btn")}</button>`;
+    return `<article class="cp-row" data-match="${m.id}">
+        <div class="cp-row-head">
+          <span class="cp-mid">#${m.id}</span>
+          <span class="cp-date">${fmtDate(m.played_at)}</span>
+          <span class="cp-status cp-st-${esc(m.status)}">${esc(cpStatusLabel(m.status))}</span>
+        </div>
+        <div class="cp-teams">
+          <span class="cp-team blue">${esc(cpTeamNames(m, 100))}</span>
+          <span class="cp-vs">${t("control.vs")}</span>
+          <span class="cp-team red">${esc(cpTeamNames(m, 200))}</span>
+        </div>
+        <div class="cp-row-act">${action}</div>
+      </article>`;
+  }
+
+  function cpPlayerRow(p) {
+    const name = esc(p.display_name);
+    return `<li class="cp-prow">
+        <span class="cp-pid">#${p.id}</span>
+        <input class="cp-pname" type="text" maxlength="64" value="${name}"
+               data-player="${p.id}" data-original="${name}"
+               aria-label="${esc(t("control.name_aria", { name: p.display_name }))}">
+        <button class="cp-btn cp-psave" type="button" data-player="${p.id}">${t("control.name_save")}</button>
+      </li>`;
+  }
+
+  async function renderControlPanel(box) {
+    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    let matches, players;
+    try {
+      // Liste uçları idari DEĞİLDİR (normal X-API-Key) — panel yalnız
+      // eylemleri kapı arkasına alır.
+      [matches, players] = await Promise.all([
+        api("/matches?limit=50"),
+        api("/players"),
+      ]);
+    } catch (e) {
+      // Yetki hatasında cpFail giriş ekranını çizer; ağ/HTTP hatasında oturum
+      // hâlâ geçerlidir → ekran boş kalmasın, sebep yazılı dursun.
+      box.innerHTML = `<p class='cp-none'>${esc(e.message)}</p>`;
+      cpFail(e);
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="cp-head">
+        <span class="cp-badge">${t("control.unlocked_badge")}</span>
+        <button class="cp-lock" type="button">${t("control.lock_btn")}</button>
+      </div>
+
+      <section class="cp-sec">
+        <h2 class="cp-sec-title">${t("control.sec_matches")}</h2>
+        <p class="cp-sec-note">${t("control.sec_matches_note")}</p>
+        <div class="cp-list">${
+          matches.length ? matches.map(cpMatchRow).join("")
+            : `<p class='cp-none'>${t("control.matches_empty")}</p>`
+        }</div>
+      </section>
+
+      <section class="cp-sec">
+        <h2 class="cp-sec-title">${t("control.sec_rating")}</h2>
+        <p class="cp-sec-note">${t("control.replay_note")}</p>
+        <button class="cp-btn cp-replay" type="button">${t("control.replay_btn")}</button>
+      </section>
+
+      <section class="cp-sec">
+        <h2 class="cp-sec-title">${t("control.sec_players")}</h2>
+        <p class="cp-sec-note">${t("control.players_note")}</p>
+        <ul class="cp-players">${
+          players.length ? players.map(cpPlayerRow).join("")
+            : `<p class='cp-none'>${t("control.players_empty")}</p>`
+        }</ul>
+      </section>`;
+
+  }
+
+  // Panel eylemleri delegasyonla ve TEK KEZ bağlanır: #control-body kalıcı bir
+  // düğümdür, her çizimde bağlansaydı dinleyiciler birikir ve tek tıklama
+  // birden çok isteğe dönüşürdü (giriş formu kendi taze düğümüne bağlanır).
+  $("#control-body").addEventListener("click", (e) => {
+    const box = $("#control-body");
+    const btn = e.target.closest("button");
+    if (!btn || !box.contains(btn)) return;
+    if (btn.classList.contains("cp-lock")) {
+      state.adminKey = "";
+      toast(t("control.locked"), "ok");
+      renderControlGate(box);
+    } else if (btn.classList.contains("cp-void")) {
+      cpVoid(btn, Number(btn.dataset.match), box);
+    } else if (btn.classList.contains("cp-unvoid")) {
+      cpUnvoid(btn, Number(btn.dataset.match), box);
+    } else if (btn.classList.contains("cp-replay")) {
+      cpReplay(btn, box);
+    } else if (btn.classList.contains("cp-psave")) {
+      cpSaveName(btn, box);
+    }
+  });
+
+  // Void/unvoid/replay sonrası TÜM önbellekler geçersizdir: rating evrenleri
+  // yeniden kuruldu (roster skorları, maç listesi, profil serileri).
+  function cpInvalidateCaches() {
+    state.roster = [];
+    state.matches = [];
+    state.ratingHistory = null;
+    state.badges = null;
+  }
+
+  async function cpAction(btn, box, busyKey, run) {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = t(busyKey);
+    try {
+      await run();
+      cpInvalidateCaches();
+      await renderControlPanel(box);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = label;
+      cpFail(e);
+    }
+  }
+
+  function cpVoid(btn, matchId, box) {
+    if (!confirm(t("control.void_confirm", { id: matchId }))) return;
+    cpAction(btn, box, "control.working", async () => {
+      const res = await api(`/matches/${matchId}/void`, { method: "POST", admin: true });
+      toast(t("control.void_done", { id: matchId, replayed: res.matches_replayed }), "ok");
+    });
+  }
+
+  function cpUnvoid(btn, matchId, box) {
+    if (!confirm(t("control.unvoid_confirm", { id: matchId }))) return;
+    cpAction(btn, box, "control.working", async () => {
+      const res = await api(`/matches/${matchId}/unvoid`, { method: "POST", admin: true });
+      toast(t("control.unvoid_done", { id: matchId, replayed: res.matches_replayed }), "ok");
+    });
+  }
+
+  function cpReplay(btn, box) {
+    if (!confirm(t("control.replay_confirm"))) return;
+    cpAction(btn, box, "control.replay_running", async () => {
+      const res = await api("/admin/replay", { method: "POST", admin: true });
+      toast(t("control.replay_done",
+        { matches: res.matches_replayed, roles: res.role_matches_replayed }), "ok");
+    });
+  }
+
+  // Oyuncu adı düzeltme: PATCH /players/{id} idari uç DEĞİLDİR (X-API-Key yeter);
+  // panelde durmasının sebebi erişim değil, yerin idari olmasıdır.
+  async function cpSaveName(btn, box) {
+    const input = box.querySelector(`.cp-pname[data-player="${btn.dataset.player}"]`);
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) { toast(t("control.name_empty"), "warn"); return; }
+    if (name === input.dataset.original) { toast(t("control.name_unchanged"), "warn"); return; }
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = t("common.saving");
+    try {
+      const res = await api(`/players/${btn.dataset.player}`,
+        { method: "PATCH", body: { display_name: name } });
+      input.dataset.original = res.display_name;
+      input.value = res.display_name;
+      state.roster = [];   // ad her ekranda görünür → roster önbelleği geçersiz
+      toast(t("control.name_saved", { name: res.display_name }), "ok");
+    } catch (e) {
+      cpFail(e);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
 
   // ── Dil (GÖREV 6) ─────────────────────────────────────────────
   // Panelin alt bloğundaki düğme (GÖREV 17'de sağ üstten taşındı) hedef dili

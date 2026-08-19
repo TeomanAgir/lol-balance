@@ -14,6 +14,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
 API_KEY = "test-key"
+# İdari uçların ikinci anahtarı (api_contract "Admin anahtarı", fix-2).
+# Test sabitidir; gerçek ADMIN_KEY yalnız k8s secret'ında yaşar.
+ADMIN_KEY = "test-admin-key"
 
 # ingest_contract.md "Request body" örneğindeki participant — birebir.
 CONTRACT_PARTICIPANT = {
@@ -124,7 +127,15 @@ def db_path(tmp_path):
 
 @pytest.fixture
 def client(db_path, monkeypatch):
+    """Varsayılan istemci: API anahtarı + admin anahtarı yapılandırılmış.
+
+    İdari uçlar (void/unvoid/replay/ping) `X-Admin-Key` ister; testlerin
+    geri kalanı bu ucu "yetkili" kullandığı için header istemciye takılıdır.
+    Yetki DAVRANIŞINI sınayan testler kendi istemcilerini kurar
+    (`test_admin_key.py`: anahtarsız ortam, yanlış anahtar).
+    """
     monkeypatch.setenv("API_KEY", API_KEY)
+    monkeypatch.setenv("ADMIN_KEY", ADMIN_KEY)
     monkeypatch.setenv("DB_PATH", str(db_path))
     monkeypatch.setenv("WEBUI_DIR", str(db_path.parent / "_no_webui_"))
 
@@ -136,7 +147,7 @@ def client(db_path, monkeypatch):
     get_settings.cache_clear()
     app = create_app()
     with TestClient(app) as c:
-        c.headers.update({"X-API-Key": API_KEY})
+        c.headers.update({"X-API-Key": API_KEY, "X-Admin-Key": ADMIN_KEY})
         yield c
     get_settings.cache_clear()
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 
-from conftest import API_KEY, make_payload, make_role_payload
+from conftest import ADMIN_KEY, API_KEY, make_payload, make_role_payload
 
 INGEST_URL = "/api/v1/ingest/match"
 
@@ -23,6 +23,7 @@ def _client_for(db_path, monkeypatch):
     test başına tek DB verdiği için burada aynı kurulum parametrik tekrarlanır.
     """
     monkeypatch.setenv("API_KEY", API_KEY)
+    monkeypatch.setenv("ADMIN_KEY", ADMIN_KEY)
     monkeypatch.setenv("DB_PATH", str(db_path))
     monkeypatch.setenv("WEBUI_DIR", str(db_path.parent / "_no_webui_"))
 
@@ -34,7 +35,7 @@ def _client_for(db_path, monkeypatch):
     get_settings.cache_clear()
     app = create_app()
     with TestClient(app) as c:
-        c.headers.update({"X-API-Key": API_KEY})
+        c.headers.update({"X-API-Key": API_KEY, "X-Admin-Key": ADMIN_KEY})
         yield c
     get_settings.cache_clear()
 

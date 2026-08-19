@@ -46,6 +46,7 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
 | Alan | Zorunlu | Varsayılan | Açıklama |
 |---|---|---|---|
 | `API_KEY` | evet | — | Tüm `/api/v1` isteklerinde beklenen `X-API-Key` değeri |
+| `ADMIN_KEY` | hayır | — | İdari uçların (`/matches/{id}/void`, `/matches/{id}/unvoid`, `/admin/replay`, `/admin/ping`) EK olarak beklediği `X-Admin-Key` değeri. Tanımlı değilse bu uçlar `503` döner (yüzey kapalı); yanlış/eksik header `403`. Prod'da değer yalnız k8s secret'ında yaşar |
 | `DB_PATH` | hayır | `backend/data/lol_balance.db` | SQLite dosya yolu |
 | `ENGINE_VERSION` | hayır | `openskill-pl-blend20-v1` | Aktif rating engine versiyonu |
 | `WEBUI_DIR` | hayır | `../webui` | Statik servis edilecek dizin |
@@ -61,3 +62,8 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
   yazılır; rating tabloları her an bu kayıtlardan yeniden üretilebilir.
 - **Idempotency:** `source_game_id` UNIQUE; aynı payload ikinci kez `200 {duplicate: true}`.
 - **Kısa maç:** `duration_s < 300` otomatik `void` — veri saklanır, rating'e girmez.
+- **void ⇄ unvoid (fix-2):** `POST /matches/{id}/unvoid` void'un simetriğidir; maç
+  `valid` olur ve her iki evren replay edilir. Rating türetilmiş veri olduğu için
+  sonuç, maç hiç void edilmemiş gibi bit-bit aynıdır. İkisi de `X-Admin-Key` ister.
+  Durum kuralları simetriktir: zaten `void` maça void → `422`, `void` olmayan maça
+  unvoid → `409`, `roulette` maça ikisi de reddedilir; hiçbirinde replay koşmaz.
