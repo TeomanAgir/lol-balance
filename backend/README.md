@@ -46,7 +46,7 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
 | Alan | Zorunlu | Varsayılan | Açıklama |
 |---|---|---|---|
 | `API_KEY` | evet | — | Tüm `/api/v1` isteklerinde beklenen `X-API-Key` değeri |
-| `ADMIN_KEY` | hayır | — | İdari uçların (`/matches/{id}/void`, `/matches/{id}/unvoid`, `/admin/replay`, `/admin/ping`) EK olarak beklediği `X-Admin-Key` değeri. Tanımlı değilse bu uçlar `503` döner (yüzey kapalı); yanlış/eksik header `403`. Prod'da değer yalnız k8s secret'ında yaşar |
+| `ADMIN_KEY` | hayır | — | İdari uçların (`/matches/{id}/void`, `/matches/{id}/unvoid`, `/matches/{id}/roulette/unlink`, `POST /players`, `PATCH /players/{id}`, `/admin/replay`, `/admin/ping`) EK olarak beklediği `X-Admin-Key` değeri. Tanımlı değilse bu uçlar `503` döner (yüzey kapalı); yanlış/eksik header `403`. **Yalnız ASCII** olabilir (fix-3): header'lar latin-1 taşındığı için Türkçe karakterli anahtar doğru girilse bile doğrulanamaz — backend böyle bir anahtarda idari uçlarda `503` + açıklayıcı hata döner, uygulamanın geri kalanı çalışır. Prod'da değer yalnız k8s secret'ında yaşar |
 | `DB_PATH` | hayır | `backend/data/lol_balance.db` | SQLite dosya yolu |
 | `ENGINE_VERSION` | hayır | `openskill-pl-blend20-v1` | Aktif rating engine versiyonu |
 | `WEBUI_DIR` | hayır | `../webui` | Statik servis edilecek dizin |
@@ -67,3 +67,13 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
   sonuç, maç hiç void edilmemiş gibi bit-bit aynıdır. İkisi de `X-Admin-Key` ister.
   Durum kuralları simetriktir: zaten `void` maça void → `422`, `void` olmayan maça
   unvoid → `409`, `roulette` maça ikisi de reddedilir; hiçbirinde replay koşmaz.
+- **Durum değişimi + replay atomiktir (fix-3):** `void`, `unvoid` ve `roulette/unlink`
+  uçlarında `matches.status` yazımı ile her iki evrenin replay'i TEK transaction'dadır
+  (`services/tx.maybe_transaction` + `replay(..., join_transaction=True)`). Replay
+  patlarsa durum yazımı da geri alınır — istemci `500` görür, veri tutarlı kalır.
+- **Admin hız sınırı (fix-3):** başarısız `X-Admin-Key` denemesi sabit
+  `ADMIN_FAIL_DELAY_S` (0.25 sn) geciktirilir; istemci IP'si başına
+  `ADMIN_FAIL_WINDOW_S` (60 sn) kayan penceresinde `ADMIN_FAIL_LIMIT` (10) başarısız
+  denemeden sonra uç `429` + `Retry-After` döner. Başarılı doğrulama sayacı sıfırlar.
+  Sayaç süreç belleğindedir (tek replica); sabitler `app/deps.py` modül seviyesindedir
+  ve testler monkeypatch ile kısaltabilir.

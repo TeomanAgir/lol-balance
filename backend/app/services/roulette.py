@@ -25,6 +25,7 @@ from fastapi import HTTPException
 from rating import ROLES
 
 from .health import utc_now_z
+from .tx import maybe_transaction
 
 ASSIGNMENT_COUNT = 10
 TEAM_SIZE = 5
@@ -319,13 +320,18 @@ def link_session(
     )
 
 
-def unlink_match(conn: sqlite3.Connection, match_id: int) -> None:
+def unlink_match(
+    conn: sqlite3.Connection, match_id: int, *, join_transaction: bool = False
+) -> None:
     """Unlink'in DB adımı: maç valid'e döner, oturum cancelled olur.
 
     `match_id` yalnız linked durumda dolu kalır (db_schema 0006 notu), bu
     yüzden NULL'lanır. Replay ÇAĞIRANIN işidir (mevcut mekanizma).
+
+    `join_transaction=True`: kendi transaction'ını açmaz — durum yazımı ve iki
+    evrenin replay'i TEK transaction olsun diye (api_contract §5, fix-3).
     """
-    with conn:
+    with maybe_transaction(conn, join_transaction):
         conn.execute(
             "UPDATE matches SET status = 'valid' WHERE id = ?", (match_id,)
         )

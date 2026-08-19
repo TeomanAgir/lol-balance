@@ -13,6 +13,7 @@ import sqlite3
 from rating import ROLES, Engine, ParticipantStats, Rating
 
 from .ratings import STAT_FIELDS, replay_order_by
+from .tx import maybe_transaction
 
 # (player_id, role) → ...
 RoleKey = tuple[int, str]
@@ -211,17 +212,25 @@ def apply_match_incremental_roles(
     return True
 
 
-def replay_roles(conn: sqlite3.Connection, engine_version: str) -> int:
+def replay_roles(
+    conn: sqlite3.Connection,
+    engine_version: str,
+    *,
+    join_transaction: bool = False,
+) -> int:
     """Aktif engine_version'ın role_rating_history'sini siler ve valid maçları
     played_at sırasıyla yeniden işler. İşlenen (UYGUN) maç sayısını döner.
 
     Uygun olmayan maçlar atlanır ve sayılmaz. Roller her zaman
     match_participants'ın GÜNCEL position değerinden okunur, bu yüzden
     `PUT /matches/{id}/positions` düzeltmeleri replay'de kaybolmaz.
+
+    `join_transaction=True`: ana evrendeki `replay` ile aynı anlam — kendi
+    transaction'ını açmaz, çağıranınkine katılır (api_contract §5).
     """
     engine = Engine(version=engine_version)
     processed = 0
-    with conn:
+    with maybe_transaction(conn, join_transaction):
         conn.execute(
             "DELETE FROM role_rating_history WHERE engine_version = ?",
             (engine_version,),

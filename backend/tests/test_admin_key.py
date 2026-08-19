@@ -243,6 +243,35 @@ def test_unvoid_unknown_match_404(client):
     assert r.status_code == 404
 
 
+def test_void_unknown_match_404(client):
+    """void'un unvoid ile simetrik durum kuralı (api_contract §3)."""
+    r = client.post("/api/v1/matches/9999/void")
+    assert r.status_code == 404
+    assert "9999" in r.json()["detail"]
+
+
+def test_void_and_unvoid_response_shape(client):
+    """Yanıt alanları contract'takinin tamamı: iki evrenin sayısı + engine_version."""
+    _ingest(client, "shape-1", "2026-08-11T20:00:00Z")
+    m2 = _ingest(client, "shape-2", "2026-08-12T20:00:00Z")
+
+    voided = client.post(f"/api/v1/matches/{m2}/void").json()
+    assert set(voided) == {
+        "match_id",
+        "status",
+        "matches_replayed",
+        "role_matches_replayed",
+        "engine_version",
+    }
+    assert voided["role_matches_replayed"] == 1  # kalan tek valid maç
+    assert voided["engine_version"] == "openskill-pl-blend20-v1"
+
+    unvoided = client.post(f"/api/v1/matches/{m2}/unvoid").json()
+    assert set(unvoided) == set(voided)
+    assert unvoided["role_matches_replayed"] == 2
+    assert unvoided["engine_version"] == voided["engine_version"]
+
+
 def test_unvoid_valid_match_409(client, db):
     m = _ingest(client, "v-1", "2026-08-11T20:00:00Z")
     r = client.post(f"/api/v1/matches/{m}/unvoid")
