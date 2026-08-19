@@ -6,6 +6,11 @@
 `webui/assets/badges/1.png` … `27.png` (öneri: kare, şeffaf zeminli PNG, ~512×512,
 koyu arayüzde okunaklı; `.webp` de desteklenir).
 
+⚠️ **Dosya adında SIFIR DOLGUSU YOK:** `1.png` doğru, `01.png` YANLIŞTIR (arayüz `1.png`
+ister, sıfır dolgulu dosya hiç yüklenmez). Aralık dışı ad (`28.png`) ve harfli ad
+(`mvp.png`) da geçersizdir. Bir test bu kuralı zorlar: yanlış adlandırılmış dosya CI'da
+açık bir mesajla yakalanır, sessizce görünmez kalmaz.
+
 Akış: dosyayı bu klasöre koy → commit + push (main'e merge = otomatik deploy) → rozet
 sitede o görselle çıkar. **Arayüz görselin varlığını çalışma anında anlar**: dosya yoksa
 rozet mevcut basit simge/metin görünümünde kalır, dosya varsa madalyon otomatik devreye

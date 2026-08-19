@@ -1721,10 +1721,14 @@
       // profilin kalanı çalışsın — /nemesis'teki desenin aynısı, o bölüm çizilmez.
       // loadAssets (GÖREV 14) reject etmez: varlık yoksa favori eşya kartı yer
       // tutucuyla çizilir, profil beklemez.
+      // include_locked=true (GÖREV 24): kilitli rozetler de gelir (count: 0) ve
+      // vitrinin sonunda soluk + ilerlemeli gösterilir. Parametreyi bilmeyen eski
+      // backend onu yok sayar → yalnız kazanılmışlar döner, vitrin yine çalışır.
       const [s, h, b] = await Promise.all([
         api(`/players/${state.profileId}/stats`),
         api(`/players/${state.profileId}/rating-history`).catch(() => null),
-        api(`/players/${state.profileId}/badges`).catch(() => null),
+        api(`/players/${state.profileId}/badges?include_locked=true`).catch(() => null),
+        fetchBadgeCatalog(),
         loadAssets(),
       ]);
       state.ratingHistory = h;
@@ -1975,9 +1979,11 @@
     closeHistPopup(false);
   });
 
-  // ── 2b3) Rozet vitrini (GÖREV 11+12) ──────────────────────────
-  // Veri: GET /players/{id}/badges — yanıt yalnız {key, count, last_match_id}
-  // taşır; ad ve açıklama BURADA, sözlüktedir (api_contract §2 "Rozetler").
+  // ── 2b3) Rozet vitrini (GÖREV 11+12; katalog GÖREV 24'te 27 rozete çıktı) ──
+  // Veri: GET /players/{id}/badges?include_locked=true — yanıt yalnız `key` +
+  // sayısal alanlar taşır; ad ve açıklama BURADA, sözlüktedir (api_contract §2
+  // "Rozetler"). Nadirlik için ayrıca GET /badges kataloğu çekilir (uç yoksa
+  // gösterim sessizce atlanır — eski backend'le geriye uyumluluk).
   // Sıra contract'ta SABİT katalog sırasıdır; yine de burada katalog sırasına göre
   // dizilir (ileri sürüm backend'i sırayı değiştirirse vitrin bozulmasın diye).
   // Bilinmeyen anahtar SESSİZCE atlanır: backend yeni rozet eklediğinde eski UI
@@ -1988,11 +1994,25 @@
   // her kartçıkta yazılıdır, açıklama da ekran okuyucuya .pb-sr ile verilir.
   // GÖREV 23: roulette_complete / roulette_winner / gambler katalog sırasının
   // SONUNDADIR (api_contract §2 — status='roulette' maçlardan türetilen tek üçlü).
+  //
+  // BU LİSTENİN SIRASI DONDURULMUŞTUR: dizideki konum + 1 = rozetin katalog
+  // ID'sidir (badges/rozetler.md) ve madalyon görsel dosyasının adıdır. Yeni
+  // rozet SONA eklenir, araya girmez — aksi hâlde tüm görseller kayar.
   const BADGE_KEYS = [
-    "mvp", "vision", "damage", "cs_per_min", "gold", "deathless", "comeback",
-    "win_streak_5", "bench_3", "versatile", "veteran_10", "veteran_25", "veteran_50",
+    "mvp", "vision", "damage", "cs_per_min", "gold", "role_duel",
+    "role_record", "pr_perf", "pr_damage",
+    "kill_20", "kda_10", "deathless", "comeback", "tragic_hero", "marathon_5",
+    "win_streak_3", "lose_streak_3", "bench_2",
+    "nemesis_6", "duo_6",
+    "versatile", "veteran_10", "veteran_20", "veteran_50",
     "roulette_complete", "roulette_winner", "gambler",
   ];
+  // ID↔key eşlemesi TEK yerde: görsel dosya adı buradan türer, manifest yoktur.
+  const badgeId = (key) => BADGE_KEYS.indexOf(key) + 1;
+
+  // Nötr gri kalan (kıracak vurgusu olmayan) esprili rozetler.
+  const BADGE_MUTED = ["bench_2", "lose_streak_3"];
+  const BADGE_TIERS = ["bronze", "silver", "gold"];
 
   // 24×24 viewBox, tek renk çizgi grafikleri (pb-fill sınıfı dolu parçalar için).
   const BADGE_ICONS = {
@@ -2001,13 +2021,27 @@
     damage: `<circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3.5M12 17.9v3.5M2.6 12h3.5M17.9 12h3.5M5.4 5.4l2.5 2.5M16.1 16.1l2.5 2.5M18.6 5.4l-2.5 2.5M7.9 16.1l-2.5 2.5"/>`,
     cs_per_min: `<circle cx="12" cy="12" r="8.6"/><path d="M12 6.8v5.4l3.4 2"/>`,
     gold: `<ellipse cx="12" cy="6.4" rx="7.4" ry="2.9"/><path d="M4.6 6.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/><path d="M4.6 11.4v5c0 1.6 3.3 2.9 7.4 2.9s7.4-1.3 7.4-2.9v-5"/>`,
+    // GÖREV 24 — yeni sınıflar: rol düellosu (çapraz kılıçlar), rekor kırma
+    // (bayrak / zirve / şimşek), anlatısal (kurukafa, mücevher, gece), kara seri
+    // (yağmur bulutu), ilişkisel (hedef tahtası, iki figür).
+    role_duel: `<path d="M5.2 5.2l8.4 8.4M18.8 5.2l-8.4 8.4"/><path class="pb-fill" d="M3.4 18.6l3.6-3.6 1.8 1.8-3.6 3.6zM20.6 18.6l-3.6-3.6-1.8 1.8 3.6 3.6z"/>`,
+    role_record: `<path d="M6.4 20.6V4"/><path d="M6.4 5.2h11l-2.4 3.6 2.4 3.6h-11z"/>`,
+    pr_perf: `<path d="M2.6 19.4l6.2-9.4 3.3 4.4 2.5-3.3 6.8 8.3z"/><path d="M12 3.2v4.4"/><path class="pb-fill" d="M12 3.2l4 1.5-4 1.5z"/>`,
+    pr_damage: `<path class="pb-fill" d="M13.6 2.6L5.4 13.8h4.9l-1.5 7.6 8.4-11.4h-5z"/>`,
+    kill_20: `<path d="M12 3.2c-3.8 0-6.8 2.9-6.8 6.6 0 2.2 1.1 3.6 1.9 4.6.5.6.7 1 .7 1.8v1.2h8.4v-1.2c0-.8.2-1.2.7-1.8.8-1 1.9-2.4 1.9-4.6 0-3.7-3-6.6-6.8-6.6z"/><circle class="pb-fill" cx="9.6" cy="10.2" r="1.3"/><circle class="pb-fill" cx="14.4" cy="10.2" r="1.3"/><path d="M8.8 20.6h6.4"/>`,
+    kda_10: `<path d="M12 3.2l8.4 5.6-8.4 12L3.6 8.8z"/><path d="M3.6 8.8h16.8M12 3.2L8.6 8.8 12 20.8l3.4-12z"/>`,
     deathless: `<path d="M12 2.8l7.4 2.7v6c0 4.4-3 8-7.4 9.7-4.4-1.7-7.4-5.3-7.4-9.7v-6z"/><path d="M8.8 12.1l2.3 2.3 4.1-4.5"/>`,
     comeback: `<path d="M4.8 19.5V13a5.6 5.6 0 0 1 11.2 0v6.5"/><path d="M12.4 16.3l3.6 3.4 3.6-3.4"/>`,
-    win_streak_5: `<path d="M12 21c3.5 0 6-2.4 6-5.6 0-4.2-4.1-5.9-3.3-11.4-2.9 1.2-5.2 4-5.2 6.4 0 1.2.4 2 .4 2S8.1 11.6 7 10c-.6 1.2-1 2.9-1 4.6C6 18.3 8.5 21 12 21z"/>`,
-    bench_3: `<path d="M3.6 9.6h16.8M3.6 13.1h16.8"/><path d="M5.8 13.1v6.1M18.2 13.1v6.1M5.8 9.6V5.4M18.2 9.6V5.4"/>`,
+    tragic_hero: `<path d="M6.4 3.8c2.6.5 4.5 2.2 5.6 4.8 1.1-2.6 3-4.3 5.6-4.8"/><path d="M12 9.4v8.4"/><path class="pb-fill" d="M12 21.2l-3.2-3.6h6.4z"/>`,
+    marathon_5: `<path d="M15.4 3.4a8.4 8.4 0 1 0 4.9 12.5A9 9 0 0 1 15.4 3.4z"/><circle class="pb-fill" cx="17.8" cy="6.6" r="1"/><circle class="pb-fill" cx="20.4" cy="10.4" r="0.8"/>`,
+    win_streak_3: `<path d="M12 21c3.5 0 6-2.4 6-5.6 0-4.2-4.1-5.9-3.3-11.4-2.9 1.2-5.2 4-5.2 6.4 0 1.2.4 2 .4 2S8.1 11.6 7 10c-.6 1.2-1 2.9-1 4.6C6 18.3 8.5 21 12 21z"/>`,
+    lose_streak_3: `<path d="M7.2 14.4a3.6 3.6 0 0 1 .4-7.2 5 5 0 0 1 9.4 1.2 3 3 0 0 1-.6 6z"/><path d="M8.6 17.2l-1 3M12 17.2l-1 3M15.4 17.2l-1 3"/>`,
+    bench_2: `<path d="M3.6 9.6h16.8M3.6 13.1h16.8"/><path d="M5.8 13.1v6.1M18.2 13.1v6.1M5.8 9.6V5.4M18.2 9.6V5.4"/>`,
+    nemesis_6: `<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="4.4"/><circle class="pb-fill" cx="12" cy="12" r="1.5"/>`,
+    duo_6: `<circle cx="9" cy="9.2" r="2.9"/><circle cx="16.4" cy="11" r="2.3"/><path d="M3.6 19.8c.6-2.7 2.8-4.5 5.4-4.5s4.8 1.8 5.4 4.5"/><path d="M15.6 15.4c2.1.3 3.8 1.9 4.3 4.1"/>`,
     versatile: `<path d="M12 3.1l8.6 6.2-3.3 10.1H6.7L3.4 9.3z"/><circle class="pb-fill" cx="12" cy="12" r="1.7"/>`,
     veteran_10: `<path d="M4.8 15.2L12 9l7.2 6.2"/>`,
-    veteran_25: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
+    veteran_20: `<path d="M4.8 12.4L12 6.2l7.2 6.2M4.8 18L12 11.8l7.2 6.2"/>`,
     veteran_50: `<path d="M4.8 10.2L12 4l7.2 6.2M4.8 15L12 8.8l7.2 6.2M4.8 19.8L12 13.6l7.2 6.2"/>`,
     roulette_complete: `<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="2.4"/><path d="M12 3.4v6.2M12 14.4v6.2M3.4 12h6.2M14.4 12h6.2M5.9 5.9l4.4 4.4M18.1 18.1l-4.4-4.4M18.1 5.9l-4.4 4.4M5.9 18.1l4.4-4.4"/>`,
     roulette_winner: `<circle cx="12" cy="12" r="8.6"/><path class="pb-fill" d="M12 7.4l1.4 2.9 3.2.5-2.3 2.2.5 3.2-2.8-1.5-2.8 1.5.5-3.2-2.3-2.2 3.2-.5z"/>`,
@@ -2015,39 +2049,230 @@
   };
 
   const badgeIcon = (key) =>
-    `<svg class="pb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${BADGE_ICONS[key]}</svg>`;
+    `<svg class="pb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">` +
+    `${BADGE_ICONS[key] || ""}</svg>`;
 
-  // Yanıttaki rozetler → katalog sırasında, tanınmayanlar atılmış liste.
+  // ── Madalyon görsel hattı (GÖREV 24, "ucu açık") ───────────────
+  // Rozet görselleri SONRADAN, teker teker eklenir: `webui/assets/badges/<ID>.png`
+  // (`.webp` de denenir). Kod/liste/manifest güncellemesi GEREKMEZ — dosyanın
+  // varlığı ÇALIŞMA ANINDA anlaşılır: <img> yüklenirse madalyon simgenin üstüne
+  // biner, yüklenemezse img DOM'dan kaldırılır ve altındaki SVG simge kalır
+  // (dd- varlık katmanındaki "yer tutucu altta, görsel üstte" deseninin aynısı;
+  // kırık görsel imkânsız, kullanıcıya hata gösterilmez, konsola BİZ yazmayız).
+  //
+  // Sonuç oturum boyunca ID başına ÖNBELLEKLENİR: aynı profil yeniden çizilince
+  // (dil değişimi, geri gelme) olmayan dosya bir daha istenmez. İki uzantı da
+  // denendikten sonra ID `null` işaretlenir; başarılı uzantı bir sonraki rozette
+  // İLK deneme olur (hepsi .webp ise tek istek yeter).
+  const BADGE_IMG_DIR = "assets/badges/";
+  const BADGE_IMG_EXT = ["png", "webp"];   // sıra: rozetler.md önerisi .png
+  let badgeImgPref = 0;                    // son BAŞARILI uzantının indeksi
+  const badgeImgSeen = new Map();          // ID -> çalışan src | null (ikisi de yok)
+
+  function badgeImgHtml(id) {
+    if (!id) return "";
+    const known = badgeImgSeen.get(id);
+    if (known === null) return "";          // bu oturumda denendi, dosya yok
+    const src = known || BADGE_IMG_DIR + id + "." + BADGE_IMG_EXT[badgeImgPref];
+    return `<img class="pb-img" alt="" src="${esc(src)}" data-bid="${id}"` +
+      (known ? ` data-known="1"` : ` data-tried="${BADGE_IMG_EXT[badgeImgPref]}"`) + `>`;
+  }
+
+  function badgeImgFail(img) {
+    const id = Number(img.dataset.bid);
+    // Daha önce YÜKLENMİŞ bir dosya düştüyse (geçici hata) işaretleme yapılmaz:
+    // yalnız bu çizimde simgeye düşülür, dosya "yok" sayılmaz.
+    if (img.dataset.known === "1") { img.remove(); return; }
+    const tried = (img.dataset.tried || "").split(",").filter(Boolean);
+    const next = BADGE_IMG_EXT.filter(x => tried.indexOf(x) === -1)[0];
+    if (!next) { badgeImgSeen.set(id, null); img.remove(); return; }
+    img.dataset.tried = tried.concat(next).join(",");
+    img.setAttribute("src", BADGE_IMG_DIR + id + "." + next);
+  }
+
+  function badgeImgOk(img) {
+    const id = Number(img.dataset.bid);
+    const src = img.getAttribute("src");
+    badgeImgSeen.set(id, src);
+    const i = BADGE_IMG_EXT.indexOf(String(src).split(".").pop());
+    if (i !== -1) badgeImgPref = i;
+    const medal = img.closest(".pb-medal");
+    if (medal) medal.classList.add("pb-has-img");
+  }
+
+  function badgeBindImages(root) {
+    root.querySelectorAll(".pb-img").forEach(img => {
+      img.addEventListener("error", () => badgeImgFail(img));
+      img.addEventListener("load", () => badgeImgOk(img));
+      // Dinleyici bağlanmadan önce sonuçlanmış olabilir (önbellek).
+      if (img.complete) {
+        if (img.naturalWidth === 0) badgeImgFail(img); else badgeImgOk(img);
+      }
+    });
+  }
+
+  // ── Rozet kataloğu (GET /badges) — nadirlik göstergesi ─────────
+  // Global ve oyuncudan bağımsız: oturumda BİR kez çekilir. Uç yoksa (eski
+  // backend) null kalır ve nadirlik satırı hiç basılmaz; yeniden denenmez.
+  let badgeCat = null;
+  let badgeCatTried = false;
+
+  async function fetchBadgeCatalog() {
+    if (badgeCatTried) return badgeCat;
+    badgeCatTried = true;
+    try {
+      badgeCat = await api("/badges");
+    } catch (err) {
+      badgeCat = null;
+    }
+    return badgeCat;
+  }
+
+  const badgeCatEntry = (key) => {
+    const rows = badgeCat && Array.isArray(badgeCat.badges) ? badgeCat.badges : [];
+    return rows.filter(x => x && x.key === key)[0] || null;
+  };
+
+  // Yanıttaki rozetler → KAZANILMIŞLAR önce, ardından İLERLEMESİ BAŞLAMIŞ
+  // kilitliler; her grup katalog sırasında, tanınmayan anahtarlar atılmış.
+  // Kazanılmamış rozetler vitrinde LİSTELENMEZ (Teoman kararı, GÖREV 24-fix):
+  // yalnızca `progress` var VE `progress.current > 0` olan kilitliler görünür
+  // (ör. "Demirbaş 22/50"). progress yoksa (maç-anı koşullu sınıflar) ya da
+  // current 0 ise ("Kumarbaz 0/5") kart hiç basılmaz. include_locked=true
+  // isteği KALIR — bu filtre istemcide uygulanır (backend'den ilerlemeli
+  // kilitliler yine gelmesi gerektiği için).
   function badgeList() {
     const raw = (state.badges && state.badges.badges) || [];
     return raw
       .filter(b => b && BADGE_KEYS.indexOf(b.key) !== -1)
-      .sort((a, b) => BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key));
+      .filter(badgeVisible)
+      .sort((a, b) =>
+        (badgeLocked(a) ? 1 : 0) - (badgeLocked(b) ? 1 : 0) ||
+        BADGE_KEYS.indexOf(a.key) - BADGE_KEYS.indexOf(b.key));
   }
 
+  // count: 0 kayıt = KİLİTLİ (yalnız include_locked=true iken gelir).
+  const badgeLocked = (b) => !(Number(b.count) > 0);
+  // Kazanılmış rozet her zaman görünür; kilitli rozet YALNIZCA ilerlemesi
+  // başlamışsa (progress.current > 0) görünür. badgeProgress() zaten
+  // current/target'ı sayıya çevirip target > 0 şartını uygular; current 0
+  // dahil geçerli bir progress objesi döner, bu yüzden c > 0 burada ayrıca
+  // kontrol edilir (Number(null)===0 tuzağı badgeProgress içinde çözülmüştür).
+  const badgeVisible = (b) => {
+    if (!badgeLocked(b)) return true;
+    const p = badgeProgress(b);
+    return !!p && p.c > 0;
+  };
   const badgeCount = (b) => (typeof b.count === "number" && b.count > 1 ? b.count : 0);
-  // last_match_id contract'ta zorunlu ama ileri sürümde null gelebilir → satır düşer.
-  const badgeLast = (b) =>
-    Number.isFinite(Number(b.last_match_id))
-      ? t("profile.badge_last", { id: Number(b.last_match_id) })
-      : "";
+  // DİKKAT: Number(null) === 0 — bu yüzden null/undefined ayrıca süzülür, yoksa
+  // kilitli rozette maç kimliği "#0" olarak görünürdü.
+  const numOrNull = (v) =>
+    v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+  // last_match_id kazanılmış rozette doludur; count: 0 kayıtlarda null → satır düşer.
+  const badgeLast = (b) => {
+    const id = numOrNull(b.last_match_id);
+    return id == null ? "" : t("profile.badge_last", { id });
+  };
+  // best_match_id yalnız ölçülebilir sınıflarda (rekor/rol/kişisel) doludur.
+  const badgeBestId = (b) => numOrNull(b.best_match_id);
+  const badgeBest = (b) => {
+    const id = badgeBestId(b);
+    if (id == null) return "";
+    const v = numOrNull(b.best_value);
+    // best_value sınıfa göre ölçek değiştirir (oran 1.62 · vizyon 44 · hasar
+    // 30969): büyük değerlerde 2 ondalık gürültüdür, tam sayıya yuvarlanır.
+    return v == null
+      ? t("profile.badge_best", { id })
+      : t("profile.badge_best_value",
+        { id, v: Math.abs(v) >= 100 ? String(Math.round(v)) : num2(v) });
+  };
+  const badgeTier = (b) =>
+    BADGE_TIERS.indexOf(b.tier) !== -1 ? b.tier : null;
+  // Kademeli rozette bir üst kademenin ADI (altında yoktur).
+  const badgeNextTier = (b) => {
+    const i = BADGE_TIERS.indexOf(badgeTier(b));
+    return i >= 0 && i + 1 < BADGE_TIERS.length ? BADGE_TIERS[i + 1] : null;
+  };
+  const badgeProgress = (b) => {
+    const p = b && b.progress;
+    if (!p) return null;
+    const c = numOrNull(p.current), tg = numOrNull(p.target);
+    return c != null && tg != null && tg > 0 ? { c, tg } : null;
+  };
+
+  // Kademe satırı: "maç başına 0.32" + varsa "Gümüş kademesine 0.04 kaldı".
+  // Eşikler BURADA YAZILI DEĞİL — sayı backend'in next_tier_rate'inden gelir.
+  function badgeRateText(b) {
+    // rate yalnız KADEMELİ rozetlerde doludur; diğerlerinde null gelir ve
+    // satır hiç basılmaz (Number(null) === 0 tuzağı için numOrNull).
+    const rate = numOrNull(b.rate);
+    if (rate == null) return "";
+    const out = [t("profile.badge_rate", { n: num2(rate) })];
+    const next = numOrNull(b.next_tier_rate), name = badgeNextTier(b);
+    if (next != null && name && next > rate) {
+      out.push(t("profile.badge_tier_next",
+        { tier: t("profile.badge_tier_" + name), n: num2(next - rate) }));
+    }
+    return out.join(" · ");
+  }
+
+  // Nadirlik: GET /badges kataloğundaki holders / holders_pct. Uç yoksa "".
+  function badgeHoldersText(key) {
+    const row = badgeCatEntry(key);
+    if (!row) return "";
+    const n = numOrNull(row.holders);
+    if (n == null) return "";
+    if (n <= 0) return t("profile.badge_holders_none");
+    const size = numOrNull(badgeCat.roster_size);
+    const given = numOrNull(row.holders_pct);
+    const pct = given != null ? given : (size != null && size > 0 ? (n / size) * 100 : null);
+    return pct == null ? t("profile.badge_holders", { n, p: "?" })
+      : t("profile.badge_holders", { n, p: pct.toFixed(1) });
+  }
 
   function badgeCard(b) {
-    // MVP vitrinin ilkidir (katalog sırası zaten öyle) ve pirinç vurgulu;
-    // bench_3 esprili olduğu için nötr gri tonda kalır.
-    const tone = b.key === "mvp" ? " pb-mvp" : b.key === "bench_3" ? " pb-bench" : "";
+    const id = badgeId(b.key);
+    const locked = badgeLocked(b);
+    const tier = locked ? null : badgeTier(b);
+    // Kademe rengi kartın çerçevesini/ışımasını belirler (AYRI GÖRSEL YOK —
+    // Teoman kararı); kademesiz esprili rozetler nötr gri kalır.
+    const cls = ["pb-card"];
+    if (locked) cls.push("pb-locked");
+    if (tier) cls.push("pb-t-" + tier);
+    else if (!locked && BADGE_MUTED.indexOf(b.key) !== -1) cls.push("pb-bench");
     const n = badgeCount(b);
-    const last = badgeLast(b);
+    const prog = badgeProgress(b);
+    const bestId = locked ? null : badgeBestId(b);
     // Görsel tooltip aria-hidden'dır; aynı bilgi ekran okuyucuya .pb-sr ile
     // düğmenin erişilebilir adının parçası olarak zaten verilir.
-    const sr = [t("profile.badge_" + b.key + "_desc"),
-      n ? t("profile.badge_count_aria", { n }) : "", last].filter(Boolean).join(" ");
-    return `<button type="button" class="pb-card${tone}" data-key="${b.key}">
-        ${badgeIcon(b.key)}
+    const sr = [
+      t("profile.badge_" + b.key + "_desc"),
+      locked ? t("profile.badge_locked") : "",
+      tier ? t("profile.badge_tier_aria", { tier: t("profile.badge_tier_" + tier) }) : "",
+      n ? t("profile.badge_count_aria", { n }) : "",
+      locked && prog ? t("profile.badge_progress_aria", { c: prog.c, tg: prog.tg }) : "",
+      locked ? "" : badgeBest(b),
+      locked ? "" : badgeLast(b),
+    ].filter(Boolean).join(" ");
+    const pct = prog ? Math.max(0, Math.min(100, (prog.c / prog.tg) * 100)) : 0;
+    // .pb-cell sarmalayıcı: "en iyi maça git" çipi düğmenin İÇİNDE olamaz
+    // (button içinde button geçersizdir), kartın köşesine kardeş olarak biner.
+    return `<div class="pb-cell">
+      <button type="button" class="${cls.join(" ")}" data-key="${b.key}">
+        <span class="pb-medal">${badgeIcon(b.key)}${badgeImgHtml(id)}</span>
         <span class="pb-name">${t("profile.badge_" + b.key)}</span>
+        ${tier ? `<span class="pb-tier" aria-hidden="true">${t("profile.badge_tier_" + tier)}</span>` : ""}
         ${n ? `<span class="pb-count" aria-hidden="true">${t("profile.badge_count", { n })}</span>` : ""}
+        ${locked && prog ? `<span class="pb-prog" aria-hidden="true">
+             <span class="pb-bar"><span class="pb-bar-fill" style="width:${pct.toFixed(1)}%"></span></span>
+             <span class="pb-prog-txt">${t("profile.badge_progress", { c: prog.c, tg: prog.tg })}</span>
+           </span>` : ""}
         <span class="pb-sr">${sr}</span>
-      </button>`;
+      </button>
+      ${bestId != null ? `<button type="button" class="pb-go" data-match="${bestId}"
+           title="${esc(t("profile.badge_best_go", { id: bestId }))}"
+           aria-label="${esc(t("profile.badge_best_go", { id: bestId }))}">#${bestId}</button>` : ""}
+    </div>`;
   }
 
   let badgeOpen = null;   // tooltip'i açık olan kartçık düğümü
@@ -2066,26 +2291,47 @@
       sec.innerHTML = title + `<p class="ps-empty">${t("profile.badges_empty")}</p>`;
       return;
     }
-    sec.innerHTML = title + `<div class="pb-grid">${list.map(badgeCard).join("")}</div>`;
+    const earned = list.filter(x => !badgeLocked(x)).length;
+    const sum = `<p class="pb-summary">${t("profile.badges_summary",
+      { n: earned, total: BADGE_KEYS.length })}</p>`;
+    sec.innerHTML = title + sum + `<div class="pb-grid">${list.map(badgeCard).join("")}</div>`;
+    badgeBindImages(sec);
 
     sec.querySelectorAll(".pb-card").forEach(card => {
-      const b = list.find(x => x.key === card.dataset.key);
+      const b = list.filter(x => x.key === card.dataset.key)[0];
       // Tıklama ve odak AÇAR (kapatmaz): fare tıklamasında odak+tık ard arda
       // gelir, "toggle" olsaydı tooltip açılıp hemen kapanırdı.
       card.addEventListener("click", () => openBadgeTip(card, b));
       card.addEventListener("focus", () => openBadgeTip(card, b));
       card.addEventListener("blur", () => { if (badgeOpen === card) closeBadgeTip(); });
     });
+    // "En iyi an" çipi: maç detayına atlama deseni tarihçe grafiğiyle aynıdır
+    // (önbellekte varsa oradan, yoksa GET /matches/{id}).
+    sec.querySelectorAll(".pb-go").forEach(go => {
+      go.addEventListener("click", () => {
+        closeBadgeTip();
+        openMatchFromHistory(Number(go.dataset.match));
+      });
+    });
   }
 
   function openBadgeTip(card, b) {
     if (!card || !b || badgeOpen === card) return;
     closeBadgeTip();
-    const last = badgeLast(b);
+    const locked = badgeLocked(b);
+    const prog = badgeProgress(b);
+    // İkincil satırlar: kademe oranı → ilerleme → en iyi an → son maç → nadirlik.
+    const rows = [
+      locked ? "" : badgeRateText(b),
+      locked && prog ? t("profile.badge_progress", { c: prog.c, tg: prog.tg }) : "",
+      locked ? "" : badgeBest(b),
+      locked ? "" : badgeLast(b),
+      badgeHoldersText(b.key),
+    ].filter(Boolean);
     card.insertAdjacentHTML("beforeend",
       `<span class="pb-tip" aria-hidden="true">
          <span>${t("profile.badge_" + b.key + "_desc")}</span>
-         ${last ? `<span class="pb-tip-last">${last}</span>` : ""}
+         ${rows.map(x => `<span class="pb-tip-last">${x}</span>`).join("")}
        </span>`);
     badgeOpen = card;
     // Kenardaki kartçıkta kutu ızgaranın dışına taşabilir: ölçüp içeri çekilir

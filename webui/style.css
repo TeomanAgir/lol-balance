@@ -676,13 +676,24 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
    Kartçık ızgarası dar ekranda sarar (320px'de 2 sütun, geniş ekranda 6).
    İkon satır içi SVG'dir ve rengini currentColor ile kartçıktan alır; renk tek
    başına anlam taşımaz, rozet adı her kartçıkta yazılıdır. */
+.pb-summary {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin: -4px 0 8px;
+}
 .pb-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px;
 }
+/* Kartçık sarmalayıcı (GÖREV 24): "en iyi maça git" çipi düğmenin İÇİNDE
+   olamaz (button içinde button geçersizdir), bu yüzden ızgara hücresi bir
+   div'dir; düğme hücreyi tamamen doldurur, çip köşeye biner. */
+.pb-cell { position: relative; display: flex; }
 .pb-card {
   position: relative;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -696,6 +707,26 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   transition: border-color 0.15s;
 }
 .pb-card:hover { border-color: var(--brass-dim); }
+/* Madalyon yuvası: SVG simge ALTTA her zaman durur, görsel (varsa) ÜSTÜNE
+   biner — dosya yoksa img kaldırılır ve simge görünür kalır (GÖREV 24). */
+.pb-medal {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;              /* yüklenene dek görünmez: kırık kutu imkânsız */
+}
+.pb-medal.pb-has-img .pb-img { opacity: 1; }
+.pb-medal.pb-has-img .pb-icon { visibility: hidden; }
 .pb-icon {
   width: 28px;
   height: 28px;
@@ -724,11 +755,88 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   color: var(--brass);
   font-variant-numeric: tabular-nums;
 }
-/* MVP (GÖREV 12'nin yıldız rozeti) vitrinin ilkidir ve hafif pirinç vurguludur. */
-.pb-mvp { background: var(--surface-2); border-color: var(--brass-dim); }
-.pb-mvp .pb-icon, .pb-mvp .pb-name { color: var(--brass); }
-/* "Sonsuz Bench" espridir, kıracak bir vurgusu yoktur: nötr gri. */
+/* "Sonsuz Bench" / "Kara Seri" espridir, kıracak bir vurgusu yoktur: nötr gri. */
 .pb-bench .pb-icon, .pb-bench .pb-name, .pb-bench .pb-count { color: var(--muted); }
+
+/* ── Kademe: bronz / gümüş / altın (GÖREV 24) ──
+   AYRI GÖRSEL YOKTUR (Teoman kararı): kademe ayrımı ÇERÇEVE + IŞIMA + küçük
+   ETİKET ile verilir; madalyon görseli her kademede aynıdır. Renk tek başına
+   anlam taşımaz — etiket metni (Bronz/Gümüş/Altın) kartçıkta yazılıdır. */
+.pb-tier {
+  font-family: var(--display);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.pb-t-bronze { border-color: #b3764a; box-shadow: 0 0 10px -3px #b3764a80; }
+.pb-t-bronze .pb-icon, .pb-t-bronze .pb-tier { color: #c68a5c; }
+.pb-t-silver {
+  background: var(--surface-2);
+  border-color: #b9c3d1;
+  box-shadow: 0 0 10px -2px #b9c3d180;
+}
+.pb-t-silver .pb-icon, .pb-t-silver .pb-tier, .pb-t-silver .pb-name { color: #cfd8e4; }
+.pb-t-gold {
+  background: var(--surface-2);
+  border-color: var(--brass);
+  box-shadow: 0 0 12px -2px #e6bd5f8c;
+}
+.pb-t-gold .pb-icon, .pb-t-gold .pb-tier, .pb-t-gold .pb-name { color: #e6bd5f; }
+
+/* ── Kilitli rozet (include_locked=true, GÖREV 24) ──
+   Kazanılmışlardan SONRA gelir (sıra app.js'te) ve görsel olarak ayrışır:
+   kesikli çerçeve + soluk. Kilitliliğin metin karşılığı .pb-sr'dedir. */
+.pb-locked {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.55;
+}
+.pb-locked .pb-icon, .pb-locked .pb-name { color: var(--muted); }
+.pb-locked:hover { opacity: 0.8; }
+/* İlerleme: ince bar + "17/20" — kartçığın DİBİNE oturur (pb-count deseni). */
+.pb-prog {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+}
+.pb-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pb-bar-fill { display: block; height: 100%; background: var(--brass-dim); }
+.pb-prog-txt {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "En iyi an" çipi: best_match_id varsa kartçığın sağ üst köşesinde küçük bir
+   düğme — o maçın detayına gider (maç detayı atlama deseni). */
+.pb-go {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  right: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.pb-go:hover { color: var(--brass); border-color: var(--brass-dim); }
 
 /* Ekran okuyucu metni: açıklama + kaç kez + son maç düğmenin adına girer,
    böylece görsel tooltip'e (aria-hidden) bağımlılık kalmaz. */
