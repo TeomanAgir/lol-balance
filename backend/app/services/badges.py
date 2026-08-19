@@ -1,4 +1,5 @@
-"""Oyuncu rozetleri (api_contract §2 "Rozetler"; katalog GÖREV 24'te 27'ye çıktı).
+"""Oyuncu rozetleri (api_contract §2 "Rozetler"; katalog GÖREV 24'te 27'ye,
+Teoman'ın `perfect_quad` revizyonuyla 28'e çıktı).
 
 SALT-OKUR gösterim katmanıdır: hiçbir tablo yazılmaz, hiçbir şema/migration
 eklenmez, rating hesabına etkisi yoktur. Her rozet mevcut `matches` /
@@ -84,12 +85,17 @@ CATALOG: tuple[BadgeDef, ...] = (
     BadgeDef(25, "roulette_complete", "roulette", "roulette", False, False),
     BadgeDef(26, "roulette_winner", "roulette", "roulette", False, False),
     BadgeDef(27, "gambler", "roulette", "roulette", False, True),
+    # Teoman, 2026-08-19: katalog SONUNA eklendi (sıra dondurulmuş — görsel
+    # dosya adı ID'ye bağlı). "narrative" sınıfı: dört bileşenin (mvp/damage/
+    # gold/cs_per_min) BİRLEŞİMİdir, kendi başına ölçülebilir bir değeri yoktur
+    # (best_value/best_match hep null kalır — BEST_VALUE_CLASSES dışında).
+    BadgeDef(28, "perfect_quad", "narrative", "valid", True, False),
 )
 
 BADGE_KEYS: tuple[str, ...] = tuple(d.key for d in CATALOG)
 BADGE_DEFS: dict[str, BadgeDef] = {d.key: d for d in CATALOG}
 
-# api_contract §2 "Kademe": yalnız bu 6 rozet kademelidir.
+# api_contract §2 "Kademe": bu 7 rozet kademelidir (6 STANDART + perfect_quad NADİR).
 TIERED_KEYS = frozenset(d.key for d in CATALOG if d.tiered)
 
 # `best_match_id`/`best_value` yalnız ölçülebilir değeri olan sınıflarda.
@@ -127,10 +133,62 @@ KDA_THRESHOLD = 10.0
 MARATHON_MIN_MATCHES = 5
 RELATIONAL_THRESHOLD = 6  # nemesis_6 / duo_6
 
-# Kademe eşikleri (api_contract §2 "Kademe"): oran + en az 8 maç.
-TIER_SILVER_RATE = 0.20
-TIER_GOLD_RATE = 0.32
-TIER_MIN_MATCHES = 8
+# Kademe eşikleri (api_contract §2 "Kademe — ALTI SEVİYE", Teoman revizyonu
+# 2026-08-19: ORAN → KÜMÜLATİF SAYAÇ). Ölçüt artık `count`tur (rozetin kaç kez
+# kazanıldığı) — `rate` SALT BİLGİDİR, kademe hesabına GİRMEZ. `matches_played`
+# şartı KALDIRILDI (sayaç bazlı sistemde gereksiz). `count` ve `tier_best`
+# (ardışık seri) kariyer boyunca yalnız ARTAR — bu yüzden `_tier(count,
+# best_streak)`'in kendisi de monoton artar: kademe kendiliğinden ASLA DÜŞMEZ,
+# ayrı bir "en yüksek kademe" ratchet'i GEREKMEZ.
+#
+# İki eşik ÖLÇEĞİ vardır (rozetin dağılım sıklığına göre): STANDART (her maçta
+# ~1 kez dağılan 6 rozet) ve NADİR (`perfect_quad` gibi seyrek olaylar).
+# DİKKAT: `stellar` bu tablolarda YOKTUR, sayaçla kazanılmaz — tavan `diamond`;
+# `stellar` = diamond sayacı + ayrı bir GÖREV (bkz. STELLAR_QUEST_TARGET ve
+# `_PlayerState.tier_streak/tier_best`, `_tier`, `_stellar_quest`).
+TIER_LEVELS_STANDARD: tuple[tuple[str, int], ...] = (
+    ("bronze", 1),
+    ("silver", 3),
+    ("gold", 5),
+    ("platinum", 8),
+    ("diamond", 12),
+)
+TIER_LEVELS_RARE: tuple[tuple[str, int], ...] = (
+    ("bronze", 1),
+    ("silver", 2),
+    ("gold", 3),
+    ("platinum", 4),
+    ("diamond", 6),
+)
+TIER_SCALE_STANDARD = "standard"
+TIER_SCALE_RARE = "rare"
+
+# Rozet anahtarı → ölçek; yalnız TIERED_KEYS'te anlamlıdır (bkz. `GET /badges`
+# katalogundaki `tier_scale`, kademesizlerde `None`).
+TIER_SCALES: dict[str, str] = {
+    "mvp": TIER_SCALE_STANDARD,
+    "vision": TIER_SCALE_STANDARD,
+    "damage": TIER_SCALE_STANDARD,
+    "cs_per_min": TIER_SCALE_STANDARD,
+    "gold": TIER_SCALE_STANDARD,
+    "role_duel": TIER_SCALE_STANDARD,
+    "perfect_quad": TIER_SCALE_RARE,
+}
+
+STELLAR_TIER = "stellar"
+
+
+def _tier_levels(key: str) -> tuple[tuple[str, int], ...]:
+    """Rozet anahtarına göre eşik tablosu (STANDART varsayılan)."""
+    if TIER_SCALES.get(key) == TIER_SCALE_RARE:
+        return TIER_LEVELS_RARE
+    return TIER_LEVELS_STANDARD
+
+
+# stellar görevi: kademeli 7 rozetten HERHANGİ birinde kariyer boyunca en az bir
+# kez ardışık 3 valid maçta kazanmak (api_contract §2, bench_2 deseniyle
+# tutarlı: kapsam dışı/kazanılmayan maç seriyi kırar — 0'a döner; GERİ ALINMAZ).
+STELLAR_QUEST_TARGET = 3
 
 # `progress` tanımlı sınıflar (kilometre, kimlik, ilişkisel, blok, gambler);
 # maç-anı koşullu sınıflarda (rekor, anlatısal, kişisel, rol) progress YOKTUR.
@@ -169,6 +227,7 @@ class _PlayerState:
         "matches_played", "win_streak", "lose_streak", "bench_streak",
         "roles", "nights", "wins_vs", "wins_with",
         "pr_max", "pr_count", "roulette_winners",
+        "tier_streak", "tier_best",
     )
 
     def __init__(self) -> None:
@@ -188,6 +247,11 @@ class _PlayerState:
         self.pr_max: dict[str, float] = {}  # kişisel rekor metriği → en iyi değer
         self.pr_count: dict[str, int] = {}  # metriği hesaplanabilir maç sayısı
         self.roulette_winners = 0
+        # stellar görevi (kademeli 6 rozet): AÇIK ardışık kazanım serisi ve
+        # kariyerdeki EN UZUN seri (bench_2 deseniyle — kazanılmayan/kapsam dışı
+        # maç 0'a döner). yalnız TIERED_KEYS için doldurulur.
+        self.tier_streak: dict[str, int] = {}
+        self.tier_best: dict[str, int] = {}
 
     def award(self, key: str, match_id: int, value: float | None = None) -> None:
         self.counts[key] = self.counts.get(key, 0) + 1
@@ -543,16 +607,49 @@ def compute_badges(
             perf = row["perf_score"]
 
             # --- Rekor rozetleri (kademeli sınıf) ---
+            tiered_earned: set[str] = set()
             if player_id == mvp_id:
                 st.award("mvp", match_id, perf)
+                tiered_earned.add("mvp")
             for key, winners in leaders.items():
                 if player_id in winners:
                     st.award(key, match_id, records[key][player_id])
+                    tiered_earned.add(key)
 
             # --- Rol sınıfı ---
             ratio = duels.get(player_id)
             if ratio is not None and ratio >= ROLE_DUEL_RATIO:
                 st.award("role_duel", match_id, ratio)
+                tiered_earned.add("role_duel")
+
+            # --- perfect_quad ("Kusursuz Dörtlük"): AYNI maçta mvp + damage +
+            # gold + cs_per_min DÖRDÜ BİRDEN (her biri kendi rozetinin kuralıyla
+            # — mvp tekliği, cs_per_min'in duration_s şartı birebir geçerli).
+            # Dördünden biri bu maçta hesaplanamıyorsa (mvp_id None, ya da
+            # leaders[key] boş/oyuncu içinde değil) rozet YOK.
+            if (
+                player_id == mvp_id
+                and player_id in leaders.get("damage", ())
+                and player_id in leaders.get("gold", ())
+                and player_id in leaders.get("cs_per_min", ())
+            ):
+                st.award("perfect_quad", match_id)
+                tiered_earned.add("perfect_quad")
+
+            # --- stellar görevi: TIERED_KEYS'in her biri için ardışık kazanım
+            # serisi (bench_2 deseniyle — kazanılmayan/kapsam dışı maç 0'a
+            # döner: cs_per_min'de duration_s NULL → `leaders["cs_per_min"]`
+            # boş küme, role_duel'de eksik slot → `ratio` None; ikisi de bu
+            # döngüde doğal olarak "kazanılmadı" sayılır, ek özel durum GEREKMEZ).
+            for tiered_key in TIERED_KEYS:
+                if tiered_key in tiered_earned:
+                    streak = st.tier_streak.get(tiered_key, 0) + 1
+                    st.tier_streak[tiered_key] = streak
+                    if streak > st.tier_best.get(tiered_key, 0):
+                        st.tier_best[tiered_key] = streak
+                else:
+                    st.tier_streak[tiered_key] = 0
+
             position = row["position"]
             if position is not None and perf is not None:
                 prior_best = role_prior_max.get(position)
@@ -681,29 +778,61 @@ def _award_roulette_badges(
 # ---------------------------------------------------------------------------
 # Yanıt katmanı (yuvarlama YALNIZ burada)
 # ---------------------------------------------------------------------------
-def _tier(count: int, rate: float | None, matches_played: int) -> str | None:
-    """bronz/gümüş/altın (api_contract §2 "Kademe"); kazanılmamışsa None.
+def _tier(
+    count: int, levels: tuple[tuple[str, int], ...], best_streak: int = 0
+) -> str | None:
+    """bronze..diamond KÜMÜLATİF SAYAÇLA (`count`), `stellar` GÖREVLE
+    (api_contract §2 "ALTI SEVİYE", Teoman revizyonu 2026-08-19); kazanılmamışsa
+    None. `matches_played` şartı KALDIRILDI — sayaç zaten geriye gitmez, bu
+    yüzden `_tier`in kendisi de `count`/`best_streak` arttıkça monoton artar:
+    kademe hiç DÜŞMEZ, ayrı bir "en yüksek kademe" ratchet'i gerekmez.
 
-    Gümüş ve altın için EK ŞART `matches_played >= 8` — az oynayanın tek
-    rozetle altın olmaması için. Karşılaştırma HAM oranla yapılır.
+    `levels` STANDART ya da NADİR ölçek tablosudur (bkz. `_tier_levels`),
+    ARTAN sırada taranır — son sağlanan eşik kademedir (tavanı `diamond`).
+    `diamond` eşiğine ulaşan VE `best_streak >= STELLAR_QUEST_TARGET` olan
+    oyuncu `stellar`a yükselir; görev de kalıcıdır (geri alınmaz).
     """
-    if count <= 0 or rate is None:
+    if count <= 0:
         return None
-    if matches_played >= TIER_MIN_MATCHES:
-        if rate >= TIER_GOLD_RATE:
-            return "gold"
-        if rate >= TIER_SILVER_RATE:
-            return "silver"
-    return "bronze"
+    tier: str | None = None
+    for name, threshold in levels:
+        if count >= threshold:
+            tier = name
+    if tier == "diamond" and best_streak >= STELLAR_QUEST_TARGET:
+        return STELLAR_TIER
+    return tier
 
 
-def _next_tier_rate(tier: str | None) -> float | None:
-    """Bir üst kademenin eşiği; altındaysa (`gold`) None."""
-    if tier == "gold":
+def _next_tier_count(
+    tier: str | None, levels: tuple[tuple[str, int], ...]
+) -> int | None:
+    """Bir üst kademenin SAYAÇ eşiği; `diamond`/`stellar`da None.
+
+    `diamond`dan sonraki hedef bir sayaç DEĞİL GÖREVDİR (bkz. `stellar_quest`)
+    — bu yüzden SAYAÇ TABLOSU `diamond`'da biter. Kazanılmamış/kilitli rozette
+    (`tier is None`) hedef bronz eşiğidir (`levels[0]`).
+    """
+    if tier is None:
+        return levels[0][1]
+    if tier == STELLAR_TIER:
         return None
-    if tier == "silver":
-        return TIER_GOLD_RATE
-    return TIER_SILVER_RATE  # bronz ya da henüz kazanılmamış
+    names = [name for name, _count in levels]
+    next_idx = names.index(tier) + 1
+    if next_idx >= len(levels):
+        return None
+    return levels[next_idx][1]
+
+
+def _stellar_quest(st: _PlayerState, key: str) -> dict[str, int | bool]:
+    """`stellar_quest` (api_contract §2): kariyerdeki EN UZUN ardışık kazanım
+    serisi ve görev tamamlandı mı — yalnız TIERED_KEYS için anlamlıdır.
+    """
+    best = st.tier_best.get(key, 0)
+    return {
+        "target": STELLAR_QUEST_TARGET,
+        "best": best,
+        "met": best >= STELLAR_QUEST_TARGET,
+    }
 
 
 def _progress(st: _PlayerState, key: str) -> dict[str, int] | None:
@@ -731,16 +860,23 @@ def _progress(st: _PlayerState, key: str) -> dict[str, int] | None:
 
 
 def _badge_entry(st: _PlayerState, definition: BadgeDef) -> dict:
-    """Tek rozetin yanıt kaydı (api_contract §2 örneğiyle birebir alanlar)."""
+    """Tek rozetin yanıt kaydı (api_contract §2 örneğiyle birebir alanlar).
+
+    `rate` (`count / matches_played`) yalnız BİLGİ amaçlıdır — kademe hesabına
+    girmez; kademe `count` (+ `stellar` için ardışık seri) üzerinden belirlenir.
+    """
     key = definition.key
     count = st.count(key)
     best_value = st.best_value.get(key)
-    tier = rate = next_rate = None
+    tier = rate = next_count = stellar_quest = None
     if definition.tiered:
         if st.matches_played > 0:
             rate = count / st.matches_played
-        tier = _tier(count, rate, st.matches_played)
-        next_rate = _next_tier_rate(tier)
+        levels = _tier_levels(key)
+        best_streak = st.tier_best.get(key, 0)
+        tier = _tier(count, levels, best_streak)
+        next_count = _next_tier_count(tier, levels)
+        stellar_quest = _stellar_quest(st, key)
     return {
         "key": key,
         "count": count,
@@ -749,8 +885,9 @@ def _badge_entry(st: _PlayerState, definition: BadgeDef) -> dict:
         "best_value": None if best_value is None else round(best_value, 2),
         "tier": tier,
         "rate": None if rate is None else round(rate, 2),
-        "next_tier_rate": next_rate,
+        "next_tier_count": next_count,
         "progress": _progress(st, key),
+        "stellar_quest": stellar_quest,
     }
 
 
@@ -812,6 +949,7 @@ def badge_catalog(conn: sqlite3.Connection, engine_version: str) -> dict:
                 "class": definition.cls,
                 "source": definition.source,
                 "tiered": definition.tiered,
+                "tier_scale": TIER_SCALES.get(definition.key),
                 "one_time": definition.one_time,
                 "holders": holders,
                 "holders_pct": (

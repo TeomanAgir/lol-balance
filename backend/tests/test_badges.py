@@ -194,9 +194,11 @@ def test_badges_follow_fixed_catalog_order(client, ids, db):
     # GÖREV 24: aynı maç role_duel (perf 2.0 vs rakip TOP 1.0 → oran 2.0) ve
     # kda_10 ((5+5)/max(1,0) = 10) da kazandırır — ikisi de katalog sırasında.
     keys = [b["key"] for b in _badges(client, ids["P0"])]
+    # GÖREV 24 revizyonu: P0 aynı maçta mvp+damage+gold+cs_per_min'in DÖRDÜNÜ de
+    # topluyor → perfect_quad da (katalog SONUNDA, ID 28) birlikte düşer.
     assert keys == [
         "mvp", "vision", "damage", "cs_per_min", "gold", "role_duel",
-        "kda_10", "deathless", "comeback",
+        "kda_10", "deathless", "comeback", "perfect_quad",
     ]
     assert [k for k in BADGE_KEYS if k in keys] == keys
 
@@ -546,14 +548,16 @@ def test_veteran_thresholds_are_independent_with_own_last_match_id(client, ids):
     assert badges["veteran_10"] == {
         "key": "veteran_10", "count": 1, "last_match_id": matches[9],
         "best_match_id": None, "best_value": None,
-        "tier": None, "rate": None, "next_tier_rate": None,
+        "tier": None, "rate": None, "next_tier_count": None,
         "progress": {"current": 20, "target": 10},
+        "stellar_quest": None,
     }
     assert badges["veteran_20"] == {
         "key": "veteran_20", "count": 1, "last_match_id": matches[19],
         "best_match_id": None, "best_value": None,
-        "tier": None, "rate": None, "next_tier_rate": None,
+        "tier": None, "rate": None, "next_tier_count": None,
         "progress": {"current": 20, "target": 20},
+        "stellar_quest": None,
     }
     assert "veteran_25" not in badges
     assert "veteran_50" not in badges

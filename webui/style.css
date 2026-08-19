@@ -15,6 +15,12 @@
   --ok: #4caf7d;
   --display: "Bahnschrift", "Arial Narrow", system-ui, sans-serif;
   --body: system-ui, "Segoe UI", sans-serif;
+  /* --mono: eskiden :root'ta yoktu; profil dışı birkaç kural (rr-score, rift
+     baloncukları vb.) zaten var(--mono) kullanıyordu — o kullanımlar kırılmasın
+     diye nötr/yerel bir yığınla burada bırakıldı. IBM Plex Mono YALNIZ profil
+     kapsamında (#view-profile) tanımlı (Teoman kararı 2026-08-19: yeni fontlar
+     yalnız profil sayfasında kalsın, siteye global uygulanmasın). */
+  --mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
   --sb-w: 200px; /* sol gezinme paneli genişliği (GÖREV 17) */
 }
 
@@ -209,6 +215,22 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 
 /* ── Ana yerleşim ── */
 main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
+/* AÇIK GÖRÜNÜM EKRANIN TAM ORTASINDA (GÖREV 24-fix2, Teoman): sol panel
+   AKIŞTA olduğu için (flex sütunu, 200px) içerik alanı sağa kayıyor ve
+   ortalanmış blok viewport merkezinin sağında duruyordu. Telafi, kabuğun
+   SAĞ UCUNA panel genişliğinde bir boşluk öğesi koymaktır: satır artık
+   panel | içerik | boşluk olarak simetriktir, içerik alanının orta noktası
+   viewport'un tam ortasına denk gelir ve 'margin: 0 auto' bloğu oraya
+   oturtur; sağda panel kadar boşluk kalır (Teoman: "ileride doldurulacak").
+   NEDEN main'e margin DEĞİL: main bir esnek öğedir ve TEK auto margin tüm
+   boş alanı yutar (margin-right: 200px verilse sol auto margin 80px'i
+   tamamen alır, blok 40px sağda kalırdı — ölçüldü). Boşluk öğesi bu tuzağa
+   düşmez, iki auto margin dengede kalır.
+   Kural YALNIZ panelin akışta olduğu genişliklerde geçerlidir — mobilde
+   (<880px) panel çekmeceye dönüp akıştan çıkar, orada telafi UYGULANMAZ. */
+@media (min-width: 880px) {
+  .sb-app::after { content: ""; flex: 0 0 var(--sb-w); }
+}
 .view-hint { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
 
 /* ── Oyuncu kartları (dengeleme) ── */
@@ -270,22 +292,8 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 .rc-matches { font-size: 9px; color: var(--muted); }
 .player-card.selected .rc-score { color: var(--brass); }
 
-/* Geniş yerleşim: sıralama tablosundaki açılır satır */
-.role-strip.long {
-  gap: 6px;
-  margin-top: 0;
-  border-top: 0;
-  padding-top: 0;
-}
-.role-strip.long .role-cell {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 4px;
-}
-.role-strip.long .rc-role { font-size: 10px; text-transform: uppercase; }
-.role-strip.long .rc-score { font-size: 15px; }
-.role-strip.long .rc-matches { font-size: 10px; }
+/* NOT (GÖREV 24): ".role-strip.long" geniş yerleşim varyantı KALDIRILDI —
+   profil artık resmî rol simgeli yay görünümünü kullanıyor (aşağıda "k2-gg"). */
 
 /* ── Yapışkan aksiyon barı ── */
 .action-bar {
@@ -469,65 +477,319 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 }
 .back-btn:hover { color: var(--brass); border-color: var(--brass-dim); }
 
-.prof-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  margin-bottom: 14px;
+/* ══════════════════════════════════════════════════════════════════
+   PROFİL GÖRÜNÜMÜ — K2-2 "Kaidenin İki Yanı" (GÖREV 24 UI turu)
+   Kaynak: Teoman'ın seçtiği konsept dosyası BİREBİR taşındı — ölçüler,
+   gradientler, clamp() değerleri ve media query eşikleri değiştirilmedi.
+   İki bilinçli uyarlama:
+     · ÖNEK: konseptin .hero / .body / .card / .duo / .lbl / .cap / .line /
+       .grid gibi ÇOK GENEL adları mevcut style.css ile çakışıyordu →
+       yerleşim parçaları "k2-" ad alanına alındı. Rozet ve madalyon
+       parçaları mevcut "pb-" ad alanında KALDI (baloncuk davranışı, görsel
+       drop-in hattı ve testler o adlara bağlı); konseptin kuralları birebir
+       o adlara uygulandı.
+     · FONT: konsept Google Fonts (Barlow Condensed / IBM Plex) yüklüyor;
+       proje "harici font yok" kuralında olduğu için punto, ağırlık ve
+       letter-spacing aynen korunup aile eşlemesi YEREL yığınlara yapıldı.
+   ══════════════════════════════════════════════════════════════════ */
+/* Konseptin paletinde olup projede olmayan tokenlar — YALNIZ profil
+   kapsamında tanımlanır, global palet değişmez. */
+/* GÖREV 24-fix2 (Teoman, 2026-08-19): K2-2 konseptinin fontları (Google
+   Fonts'tan yüklenir, link index.html'de) YALNIZ profil sayfasında kalır —
+   siteye global uygulanmaz. Her yığının SONUNDA gerçek yerel yedek vardır —
+   font gelmezse ölçüler eski yığına düşer, sayfa fontsuz kalmaz. Bu üç
+   değişken burada #view-profile içindeki --display/--body/--mono'yu
+   GÖLGELER (:root'takiler eski değerlerinde kalır); .k2-/.ph-/.pl-/.pb-/
+   .tb- vb. tüm profil kuralları zaten var(--display)/var(--body)/
+   var(--mono) üzerinden çalıştığı için başka değişiklik gerekmez. */
+#view-profile {
+  --display: "Barlow Condensed", "Bahnschrift", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  /* <body> zaten font-family: var(--body) taşıyor (eski yığınla) — o değer
+     INHERITED olarak buraya sızar ve açıkça font-family ayarlamayan profil
+     metinleri (ör. .k2-riot) yeni değişkeni değil eski hesaplanmış değeri
+     görür. Bu satır zinciri burada KIRAR: --body artık yerelde IBM Plex Sans
+     olduğu için profil alt ağacındaki tüm dolaylı miras da ona döner. */
+  font-family: var(--body);
+  --surface-3: #1e2c3d;
+  --brass-hi: #e6bd5f;
+  --bronze: #c68a5c;
+  --k2-silver: #cfd8e4;
+  --ink: #14100a;
 }
-.prof-name {
+/* GENİŞLİK: konseptte .hero TAM GENİŞLİK (full-bleed), .hero-in ve .body
+   1240px'e kadar. Profil görünümünde main'in 720px kısıtı kalkar; showView
+   .pa-full'u YALNIZ bu görünümde basar, diğer görünümler etkilenmez. */
+main.pa-full { max-width: none; padding: 0 0 40px; }
+main.pa-full #view-profile > .back-btn { margin: 16px 0 0 20px; }
+
+.k2-lbl {
   font-family: var(--display);
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-.prof-riot { color: var(--muted); font-size: 14px; }
-.prof-score {
-  margin-left: auto;
-  font-family: var(--display);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--brass);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.prof-score span {
   font-size: 11px;
-  font-weight: 400;
-  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin-left: 4px;
+  color: var(--muted);
 }
 
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 10px;
+/* ══════════ kaide ══════════ */
+.k2-hero {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+  background: radial-gradient(125% 95% at 50% 0%, #16283a 0%, var(--bg) 70%);
 }
-.stat-card {
+.k2-hero-in { max-width: 1240px; margin: 0 auto; padding: 26px 20px 0; }
+.k2-cap { text-align: center; }
+.k2-cap .k2-lbl { display: block; margin-bottom: 6px; }
+.k2-cap-nm {
+  font-family: var(--display);
+  font-size: clamp(30px, 6vw, 52px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+  text-wrap: balance;
+}
+.k2-riot { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
+/* PUAN HİZALAMASI (GÖREV 24-fix2, Teoman): "18.5" kaidenin TAM ORTASINDA
+   durur, birim ("PUAN") onun sağına doğru uzayan bir ek olur ve merkezlemeyi
+   BOZMAZ. Teknik: birim sıfır genişlikli bir esnek öğedir (flex: 0 0 0;
+   width: 0) ve taşması görünür kalır — ana eksende yer kaplamadığı için
+   sayının merkezi basamak sayısından (7.9 / 18.5 / 118.5) BAĞIMSIZDIR;
+   align-items: baseline sayesinde taban hizası da korunur (mutlak
+   konumlandırma gerekmez, taban hizası elle ayarlanmaz). */
+.k2-cap-sc { display: flex; align-items: baseline; justify-content: center; margin-top: 8px; }
+.k2-cap-sc b {
+  font-family: var(--mono);
+  font-size: clamp(34px, 7vw, 50px);
+  font-weight: 600;
+  color: var(--brass-hi);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.k2-cap-sc .k2-sc-u {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  padding-left: 9px;
+  overflow: visible;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* Puanın ALTINDA engine/formül satırı YOKTUR (Teoman düzeltmesi 1):
+   konseptteki .cap-eng bilinçli olarak taşınmadı. */
+
+/* Göstergeler: kaidenin İKİ YANINDA, aynaya bakan rakam blokları. */
+.k2-stage {
+  display: grid;
+  grid-template-columns: minmax(132px, 186px) minmax(0, 1fr) minmax(132px, 186px);
+  gap: 10px 24px;
+  align-items: center;
+  padding: 18px 0 22px;
+}
+.k2-nbs { display: grid; min-width: 0; }
+.k2-nbs-l { text-align: right; }
+.k2-nb { padding: 10px 0; min-width: 0; }
+.k2-nb + .k2-nb { border-top: 1px solid var(--line); }
+.k2-nb .k2-lbl { display: block; font-size: 10px; letter-spacing: 0.13em; margin-bottom: 1px; }
+.k2-nb-v {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 27px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  min-width: 0;
+}
+.k2-nbs-l .k2-nb-v { justify-content: flex-end; }
+.k2-nb-v small {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.k2-nb-v .k2-g { color: var(--ok); }
+.k2-nb-v .k2-m { color: var(--red); }
+.k2-nb-v .k2-sep { color: var(--line); font-weight: 400; }
+.k2-nb-v .k2-txt {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+/* Şampiyon adı büyük harfe çevrilmez: Türkçe eşlemede "Diana" → "DİANA" olurdu. */
+.k2-nb-v .k2-txt.k2-name { text-transform: none; letter-spacing: 0.01em; }
+/* Rol simgesi: konseptin çizimi DEĞİL, projenin resmî pos-ico varlığı. */
+.k2-nb-ico { --pos-ico: 24px; align-self: center; color: var(--brass-hi); }
+
+/* Kaidenin zemin çizgisi. */
+.k2-floor {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass-dim) 22%,
+              var(--brass) 50%, var(--brass-dim) 78%, transparent);
+}
+
+@media (max-width: 900px) {
+  .k2-hero-in { padding: 22px 14px 0; }
+  .k2-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; padding: 16px 0 18px; }
+  .pb-plinth { grid-column: 1 / -1; order: -1; margin-bottom: 16px; }
+  .k2-nbs-l { text-align: left; }
+  .k2-nbs-l .k2-nb-v { justify-content: flex-start; }
+  .k2-nb-v { font-size: 22px; }
+  .k2-nb-v .k2-txt { font-size: 24px; }
+  main.pa-full #view-profile > .back-btn { margin: 12px 0 0 14px; }
+}
+/* Konseptte olmayan tek ek eşik: 420px'de rakam bloğunun alt yazısı
+   (k/d/a, "14 maç") sayının ALTINA düşer, yoksa satır taşardı. */
+@media (max-width: 420px) {
+  .k2-nb-v { flex-wrap: wrap; gap: 0 6px; }
+  .k2-nb-v small { flex: 1 0 100%; }
+}
+
+/* ══════════ gövde ══════════ */
+.k2-body { max-width: 1240px; margin: 0 auto; padding: 24px 20px 70px; }
+.k2-sec { margin-bottom: 26px; }
+.k2-sec-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--brass-dim);
+}
+.k2-sec-hd h3 {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.k2-note { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: right; }
+@media (max-width: 620px) {
+  .k2-sec-hd { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .k2-note { text-align: left; }
+}
+.k2-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px); gap: 18px; }
+.k2-duo-solo { grid-template-columns: minmax(0, 1fr); }
+.k2-card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 14px 16px 16px;
+  min-width: 0;
 }
-.sc-title {
+.k2-card-accent { border-color: var(--brass-dim); }
+.k2-card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+@media (max-width: 900px) {
+  .k2-duo { grid-template-columns: minmax(0, 1fr); }
+  .k2-body { padding: 20px 14px 60px; }
+}
+
+/* ── Rol yayları: simge ortada, dolgu yayı çevrede ──
+   Simge konseptin çizimi DEĞİL, ortak posIconHtml varlığıdır (Teoman
+   düzeltmesi 2); ölçüler ve %46'lık oran konseptten birebir. */
+.k2-gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 12px 8px; }
+.k2-gg { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; min-width: 0; }
+.k2-gg-w { position: relative; width: clamp(62px, 18vw, 78px); aspect-ratio: 1; }
+.k2-gg-svg { display: block; width: 100%; height: 100%; }
+.k2-gg-svg .k2-g-bg { fill: none; stroke: var(--line); stroke-width: 6; stroke-linecap: round; }
+.k2-gg-svg .k2-g-fg { fill: none; stroke: var(--brass); stroke-width: 6; stroke-linecap: round; }
+.k2-gg.k2-off .k2-gg-svg .k2-g-fg { stroke: transparent; }
+.k2-gg-ic { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+/* Simge çizilemezse (varlık indirilmemiş / mask desteklenmiyor) buradaki
+   ETİKET METNİ görünür kalır — kutu hiçbir hâlde boş kalmaz. */
+.k2-gg-ic .k2-ri {
+  --pos-ico: 36px;
+  color: var(--brass-hi);
   font-family: var(--display);
   font-size: 11px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
-.sc-main { font-size: 18px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.sc-sub { font-size: 13px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.k2-gg.k2-off .k2-gg-ic .k2-ri { color: var(--muted); opacity: 0.42; }
+.k2-gg-v { font-family: var(--mono); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.k2-gg.k2-off .k2-gg-v { color: var(--muted); opacity: 0.6; }
+.k2-gg-n { font-family: var(--mono); font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.k2-role-foot {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
 
-/* Favori eşya kartı (GÖREV 14) — şeritteki diğer kartlarla aynı gövde, tek fark
-   adın yanındaki eşya ikonu (varlık yoksa yer tutucu kutu). */
-.fi-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.fi-card .dd-ico { flex: 0 0 auto; width: 28px; height: 28px; }
-.fi-name { margin-top: 0; min-width: 0; font-size: 16px; overflow-wrap: anywhere; }
+/* ══════════ sinerji ══════════ */
+.k2-syn { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.k2-syn-c {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--brass);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 14px;
+}
+.k2-syn-d {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--brass-hi);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.k2-syn-nm { display: block; font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k2-syn-m { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Kuyruğun altındaki kural notu (konseptteki .gate). */
+.k2-gate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-left: 2px solid var(--brass-dim);
+  padding: 2px 0 2px 11px;
+  margin-top: 18px;
+}
+
+/* NOT (GÖREV 24): .stat-grid / .stat-card / .sc-* kuralları KALDIRILDI —
+   profil K2-2 konseptinin .k2-card diline geçti, gösterge kartları kaidenin
+   rakam bloklarına dönüştü ve bu sınıfları kullanan başka görünüm yok. */
+
+/* Favori eşya kartı (GÖREV 14) — konseptin .card dilinde; tek fark adın
+   yanındaki eşya ikonu (varlık yoksa yer tutucu kutu). */
+.fi-row { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.fi-card .dd-ico { flex: 0 0 auto; width: 32px; height: 32px; }
+.fi-name { min-width: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.fi-sub { margin-top: 6px; }
 
 .prof-section { margin-top: 18px; }
 .ps-title {
@@ -567,32 +829,37 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
    Grafik satır içi SVG'dir ve viewBox ile kapsayıcıya oranlı ölçeklenir; eksen
    yazıları SVG'de değil bu HTML katmanındadır (ölçeklenip küçülmesinler diye).
    Y ekseni solda sabit genişlikte bir oluk, X ekseni grafiğin altında. */
-.ph-ranges { display: flex; gap: 6px; margin-bottom: 10px; }
+.ph-ranges { display: flex; gap: 6px; flex-wrap: wrap; }
 .ph-pill {
-  font-size: 12px;
-  padding: 8px 14px;
-  min-height: 40px;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s;
-}
-.ph-pill:hover { color: var(--brass); border-color: var(--brass-dim); }
-.ph-pill.active {
-  color: var(--brass);
-  border-color: var(--brass);
-  background: var(--surface-2);
+  min-height: 30px;
+  padding: 0 12px;
+  font-family: var(--display);
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  transition: color 0.14s, border-color 0.14s, background-color 0.14s;
 }
+.ph-pill:hover { color: var(--text); border-color: var(--brass-dim); }
+.ph-pill.active { color: var(--ink); background: var(--brass); border-color: var(--brass); }
+/* Konseptin 30px'lik düğmesi masaüstünde birebir korunur; dokunmatik ekranda
+   projenin 40px'lik hedef kuralı geçerli kalır (aşağıdaki dar ekran bloğu). */
+@media (max-width: 620px) { .ph-pill { min-height: 40px; } }
+/* Grafik notu (konsept: #chartNote) — "22 maç · Tümü". */
+.ph-note { display: block; margin: -6px 0 10px; }
 
 .ph-chart { display: flex; align-items: stretch; }
-.ph-yaxis { flex: 0 0 38px; position: relative; }
+.ph-yaxis { flex: 0 0 34px; position: relative; }
 .ph-ytick {
   position: absolute;
-  right: 6px;
+  right: 0;
   transform: translateY(-50%);
-  font-size: 11px;
+  font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -602,13 +869,14 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 .ph-xaxis {
   display: flex;
   justify-content: space-between;
-  margin: 2px 0 0 38px;
-  font-size: 11px;
+  margin: 4px 0 0 34px;
+  font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--muted);
 }
 
 .ph-grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.55; }
-.ph-area { fill: var(--brass); opacity: 0.10; }
+.ph-area { fill: var(--brass); opacity: 0.09; }
 .ph-line {
   fill: none;
   stroke: var(--brass);
@@ -621,11 +889,26 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 .ph-dot { stroke: var(--bg); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .ph-dot.win { fill: var(--blue); }
 .ph-dot.loss { fill: var(--red); }
-.ph-dot.last { stroke: var(--brass); stroke-width: 2.4; }
+.ph-dot.last { fill: var(--brass-hi); stroke: var(--brass-hi); stroke-width: 2.2; }
 /* Dokunma hedefi: noktadan büyük, saydam daire (≈18px @320px ekran). */
 .ph-hit { fill: transparent; cursor: pointer; outline: none; }
 .ph-hit:hover { fill: rgba(200, 161, 90, 0.10); }
 .ph-hit:focus-visible { fill: rgba(200, 161, 90, 0.16); stroke: var(--brass); stroke-width: 2; }
+
+/* Gösterge satırı (konsept: .ph-key) — nokta renklerinin metin karşılığı. */
+.ph-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ph-key span { display: inline-flex; align-items: center; gap: 6px; }
+.ph-key b { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.ph-k-w { background: var(--blue); }
+.ph-k-l { background: var(--red); }
+.ph-k-n { background: var(--brass-hi); }
 
 .ph-pop {
   position: absolute;
@@ -636,12 +919,12 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   text-align: left;
   width: max-content;
   max-width: min(210px, 100%);
-  background: var(--surface-2);
+  background: var(--surface-3);
   border: 1px solid var(--brass-dim);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  padding: 9px 11px 10px;
+  font-size: 12.5px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
 }
 .ph-pop.above { transform: translate(-50%, -100%); margin-top: -12px; }
 .ph-pop.below { transform: translate(-50%, 0); margin-top: 12px; }
@@ -672,50 +955,39 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 }
 .ph-pop-hint { color: var(--muted); font-size: 10px; margin-top: 2px; }
 
-/* ── Rozet vitrini (GÖREV 11+12) — "pb-" öneki profil rozetlerine aittir ──
-   Kartçık ızgarası dar ekranda sarar (320px'de 2 sütun, geniş ekranda 6).
-   İkon satır içi SVG'dir ve rengini currentColor ile kartçıktan alır; renk tek
-   başına anlam taşımaz, rozet adı her kartçıkta yazılıdır. */
-.pb-summary {
-  font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  margin: -4px 0 8px;
-}
-.pb-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 8px;
-}
-/* Kartçık sarmalayıcı (GÖREV 24): "en iyi maça git" çipi düğmenin İÇİNDE
-   olamaz (button içinde button geçersizdir), bu yüzden ızgara hücresi bir
-   div'dir; düğme hücreyi tamamen doldurur, çip köşeye biner. */
-.pb-cell { position: relative; display: flex; }
+/* ── Rozetler ve madalyon (GÖREV 11+12; form GÖREV 24'te K2-2'den taşındı) ──
+   "pb-" öneki profil rozetlerine aittir. Madalyon SEKİZGEN PLAKADIR (konseptin
+   .medal bileşeni birebir): plaka + merkeze giden faset çizgileri + iç halka +
+   ortada rozetin simgesi. Renk tek başına anlam taşımaz — ad ve kademe her
+   madalyonun altında yazılıdır, aynı bilgi .pb-sr ile ekran okuyucuya da gider.
+   Kuyruk konseptteki .tail'dir: kart değil, 88px'lik madalyon sütunları. */
+.pb-grid { display: flex; flex-wrap: wrap; gap: 16px 20px; }
+/* Hücre sarmalayıcı: "en iyi maça git" çipi düğmenin İÇİNDE olamaz (button
+   içinde button geçersizdir), bu yüzden hücre bir div'dir; çip köşeye biner. */
+.pb-cell { position: relative; display: flex; flex-direction: column; align-items: center; width: 88px; }
 .pb-card {
   position: relative;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-height: 92px;
-  padding: 10px 6px;
+  gap: 5px;
+  padding: 0;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: none;
+  border: 0;
   border-radius: 10px;
-  transition: border-color 0.15s;
 }
-.pb-card:hover { border-color: var(--brass-dim); }
-/* Madalyon yuvası: SVG simge ALTTA her zaman durur, görsel (varsa) ÜSTÜNE
-   biner — dosya yoksa img kaldırılır ve simge görünür kalır (GÖREV 24). */
+/* Madalyon yuvası: SVG plaka ALTTA her zaman durur, gerçek görsel (varsa)
+   ÜSTÜNE biner — dosya yoksa img kaldırılır ve plaka görünür kalır. */
+.pb-glow { position: relative; display: block; }
 .pb-medal {
   position: relative;
-  width: 36px;
-  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 52px;
+  height: 52px;
 }
 .pb-img {
   position: absolute;
@@ -727,79 +999,213 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 }
 .pb-medal.pb-has-img .pb-img { opacity: 1; }
 .pb-medal.pb-has-img .pb-icon { visibility: hidden; }
-.pb-icon {
-  width: 28px;
-  height: 28px;
-  color: var(--brass-dim);
+/* Madalyonun kendisi (konsept: .medal, 512×512 viewBox). */
+.pb-icon { display: block; width: 100%; height: 100%; color: var(--pb-tint, var(--brass)); }
+.pb-plate { fill: var(--surface-2); stroke: var(--pb-edge, var(--brass-dim)); stroke-width: 10; }
+.pb-facet { fill: none; stroke: var(--line); stroke-width: 5; opacity: 0.6; }
+.pb-ring { fill: none; stroke: var(--pb-edge, var(--brass-dim)); stroke-width: 5; opacity: 0.5; }
+/* Simge yolları 24'lük kutuda çizilidir ve 9.17 ile ölçeklenir; 1.84 × 9.17
+   ≈ 16.9 → konseptin .gl kalınlığıyla (6.5 × 2.6) birebir aynı. */
+.pb-gl {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.84;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.pb-icon .pb-fill { fill: currentColor; stroke: none; }
+.pb-gl .pb-fill { fill: currentColor; stroke: none; }
 .pb-name {
   font-family: var(--display);
-  font-size: 11px;
-  line-height: 1.25;
-  letter-spacing: 0.06em;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
-/* margin-top: auto → ad iki satıra sarsa bile ×N satırı kartçığın DİBİNE oturur,
-   satırdaki kartçıklarda aynı hizada kalır. */
-.pb-count {
-  margin-top: auto;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--brass);
-  font-variant-numeric: tabular-nums;
-}
-/* "Sonsuz Bench" / "Kara Seri" espridir, kıracak bir vurgusu yoktur: nötr gri. */
-.pb-bench .pb-icon, .pb-bench .pb-name, .pb-bench .pb-count { color: var(--muted); }
-
-/* ── Kademe: bronz / gümüş / altın (GÖREV 24) ──
-   AYRI GÖRSEL YOKTUR (Teoman kararı): kademe ayrımı ÇERÇEVE + IŞIMA + küçük
-   ETİKET ile verilir; madalyon görseli her kademede aynıdır. Renk tek başına
-   anlam taşımaz — etiket metni (Bronz/Gümüş/Altın) kartçıkta yazılıdır. */
+.pb-card:hover .pb-name { color: var(--brass-hi); }
+/* Kademe adı: renkli pill DEĞİL, madalyonun altında sakin metin (Teoman
+   düzeltmesi 4); renk kademeden gelir. */
 .pb-tier {
   font-family: var(--display);
-  font-size: 9px;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  padding: 1px 5px;
-  border: 1px solid currentColor;
+  color: var(--pb-tint, var(--muted));
+}
+/* "Sonsuz Bench" / "Kara Seri" espridir, kıracak bir vurgusu yoktur: nötr gri. */
+.pb-bench { --pb-tint: var(--muted); --pb-edge: var(--line); }
+.pb-bench .pb-name { color: var(--muted); }
+
+/* ── ÇARPAN MADENİ (konsept: .coin) ──
+   Madalyonun sağ alt köşesinden DIŞA taşan yuvarlak pirinç sayaç: rakam
+   uzaktan okunur (Teoman'ın açık isteği) ve madalyonun kimliğiyle yarışmaz
+   çünkü ayrı bir katmandır. Plakanın DIŞINA taşırılır ki gerçek PNG geldiğinde
+   resmin üstünü kapatmasın, yalnız köşesine değsin. */
+.pb-coin {
+  position: absolute;
+  right: -15%;
+  bottom: -11%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: clamp(28px, 7.4vw, 52px);
+  height: clamp(28px, 7.4vw, 52px);
+  padding: 0 4px;
   border-radius: 999px;
-  color: var(--muted);
+  background: var(--bg);
+  border: 2px solid var(--pb-edge, var(--brass-hi));
+  box-shadow: 0 0 0 3px var(--bg), 0 3px 12px rgba(0, 0, 0, 0.6);
 }
-.pb-t-bronze { border-color: #b3764a; box-shadow: 0 0 10px -3px #b3764a80; }
-.pb-t-bronze .pb-icon, .pb-t-bronze .pb-tier { color: #c68a5c; }
-.pb-t-silver {
-  background: var(--surface-2);
-  border-color: #b9c3d1;
-  box-shadow: 0 0 10px -2px #b9c3d180;
+.pb-coin i {
+  font-style: normal;
+  font-family: var(--display);
+  font-size: clamp(11px, 2.6vw, 16px);
+  font-weight: 700;
+  color: var(--brass);
+  align-self: center;
 }
-.pb-t-silver .pb-icon, .pb-t-silver .pb-tier, .pb-t-silver .pb-name { color: #cfd8e4; }
-.pb-t-gold {
-  background: var(--surface-2);
-  border-color: var(--brass);
-  box-shadow: 0 0 12px -2px #e6bd5f8c;
+.pb-coin b {
+  font-family: var(--display);
+  font-size: clamp(17px, 4.6vw, 32px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--pb-tint, var(--brass-hi));
+  font-variant-numeric: tabular-nums;
 }
-.pb-t-gold .pb-icon, .pb-t-gold .pb-tier, .pb-t-gold .pb-name { color: #e6bd5f; }
+/* Kuyruktaki maden madalyonla birlikte küçülür (konsept: .tb .medal 52px). */
+.pb-cell .pb-coin { min-width: 24px; height: 24px; padding: 0 3px; border-width: 1.5px; box-shadow: 0 0 0 2px var(--bg); }
+.pb-cell .pb-coin i { font-size: 10px; }
+.pb-cell .pb-coin b { font-size: 14px; }
+
+/* ── Vitrin: kaidenin ortasındaki 3 büyük rozet (konsept: .plinth) ──
+   Sıra etiketi ("EN NADİR 1/2/3") ve nadirlik yüzdesi/çubuğu YOKTUR (Teoman
+   düzeltmeleri 3-4). DOM sırası RÜTBE sırasıdır (ekran okuyucu 1-2-3 duyar);
+   en iyisinin ORTADA ve YÜKSELTİLMİŞ durması yalnız order + transform işidir. */
+.pb-plinth {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(6px, 3vw, 40px);
+}
+.pb-big-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 224px;
+}
+.pb-big-cell:nth-child(1) { order: 2; transform: translateY(-12px); }
+.pb-big-cell:nth-child(2) { order: 1; }
+.pb-big-cell:nth-child(3) { order: 3; }
+.pb-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  text-align: center;
+  background: none;
+  border: 0;
+}
+/* Madalyonun arkasındaki ışıma (konsept: .pl-glow::before) — kademe rengini alır. */
+.pb-plinth .pb-glow::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--pb-glow, #c8a15a42) 0%, transparent 66%);
+  pointer-events: none;
+}
+.pb-plinth .pb-medal { width: clamp(58px, 16vw, 116px); height: clamp(58px, 16vw, 116px); }
+.pb-big-cell:nth-child(1) .pb-medal { width: clamp(70px, 20vw, 142px); height: clamp(70px, 20vw, 142px); }
+.pb-big .pb-name { font-size: clamp(12px, 2.9vw, 19px); margin-top: 14px; line-height: 1.12; }
+.pb-big .pb-tier { font-size: clamp(9px, 2.2vw, 10px); margin-top: 3px; }
+.pb-big .pb-sr { position: absolute; }
+
+/* ── Kademe: ALTI SEVİYE (GÖREV 24; 3→6, Teoman 2026-08-19) ──
+   AYRI GÖRSEL YOKTUR (Teoman kararı): kademe ayrımı madalyonun KENARI +
+   ARKASINDAKİ IŞIMA + altındaki sakin ETİKET METNİ ile verilir; madalyon
+   görseli her kademede aynıdır. Renk tek başına anlam taşımaz — kademe adı
+   (Bronz/…/Stellar) madalyonun altında yazılıdır ve .pb-sr ile ekran
+   okuyucuya da gider. Palet LoL kademe renklerine yakın: bronz bakır, gümüş
+   soğuk gri, altın pirinç, platin buzlu turkuaz-beyaz, elmas parlak açık mavi.
+   Her kademe YALNIZCA üç değişken atar; plaka/halka/simge/metin/maden bu
+   değişkenleri okur (tek yerden renklenir). `stellar` AYRICALIKLI (aşağıda). */
+.pb-t-bronze   { --pb-tint: #c68a5c; --pb-edge: #b3764a; --pb-glow: #c68a5c42; }
+.pb-t-silver   { --pb-tint: #cfd8e4; --pb-edge: #b9c3d1; --pb-glow: #cfd8e442; }
+.pb-t-gold     { --pb-tint: #e6bd5f; --pb-edge: var(--brass); --pb-glow: #e6bd5f4a; }
+.pb-t-platinum { --pb-tint: #b7ece3; --pb-edge: #7fd6c8; --pb-glow: #a8e6dc4a; }
+.pb-t-diamond  { --pb-tint: #bfe3ff; --pb-edge: #7ec4ff; --pb-glow: #8fd0ff55; }
+.pb-t-stellar  { --pb-tint: #f2f6ff; --pb-edge: #cbb8ff; --pb-glow: #cbb8ff55; }
+/* Üst kademelerde plaka biraz daha "dolu" görünür (iç dolgu koyulaşır). */
+.pb-t-platinum .pb-plate { fill: #1b2f34; }
+.pb-t-diamond .pb-plate { fill: #182d47; }
+.pb-t-stellar .pb-plate { fill: #232a45; }
+
+/* ── STELLAR: ayrıcalıklı çerçeve (Teoman düzeltmesi 5; fix2 ile revize) ──
+   Referans Clash Royale'in en nadir kart çerçevesi: gökkuşağı + parlak metal,
+   "CD'nin arkasındaki ışık kırınımı" hissi.
+   [REVİZE — Teoman, fix2] Madalyonun DIŞINDA dönen ekstra halka KALDIRILDI:
+   komşu bileşenlerin kutusuna giriyordu. Stellar rozetin ŞEKLİ artık diğer
+   kademelerle BİREBİR AYNIDIR (aynı sekizgen plaka, aynı ışıma kutusu); kırınım
+   efekti madalyonun KENDİ yüzeyinde kalır — conic-gradient, plakanın sekizgen
+   geometrisine `clip-path` ile kırpılır (yüzdeler plaka yolunun 512'lik
+   koordinatlarından türetildi: 256/512 = %50, 418/512 = %81.6 …), yani
+   madalyonun sınırlarını AŞMAZ.
+   Açı @property ile animasyona girer. İki emniyet:
+     · @property desteklenmiyorsa açı sabit kalır → kırınım STATİK gökkuşağı
+       olarak durur (his kaybolmaz),
+     · prefers-reduced-motion'da dosyanın sonundaki global `animation: none`
+       animasyonu durdurur; gradient yine yerinde kalır. */
+@property --pb-turn {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.pb-t-stellar .pb-medal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 4.3%, 81.6% 18.8%, 96.1% 50.4%, 81.6% 82%,
+                     50% 96.5%, 18.4% 82%, 3.9% 50.4%, 18.4% 18.8%);
+  background: conic-gradient(from var(--pb-turn),
+    #ff6b8b, #ffb86b, #f7ff7a, #6cffab, #56d8ff, #8f7bff, #ff7bd5, #ff6b8b);
+  opacity: 0.3;
+  animation: pb-stellar-turn 7s linear infinite;
+  pointer-events: none;
+}
+/* Parlak metal: plakanın üstünde duran ince ışık bandı (statikte de kalır). */
+.pb-t-stellar .pb-medal::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  background: linear-gradient(115deg, transparent 34%, #ffffff1c 48%,
+              #ffffff3d 52%, transparent 66%);
+  pointer-events: none;
+}
+/* Simge kırınımın ÜSTÜNDE kalır (madalyonun kimliği okunur olmalı). */
+.pb-t-stellar .pb-icon { position: relative; z-index: 1; }
+@keyframes pb-stellar-turn { to { --pb-turn: 360deg; } }
 
 /* ── Kilitli rozet (include_locked=true, GÖREV 24) ──
    Kazanılmışlardan SONRA gelir (sıra app.js'te) ve görsel olarak ayrışır:
-   kesikli çerçeve + soluk. Kilitliliğin metin karşılığı .pb-sr'dedir. */
-.pb-locked {
-  background: transparent;
-  border-style: dashed;
-  opacity: 0.55;
-}
-.pb-locked .pb-icon, .pb-locked .pb-name { color: var(--muted); }
-.pb-locked:hover { opacity: 0.8; }
-/* İlerleme: ince bar + "17/20" — kartçığın DİBİNE oturur (pb-count deseni). */
+   konseptteki .medal.t-locked gibi plaka BOŞ + KESİKLİ çerçeve, faset ve halka
+   yok, simge soluk. Kilitliliğin metin karşılığı .pb-sr'dedir. */
+.pb-locked { --pb-tint: var(--muted); --pb-edge: var(--line); opacity: 0.62; }
+.pb-locked .pb-plate { fill: transparent; stroke-dasharray: 22 14; }
+.pb-locked .pb-facet, .pb-locked .pb-ring { display: none; }
+.pb-locked .pb-name { color: var(--muted); }
+.pb-locked:hover { opacity: 0.85; }
+/* İlerleme: ince bar + "17/20" — madalyonun altında, konseptin .tb-bar deseni. */
 .pb-prog {
-  margin-top: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -815,28 +1221,29 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 }
 .pb-bar-fill { display: block; height: 100%; background: var(--brass-dim); }
 .pb-prog-txt {
-  font-size: 11px;
+  font-family: var(--mono);
+  font-size: 11.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* "En iyi an" çipi: best_match_id varsa kartçığın sağ üst köşesinde küçük bir
-   düğme — o maçın detayına gider (maç detayı atlama deseni). */
+/* "En iyi an" bağlantısı: best_match_id varsa sütunun ALTINDA küçük bir
+   satır — o maçın detayına gider (maç detayı atlama deseni). Konseptte
+   madalyonun köşesinde yüzen bir çip yoktur; bu satır nadirlik yüzdesinin
+   kaldırılmasıyla boşalan yere oturur. */
 .pb-go {
-  position: absolute;
-  z-index: 2;
-  top: 3px;
-  right: 3px;
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 15px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--muted);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  padding: 5px 6px;
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--brass-dim);
   font-variant-numeric: tabular-nums;
 }
-.pb-go:hover { color: var(--brass); border-color: var(--brass-dim); }
+.pb-go:hover { color: var(--brass-hi); border-bottom-color: var(--brass-hi); }
+.pb-big-cell .pb-go { font-size: 11.5px; margin-top: 2px; }
 
 /* Ekran okuyucu metni: açıklama + kaç kez + son maç düğmenin adına girer,
    böylece görsel tooltip'e (aria-hidden) bağımlılık kalmaz. */
@@ -860,21 +1267,35 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   flex-direction: column;
   gap: 2px;
   width: max-content;
-  max-width: 190px;
-  padding: 8px 10px;
+  max-width: 208px;
+  padding: 9px 11px 10px;
   text-align: left;
   font-family: var(--body);
-  font-size: 12px;
+  font-size: 12.5px;
   letter-spacing: 0;
   text-transform: none;
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface-3);
   border: 1px solid var(--brass-dim);
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
   pointer-events: none;   /* kutu kendisi tıklama hedefi değildir */
 }
 .pb-tip-last { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Baloncuk başlığı (GÖREV 24 düzeltme 6): rozet adı + çarpan. Vitrindeki büyük
+   madalyonda ad kartın üstünde küçük yazıyor; baloncuk onu tam boyda yineler. */
+.pb-tip-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 1px;
+}
+.pb-tip-nm { font-weight: 600; }
+.pb-tip-x { color: var(--brass); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Vitrindeki baloncuk madalyonun ALTINA açılır; kaide dar olduğu için kutu
+   madalyondan geniştir, app.js kenar taşmasını ölçüp içeri çeker. */
+.pb-plinth .pb-tip { max-width: min(230px, 78vw); }
 
 /* ── Haftanın enleri (GÖREV 2) ── */
 .hl-window {
@@ -3219,6 +3640,12 @@ main.pa-wide { max-width: 1080px; }
   font-size: 15px;
   padding: 8px 10px;
   min-height: 40px;
+}
+
+/* Çok dar ekran: vitrin madalyonu ve çarpan madeni küçülür (konseptin
+   clamp() değerleri zaten ölçekliyor; buradaki tek ek kart genişliğidir). */
+@media (max-width: 420px) {
+  .pb-big-cell { max-width: none; }
 }
 
 /* ── Geniş ekran ── */

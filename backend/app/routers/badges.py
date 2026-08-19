@@ -18,7 +18,7 @@ def badge_catalog_list(
     conn: sqlite3.Connection = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BadgeCatalogOut:
-    """27 rozetlik katalog + `holders` nadirliği (api_contract §2).
+    """28 rozetlik katalog + `holders` nadirliği (api_contract §2).
 
     SALT-OKUR: DB'ye yazmaz, rating'e dokunmaz. Maliyet global'dir (tüm
     oyuncuların rozetleri toplanır) ama tek toplu geçişle hesaplanır

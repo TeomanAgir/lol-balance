@@ -10,6 +10,15 @@
      çoğu düğüm burada boştur. Marka adı "LoL Balance" çevrilmez ama <title>
      yine sözlükten geçer. -->
 <title data-i18n="common.app_title">LoL Balance</title>
+<!-- Yazı tipleri (GÖREV 24-fix2, Teoman kararı: "harici font yok" kuralı BU İŞ
+     İÇİN gevşetildi): K2-2 konseptinin aileleri gerçekten yüklenir. preconnect
+     el sıkışmayı öne alır, display=swap ilk boyamayı bloklamaz. Ağ/CDN
+     erişilemezse hiçbir şey bozulmaz: her değişkende GERÇEK yerel yığın vardır
+     (--display → Bahnschrift/Arial Narrow, --body → system-ui/Segoe UI,
+     --mono → ui-monospace/Cascadia/Consolas), yani site fontsuz kalmaz. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -392,7 +401,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" }; // USE_MOCK: true -> mock_api.js (lokal gelistirme)</script>
+<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" }; // USE_MOCK: false -> mock_api.js (lokal gelistirme)</script>
 <script src="mock_api.js"></script>
 <!-- i18n yükleme sırası contract geregi: tr.js, en.js, core.js, sonra app.js -->
 <script src="i18n/tr.js"></script>

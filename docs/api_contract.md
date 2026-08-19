@@ -213,7 +213,9 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   `mvp, vision, damage, cs_per_min, gold, role_duel, role_record, pr_perf, pr_damage,
   kill_20, kda_10, deathless, comeback, tragic_hero, marathon_5, win_streak_3,
   lose_streak_3, bench_2, nemesis_6, duo_6, versatile, veteran_10, veteran_20,
-  veteran_50, roulette_complete, roulette_winner, gambler` (27 rozet).
+  veteran_50, roulette_complete, roulette_winner, gambler, perfect_quad` (28 rozet).
+  NOT: `perfect_quad` katalog SONUNA eklenmiştir (ID 28) — sıra dondurulmuş olduğu için
+  yeni rozet araya girmez, sona eklenir (görsel dosya adları ID'ye bağlı).
 - **Varsayılan yanıt DEĞİŞMEZ anlamda kalır:** `include_locked=false` (varsayılan) iken
   yalnız `count > 0` rozetler döner. `include_locked=true` iken katalogdaki TÜM anahtarlar
   döner (`count: 0` olanlar dahil) — kilitli rozetin ilerlemesini göstermek için. Bilinmeyen
@@ -259,6 +261,16 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   2 maç bloğu 1 rozet (ayrık bloklar). Karşılaştırılabilirlik: kendi takımının
   5 oyuncusunun da perf'i non-null olmalıdır; karşılaştırılamayan maç seriyi KIRAR.
   En düşükte eşitlik varsa o maç bench SAYILMAZ ve seriyi kırar (kırılım uygulanmaz).
+- **perfect_quad** ("Kusursuz Dörtlük", Teoman 2026-08-19, KADEMELİ — NADİR ölçek):
+  oyuncu AYNI MAÇTA dört şeyi birden yaparsa 1 rozet: maçın MVP'si olmak + maçın en yüksek
+  şampiyon hasarı + maçın en çok gold'u + maçın en yüksek CS/dk'sı. Her bileşen kendi
+  rozetinin kuralıyla ölçülür (`mvp`, `damage`, `gold`, `cs_per_min` tanımları birebir);
+  dolayısıyla MVP tekliği (kazanan takımda tek başına en yüksek perf) ve `cs_per_min`'in
+  `duration_s` şartı burada da geçerlidir. Dört bileşenden biri hesaplanamıyorsa o maç bu
+  rozetin dışındadır. Tekrarlanabilir. Kalibrasyon (canlı 25 maç): **5 olay / 3 oyuncu**
+  (Konna 3, SoSiSwithSaLaM 1, Śhade 1) — bileşenler güçlü korelasyonlu olduğu için
+  beklenenden sık; zorluk NADİR kademe ölçeğinde ve `stellar` görevinde yaşar (3 maç üst
+  üste Kusursuz Dörtlük fiilen ulaşılamazdır, bilinçli "efsane" eşiği).
 - **role_duel** ("Koridor Hâkimi", GÖREV 24 YENİ, KADEMELİ): maç başına, oyuncunun
   `perf_score`'u kendi rolündeki RAKİBİNİN perf'inin **≥ 1.5 katı** ise 1 rozet.
   Şartlar: o maçta ilgili rolde KARŞI takımlarda tam 2 non-NULL `position` slotu olmalı
@@ -321,25 +333,89 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   ID↔key eşlemesi web UI'da tek bir sabittedir. Şu an görseller HENÜZ YOK: sistem basit
   simge görünümüyle çalışır, madalyonlar geldikçe kendiliğinden devreye girer.
 
-#### Kademe (GÖREV 24, Teoman kararı)
-Yalnız **6 rozet kademelidir**: `mvp`, `vision`, `damage`, `cs_per_min`, `gold`, `role_duel`.
-Kademe, rozetin MAÇ BAŞINA ORANINA bakar (ham sayaca DEĞİL — aksi hâlde çok oynayan
-otomatik altın olurdu): `rate = count / matches_played`.
-- **bronz** = rozeti kazanmış herkes (oran şartı yok) · **gümüş** = `rate >= 0.20`
-  · **altın** = `rate >= 0.32`. Gümüş ve altın için EK ŞART: `matches_played >= 8`
-  (az oynayan tek rozetle altın olmasın; bu şart olmadan 3 maçta 1 rozet alan altın olurdu).
-- Eşiklerin gerekçesi: 10 kişilik maçta tek-rekor rozetinin beklenen oranı tam `0.10`;
-  gümüş bunun 2 katı, altın ~3.2 katıdır (yani "grup beklentisinin üstü").
-- `rate` yanıtta 2 ondalığa yuvarlanır (karşılaştırma HAM değerle); `next_tier_rate` =
-  bir üst kademenin eşiği (altındaysa `null`).
+#### Kademe — ALTI SEVİYE (GÖREV 24; 3→6 genişletme: Teoman, 2026-08-19)
+Yalnız **7 rozet kademelidir**: `mvp`, `vision`, `damage`, `cs_per_min`, `gold`, `role_duel`
+(STANDART ölçek) ve `perfect_quad` (NADİR ölçek).
+**Kademe KÜMÜLATİF SAYAÇLADIR ve ASLA DÜŞMEZ** [REVİZE — Teoman, 2026-08-19]. Ölçüt
+rozetin kaç kez kazanıldığıdır (`count`); ORAN KULLANILMAZ. Gerekçe (Teoman): oran
+ilerlemeyi paydaya bağlıyordu — oynadıkça payda büyüdüğü için kötü bir gece kademeyi
+DÜŞÜREBİLİYOR ve yeni maç oynamak risk hâline geliyordu; ölçümle doğrulandı (aynı
+oyuncunun MVP oranı 0.29 → 0.12'ye inip Platin'den Gümüş'e düşüyordu). Sayaç geri
+gitmediği için kademe kalıcıdır ve her kazanım tartışmasız ileri taşır.
+
+İki eşik ölçeği vardır (rozetin dağılım sıklığına göre; `GET /badges` katalogunda
+`tier_scale` alanıyla bildirilir):
+
+| `tier` | STANDART ölçek (`count >=`) | NADİR ölçek (`count >=`) |
+|---|---|---|
+| `bronze` | 1 | 1 |
+| `silver` | 3 | 2 |
+| `gold` | 5 | 3 |
+| `platinum` | 8 | 4 |
+| `diamond` | 12 | 6 |
+| `stellar` | **sayaç YETMEZ — ÖZEL GÖREV ister, aşağıya bkz.** | aynı |
+
+- **STANDART** ölçek: her maçta ~1 kez dağılan rozetler — `mvp`, `vision`, `damage`,
+  `cs_per_min`, `gold`, `role_duel`. **NADİR** ölçek: seyrek olaylar — `perfect_quad`.
+- Kalibrasyon (canlı 25 maç): standart ölçekte bugün Platin'de 4 kayıt var (vision 11,
+  gold 11 ve 8, damage 10), **Elmas'ta kimse yok** ama iki oyuncu birer rozet uzakta —
+  yani üst kademeler canlı hedef. Nadir ölçekte `perfect_quad` en yüksek sayaç 3 (Altın).
+- `matches_played >= 8` şartı KALDIRILDI: sayaç bazlı sistemde gereksizdir (3 rozet
+  kazanmak için zaten maç oynamış olmak gerekir).
+- Yanıt alanları: `next_tier_count` = bir üst kademenin eşiği (en üstteyse `null`); UI
+  "Platin'e 3 rozet kaldı" hesabını `next_tier_count - count` ile yapar. `rate`
+  (`count / matches_played`) SALT BİLGİ olarak kalır — kademeyi ETKİLEMEZ, yalnız bilgi
+  baloncuğunda gösterilebilir. `next_tier_rate` alanı KALDIRILDI.
+
+**`stellar` = ELMAS + ÖZEL GÖREV (Teoman, 2026-08-19).** Sayaç eşiğiyle çıkılan en üst
+kademe `diamond`'dır: "herkes elmasa kadar gelebilir". `stellar` yalnız şu İKİ şart birden
+sağlanınca verilir:
+1. `count` elmas eşiğinde olmalı (standart ölçekte ≥12, nadir ölçekte ≥6), VE
+2. **GÖREV:** oyuncu o rozeti kariyerinde en az bir kez **ARDIŞIK 3 valid maçta** kazanmış
+   olmalı. Ardışıklık oyuncunun kronolojik (replay sort-key) valid maçları üzerinden sayılır;
+   rozetin değerlendirme kapsamına GİRMEYEN maç (ör. `cs_per_min` için `duration_s` NULL,
+   `role_duel` için rolde tam 2 slot bulunmaması, `perfect_quad` için dört metrikten
+  birinin hesaplanamaması) seriyi **KIRAR** (`bench_2` deseniyle
+   tutarlı). Seri kariyerin herhangi bir yerinde olabilir ve GERİ ALINMAZ — sayaç gibi
+   görev de kalıcıdır (kademe hiç düşmez).
+   Görev rozete göre şudur: `mvp` → 3 maç üst üste MVP · `vision` → 3 maç üst üste maçın en
+   yüksek vizyonu · `damage` → 3 maç üst üste en yüksek hasar · `cs_per_min` → 3 maç üst üste
+   en yüksek CS/dk · `gold` → 3 maç üst üste en çok gold · `role_duel` → 3 maç üst üste rol
+   rakibini ≥1.5× geçmek · `perfect_quad` → 3 maç üst üste Kusursuz Dörtlük (fiilen ulaşılamaz
+   sayılır; bilinçli olarak "efsane" eşiğidir).
+- Kalibrasyon (canlı 25 maç): en uzun ardışık seriler vision 8 ve 3, damage 4 ve 3, gold 4
+  ve 3, cs_per_min 2. Sayaç eşiğiyle birleşince bugün `stellar` kaydı YOKTUR (Elmas'ta kimse
+  yok), ama Konna Netlaka'nın `gold` sayacı 11 ve zaten 3'lük serisi var — bir Kasa rozeti
+  daha alınca hem Elmas'a çıkıp hem görevi karşılayarak ilk `stellar`ı alacak. Yani en üst
+  kademe oynanarak kazanılan canlı bir hedeftir.
+- Kademeli rozetlerin yanıtına görev ilerlemesi eklenir:
+  `"stellar_quest": {"target": 3, "best": 2, "met": false}` — `best` = oyuncunun o rozette
+  kariyerdeki EN UZUN ardışık kazanım serisi, `met` = `best >= target`. Kademesiz rozetlerde
+  `null`. UI bunu "Stellar görevi: en iyi seri 2/3" olarak gösterir.
+
+- `rate` yanıtta 2 ondalığa yuvarlanır ve SALT BİLGİDİR (kademe hesabına girmez).
 - **Kilitli kademeli rozet** (`include_locked=true` ile gelen `count: 0` kaydı): `tier`
-  `null`, `rate` `0.0` (oyuncunun hiç valid maçı yoksa `null`), `next_tier_rate` `0.20`
-  (ilk hedef gümüş). Kademe yalnız KAZANILMIŞ rozette anlamlıdır.
-- Kademe GÖRSEL GEREKTİRMEZ: her rozet için tek madalyon görseli vardır, kademe ayrımını
-  web UI çerçeve/ışıma/etiketle verir (Teoman kararı — görsel yükü 27'de kalır).
+  `null`, `rate` `0.0` (oyuncunun hiç valid maçı yoksa `null`), `next_tier_count` = bronz
+  eşiği (`1`). Kademe yalnız KAZANILMIŞ rozette anlamlıdır.
+- Kademe GÖRSEL GEREKTİRMEZ: her rozet için tek madalyon görseli vardır, altı kademe
+  ayrımını web UI çerçeve/ışıma/etiketle verir (Teoman kararı — görsel yükü 27'de kalır).
+  `stellar` kademesi web UI'da AYRICALIKLI bir işlem görür: gökkuşağı/CD kırınımı
+  hissi veren devingen kenar (Clash Royale'in en nadir kart çerçevesi referansı).
 - Diğer sınıflar (kişisel rekor, rol rekoru, anlatısal, blok, ilişkisel, kimlik, kilometre,
   rulet) KADEMELENMEZ. Gerekçe: kendi rekorunu kırmak deneyimle ZORLAŞIR, orana bağlı
   kademe çaylağı ödüllendirirdi; blok/tek-seferlik rozetlerde sayı zaten anlatıyı taşır.
+
+#### Profil vitrini (GÖREV 24 UI turu, Teoman 2026-08-19)
+Profilin en üstünde, puanın yanında **3 rozet** sergilenir. Seçim ölçütü **EN YÜKSEK
+KADEME**dir (`stellar > diamond > platinum > gold > silver > bronze`; kademesiz rozetler
+kademelilerden sonra gelir), eşitlikte `holders_pct` KÜÇÜK olan (grupta daha az kişide),
+sonra `count` büyük olan, sonra katalog sırası. Gerekçe (Teoman): "sayfayı açan kişi
+raf gibi duran Elmas/Stellar rozetleri görüp oyuncunun iyi olduğunu anlamalı; bu da
+insanları profilini iyileştirmek için oynamaya iter."
+- Vitrinde **çarpan (`×N`) belirgin okunur** — kaç kez kazanıldığı birincil bilgidir.
+- Vitrinde **nadirlik yüzdesi YAZILMAZ** ve "en nadir 1/2/3" gibi sıra etiketi YOKTUR;
+  nadirlik bilgisi hover/dokunma ile açılan bilgi baloncuğuna taşınır (aynı baloncuk
+  aşağıdaki rozet kuyruğunda da çalışır).
 
 #### Rozet kataloğu ucu (GÖREV 24 YENİ)
 ```
@@ -348,7 +424,8 @@ GET /badges
   "roster_size": 18,
   "badges": [
     {"id": 1, "key": "mvp", "class": "record", "source": "valid",
-     "tiered": true, "one_time": false, "holders": 11, "holders_pct": 61.1}
+     "tiered": true, "tier_scale": "standard", "one_time": false,
+     "holders": 11, "holders_pct": 61.1}
   ]
 }
 ```

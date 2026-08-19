@@ -1,10 +1,12 @@
-"""GÖREV 24 — rozet motoru 16 → 27 (api_contract §2 "Rozetler" + "Kademe" +
-"Rozet kataloğu ucu").
+"""GÖREV 24 — rozet motoru 16 → 27 → 28 (api_contract §2 "Rozetler" + "Kademe" +
+"Rozet kataloğu ucu"), + Teoman'ın kademe revizyonları (oran→ardışık-görev,
+sonra oran→KÜMÜLATİF SAYAÇ) + `perfect_quad` (ID 28, NADİR ölçek).
 
-Kapsam: 11 yeni rozetin kesin tanımı (eşik altı/üstü, NULL, eşitlik, blok
-ayrıklığı, min-geçmiş, snapshot'ın İLERİYE BAKMADIĞI), kademe eşikleri ve
-`matches_played >= 8` şartı, `include_locked` iki modu, `GET /badges`
-(holders/roster_size) ve replay determinizmi.
+Kapsam: 11+1 yeni rozetin kesin tanımı (eşik altı/üstü, NULL, eşitlik, blok
+ayrıklığı, min-geçmiş, snapshot'ın İLERİYE BAKMADIĞI), kademe SAYAÇ eşikleri
+(STANDART/NADİR ölçek, `matches_played` şartı YOK, kademe hiç düşmez),
+`stellar_quest`, `include_locked` iki modu, `GET /badges` (holders/roster_size/
+`tier_scale`) ve replay determinizmi.
 
 Kurgu deseni `test_badges.py` ile aynıdır (yardımcılar oradan gelir):
 10 oyuncu (P0..P4 = team100, P5..P9 = team200), tüm katılımcılarda AYNI
@@ -18,6 +20,7 @@ import pytest
 
 from app.services.badges import BADGE_KEYS, CATALOG
 from test_badges import (
+    DURATION_S,
     NAMES,
     POSITIONS,
     TEAM200,
@@ -32,13 +35,18 @@ from test_badges import (
 )
 
 # api_contract §2: katalog sırası DONDURULMUŞ (görsel dosya adları ID'ye bağlı).
+# `perfect_quad` katalog SONUNA eklendi (ID 28) — araya girmez.
 CONTRACT_ORDER = (
     "mvp", "vision", "damage", "cs_per_min", "gold", "role_duel",
     "role_record", "pr_perf", "pr_damage", "kill_20", "kda_10", "deathless",
     "comeback", "tragic_hero", "marathon_5", "win_streak_3", "lose_streak_3",
     "bench_2", "nemesis_6", "duo_6", "versatile", "veteran_10", "veteran_20",
     "veteran_50", "roulette_complete", "roulette_winner", "gambler",
+    "perfect_quad",
 )
+
+# Kademeli 7 rozet: 6 STANDART ölçek + perfect_quad (NADİR ölçek, katalog sonunda).
+TIERED_ORDER = CONTRACT_ORDER[:6] + ("perfect_quad",)
 
 FLAT = {n: 1.0 for n in NAMES}  # nötr perf zemini
 
@@ -60,12 +68,13 @@ def _badge(client, player_id, key, include_locked=False):
 # ==========================================================================
 # Katalog
 # ==========================================================================
-def test_catalog_is_27_frozen_keys_in_contract_order():
+def test_catalog_is_28_frozen_keys_in_contract_order():
     assert BADGE_KEYS == CONTRACT_ORDER
-    assert len(CATALOG) == 27
-    assert [d.id for d in CATALOG] == list(range(1, 28))
-    # Kademeli olanlar YALNIZ 01-06.
-    assert [d.key for d in CATALOG if d.tiered] == list(CONTRACT_ORDER[:6])
+    assert len(CATALOG) == 28
+    assert [d.id for d in CATALOG] == list(range(1, 29))
+    assert CATALOG[-1].key == "perfect_quad"  # sona eklendi, araya girmedi
+    # Kademeli olanlar 01-06 + perfect_quad (28.).
+    assert [d.key for d in CATALOG if d.tiered] == list(TIERED_ORDER)
     assert [d.key for d in CATALOG if d.one_time] == [
         "nemesis_6", "duo_6", "versatile",
         "veteran_10", "veteran_20", "veteran_50", "gambler",
@@ -479,7 +488,10 @@ def test_relational_progress_below_threshold(client, ids):
 
 
 # ==========================================================================
-# Kademe (api_contract §2 "Kademe")
+# Kademe (api_contract §2 "Kademe — ALTI SEVİYE", Teoman revizyonu 2026-08-19:
+# ORAN → KÜMÜLATİF SAYAÇ (`count`); kademe ASLA DÜŞMEZ; `matches_played >= 8`
+# şartı KALDIRILDI; `next_tier_rate` → `next_tier_count`; iki eşik ölçeği
+# STANDART (6 rozet) / NADİR (`perfect_quad`))
 # ==========================================================================
 def _vision_stats(leader):
     return {n: {"vision_score": 99 if n == leader else 1} for n in NAMES}
@@ -496,63 +508,506 @@ def _vision_series(client, ids, prefix, leaders, start=1):
     ]
 
 
-def test_tier_gold_uses_raw_rate_not_the_rounded_one(client, ids):
-    """8 maçta 3 rozet → ham oran 0.375 (>= 0.32) → altın; `rate` 0.38 gösterir."""
-    _vision_series(client, ids, "tg", ["P0"] * 3 + ["P1"] * 5)
+def test_tier_matches_played_no_longer_gates_the_tier(client, ids):
+    """Eskiden `matches_played < 8` bronza sabitlerdi; artık YOK — 3 maçta silver açılır."""
+    _vision_series(client, ids, "mpgate", ["P0"] * 3)
     badge = _by_key(client, ids["P0"])["vision"]
     assert badge["count"] == 3
-    assert badge["tier"] == "gold"
-    assert badge["rate"] == 0.38
-    assert badge["next_tier_rate"] is None
+    assert badge["tier"] == "silver"
+    assert badge["next_tier_count"] == 5
 
 
-def test_tier_silver_and_bronze_thresholds(client, ids):
-    _vision_series(client, ids, "ts", ["P0"] * 2 + ["P1"] * 8)  # 2/10 = 0.20
+def test_tier_rate_is_informational_and_does_not_affect_the_tier(client, wide_ids):
+    """Aynı count, FARKLI rate → aynı kademe (`rate` SALT bilgi, hesaba girmez)."""
+    ids = wide_ids
+    _vision_series(client, ids, "info-a", ["P0"] * 3)  # P0: 3 galibiyet / 3 maç
+    _vision_series(client, ids, "info-b", ["P1"] * 3, start=4)  # P1: aynı, şimdilik
+    # P1'e P0'ı HİÇ içermeyen 9 ekstra maç (WIDE'daki diğer oyuncularla 5v5) →
+    # aynı count (3), çok daha düşük rate.
+    filler_t100 = ["P1", "P10", "P11", "P12", "P13"]
+    filler_t200 = ["P2", "P3", "P4", "P5", "P6"]
+    filler_stats = {
+        n: {"vision_score": 99 if n == "P10" else 1}
+        for n in filler_t100 + filler_t200
+    }
+    for i in range(9):
+        _ingest(
+            client, ids, f"info-filler-{i}", _day(7 + i),
+            t100=filler_t100, t200=filler_t200, stats=filler_stats,
+        )
+    p0 = _by_key(client, ids["P0"])["vision"]
+    p1 = _by_key(client, ids["P1"])["vision"]
+    assert p0["count"] == 3
+    assert p1["count"] == 3
+    assert p0["rate"] != p1["rate"]
+    assert p0["tier"] == p1["tier"] == "silver"
+
+
+def test_tier_never_drops_after_a_long_stretch_without_new_wins(client, ids):
+    """Eski oran modelinde kademe düşerdi; SAYAÇ modelinde ASLA düşmez."""
+    _vision_series(client, ids, "hold-a", ["P0"] * 5)  # count=5 → gold
+    gold = _by_key(client, ids["P0"])["vision"]
+    assert gold["tier"] == "gold"
+    # 20 maç daha, hiçbirinde P0 lider değil (rate ÇÖKER) → kademe SABİT kalır.
+    _vision_series(client, ids, "hold-b", ["P1"] * 20, start=6)
+    still = _by_key(client, ids["P0"])["vision"]
+    assert still["count"] == 5
+    assert still["tier"] == "gold"
+    assert still["rate"] < gold["rate"]  # oran gerçekten düştü, kademeyi etkilemedi
+
+
+def test_tier_diamond_without_quest_stays_diamond_via_api(client, ids):
+    """12 galibiyet ama HİÇ 3-ardışık yok (WLWLWL...) → diamond kalır, stellar olmaz."""
+    pattern = (["P0", "P1"] * 12)[:24]
+    _vision_series(client, ids, "dq", pattern)
+    badge = _by_key(client, ids["P0"])["vision"]
+    assert badge["count"] == 12
+    assert badge["tier"] == "diamond"
+    assert badge["next_tier_count"] is None  # bir sonraki hedef GÖREVDİR, sayaç değil
+    assert badge["stellar_quest"] == {"target": 3, "best": 1, "met": False}
+
+
+def test_tier_quest_met_early_persists_until_diamond_count_then_yields_stellar(
+    client, ids
+):
+    """Görev (ardışık 3) ERKEN ve KALICI tamamlanır; sayaç SONRADAN elmasa
+    ulaşınca stellar HEMEN açılır (kalibrasyon notundaki Konna örneğiyle aynı)."""
+    _vision_series(client, ids, "early", ["P0"] * 3 + ["P1"] * 9)  # count=3 (silver)
     silver = _by_key(client, ids["P0"])["vision"]
-    assert (silver["tier"], silver["rate"], silver["next_tier_rate"]) == (
-        "silver", 0.2, 0.32,
+    assert silver["tier"] == "silver"
+    assert silver["stellar_quest"] == {"target": 3, "best": 3, "met": True}
+    _vision_series(client, ids, "early2", ["P0"] * 9, start=13)  # count=12 (diamond eşiği)
+    stellar = _by_key(client, ids["P0"])["vision"]
+    assert stellar["count"] == 12
+    assert stellar["tier"] == "stellar"
+
+
+# --- Doğrudan birim testler: `_tier`/`_next_tier_count`/`_stellar_quest`, iki
+# ölçeğin (STANDART/NADİR) sayaç sınırlarında — bkz. `test_badges.
+# _cs_per_min_values` ile aynı desen (private fonksiyon doğrudan import).
+from app.services.badges import (  # noqa: E402
+    STELLAR_QUEST_TARGET,
+    STELLAR_TIER,
+    TIER_LEVELS_RARE,
+    TIER_LEVELS_STANDARD,
+    TIER_SCALES,
+    _next_tier_count,
+    _PlayerState,
+    _stellar_quest,
+    _tier,
+    _tier_levels,
+)
+
+
+def test_tier_levels_are_two_named_ordered_scales_ending_at_diamond():
+    """SAYAÇ TABLOSU diamond'da BİTER; `stellar` bu tabloda hiç YOKTUR."""
+    assert TIER_LEVELS_STANDARD == (
+        ("bronze", 1), ("silver", 3), ("gold", 5), ("platinum", 8), ("diamond", 12),
     )
-    bronze = _by_key(client, ids["P1"])["vision"]  # 8/10 = 0.80 → altın
-    assert bronze["tier"] == "gold"
-
-
-def test_tier_requires_eight_matches_for_silver_and_gold(client, ids):
-    """3 maçta 3 rozet (oran 1.0) bile matches_played < 8 iken BRONZ kalır."""
-    _vision_series(client, ids, "tm", ["P0"] * 3)
-    badge = _by_key(client, ids["P0"])["vision"]
-    assert badge["count"] == 3
-    assert (badge["tier"], badge["rate"], badge["next_tier_rate"]) == (
-        "bronze", 1.0, 0.2,
+    assert TIER_LEVELS_RARE == (
+        ("bronze", 1), ("silver", 2), ("gold", 3), ("platinum", 4), ("diamond", 6),
     )
-    # 8. maçta oran hâlâ >= 0.32 → altın açılır.
-    _vision_series(client, ids, "tm2", ["P0"] * 5, start=4)
-    assert _by_key(client, ids["P0"])["vision"]["tier"] == "gold"
+    assert STELLAR_QUEST_TARGET == 3
+    assert STELLAR_TIER == "stellar"
 
 
-def test_tier_bronze_when_rate_below_silver(client, ids):
-    _vision_series(client, ids, "tb", ["P0"] + ["P1"] * 9)  # 1/10 = 0.10
-    badge = _by_key(client, ids["P0"])["vision"]
-    assert (badge["tier"], badge["rate"], badge["next_tier_rate"]) == (
-        "bronze", 0.1, 0.2,
-    )
+def test_tier_scale_lookup_maps_the_seven_tiered_badges():
+    assert TIER_SCALES == {
+        "mvp": "standard", "vision": "standard", "damage": "standard",
+        "cs_per_min": "standard", "gold": "standard", "role_duel": "standard",
+        "perfect_quad": "rare",
+    }
+    assert _tier_levels("vision") == TIER_LEVELS_STANDARD
+    assert _tier_levels("perfect_quad") == TIER_LEVELS_RARE
+    assert _tier_levels("kill_20") == TIER_LEVELS_STANDARD  # kademesiz → varsayılan
+
+
+@pytest.mark.parametrize(
+    "count, expected_tier, expected_next",
+    [
+        (1, "bronze", 3),
+        (2, "bronze", 3),
+        (3, "silver", 5),
+        (4, "silver", 5),
+        (5, "gold", 8),
+        (7, "gold", 8),
+        (8, "platinum", 12),
+        (11, "platinum", 12),
+        (12, "diamond", None),
+        (99, "diamond", None),
+    ],
+)
+def test_tier_standard_scale_counter_boundaries(count, expected_tier, expected_next):
+    tier = _tier(count, TIER_LEVELS_STANDARD, best_streak=0)
+    assert tier == expected_tier
+    assert _next_tier_count(tier, TIER_LEVELS_STANDARD) == expected_next
+
+
+@pytest.mark.parametrize(
+    "count, expected_tier, expected_next",
+    [
+        (1, "bronze", 2),
+        (2, "silver", 3),
+        (3, "gold", 4),
+        (4, "platinum", 6),
+        (6, "diamond", None),
+        (20, "diamond", None),
+    ],
+)
+def test_tier_rare_scale_counter_boundaries(count, expected_tier, expected_next):
+    tier = _tier(count, TIER_LEVELS_RARE, best_streak=0)
+    assert tier == expected_tier
+    assert _next_tier_count(tier, TIER_LEVELS_RARE) == expected_next
+
+
+def test_tier_locked_badge_next_tier_count_is_bronze_threshold():
+    """Kilitli kademeli rozette (`tier is None`) hedef bronz eşiğidir (`1`)."""
+    assert _next_tier_count(None, TIER_LEVELS_STANDARD) == 1
+    assert _next_tier_count(None, TIER_LEVELS_RARE) == 1
+
+
+def test_tier_stellar_needs_diamond_count_and_the_quest_together():
+    assert _tier(12, TIER_LEVELS_STANDARD, best_streak=2) == "diamond"  # görev eksik
+    assert _tier(12, TIER_LEVELS_STANDARD, best_streak=3) == "stellar"
+    assert _tier(6, TIER_LEVELS_RARE, best_streak=1) == "diamond"
+    assert _tier(6, TIER_LEVELS_RARE, best_streak=3) == "stellar"
+
+
+def test_tier_quest_alone_never_promotes_below_diamond_count():
+    """Görev VAR (ardışık 3+) ama sayaç elmas eşiğinin altındaysa stellar olmaz."""
+    assert _tier(5, TIER_LEVELS_STANDARD, best_streak=10) == "gold"
+    assert _tier(3, TIER_LEVELS_RARE, best_streak=10) == "gold"
+
+
+def test_tier_next_count_is_null_for_diamond_and_stellar():
+    assert _next_tier_count("diamond", TIER_LEVELS_STANDARD) is None
+    assert _next_tier_count("stellar", TIER_LEVELS_STANDARD) is None
+    assert _next_tier_count("diamond", TIER_LEVELS_RARE) is None
+    assert _next_tier_count("stellar", TIER_LEVELS_RARE) is None
+
+
+def test_tier_never_decreases_as_count_increases():
+    """Kademe hiç düşmez: `count` tek yönlü arttıkça `_tier` de asla düşmez."""
+    order = {
+        None: -1, "bronze": 0, "silver": 1, "gold": 2,
+        "platinum": 3, "diamond": 4, "stellar": 5,
+    }
+    prev = -1
+    for count in range(0, 15):
+        rank = order[_tier(count, TIER_LEVELS_STANDARD, best_streak=0)]
+        assert rank >= prev
+        prev = rank
+
+
+def test_tier_unearned_badge_defaults_to_none():
+    assert _tier(0, TIER_LEVELS_STANDARD, best_streak=0) is None
+    assert _tier(0, TIER_LEVELS_RARE, best_streak=5) is None  # count=0 tavan
+
+
+def test_stellar_quest_helper_reads_tier_best():
+    st = _PlayerState()
+    assert _stellar_quest(st, "vision") == {"target": 3, "best": 0, "met": False}
+    st.tier_best["vision"] = 3
+    assert _stellar_quest(st, "vision") == {"target": 3, "best": 3, "met": True}
 
 
 def test_non_tiered_badges_never_carry_tier_fields(client, ids):
     _ingest(client, ids, "nt", _day(1), stats={"P0": {"deaths": 0}})
     badge = _by_key(client, ids["P0"])["deathless"]
-    assert (badge["tier"], badge["rate"], badge["next_tier_rate"]) == (
+    assert (badge["tier"], badge["rate"], badge["next_tier_count"]) == (
         None, None, None,
     )
+    assert badge["stellar_quest"] is None  # kademesiz sınıf → görev yok
 
 
 def test_locked_tiered_badge_has_no_tier_but_reports_rate(client, ids):
-    """Kazanılmamış kademeli rozet: tier NULL, rate 0.0, next_tier_rate 0.20."""
+    """Kazanılmamış kademeli rozet: tier NULL, rate 0.0, next_tier_count 1
+    (bronz eşiği), stellar_quest yine de {best:0, met:false} döner."""
     _ingest(client, ids, "lt", _day(1), stats=_vision_stats("P1"))
     badge = _badge(client, ids["P0"], "vision", include_locked=True)
     assert badge["count"] == 0
-    assert (badge["tier"], badge["rate"], badge["next_tier_rate"]) == (
-        None, 0.0, 0.2,
+    assert (badge["tier"], badge["rate"], badge["next_tier_count"]) == (
+        None, 0.0, 1,
     )
+    assert badge["stellar_quest"] == {"target": 3, "best": 0, "met": False}
+
+
+def test_locked_tiered_badge_without_any_matches_still_reports_next_tier_count(
+    client,
+):
+    """Hiç valid maçı olmayan oyuncuda bile kilitli kademeli rozet next_tier_count
+    (bronz eşiği) verir; `rate` yalnız bu durumda `null`dır (payda 0)."""
+    created = client.post("/api/v1/players", json={"display_name": "Maçsız"})
+    player_id = created.json()["id"]
+    badge = _badge(client, player_id, "vision", include_locked=True)
+    assert badge["count"] == 0
+    assert (badge["tier"], badge["rate"], badge["next_tier_count"]) == (
+        None, None, 1,
+    )
+
+
+# ==========================================================================
+# stellar_quest — ardışık-3 GÖREVİ, kademeli 7 rozetin HEPSİNDE (bench_2
+# deseniyle: kapsam dışı / kazanılmayan maç seriyi 0'a döndürür; GERİ ALINMAZ)
+# ==========================================================================
+def _mvp_scenario(client, ids, db, sgid, day, win, out_of_scope=False):
+    """MVP: takım100 hep kazanır; win=True → P0 en yüksek perf (MVP)."""
+    match_id = _ingest(client, ids, sgid, day, winner_team=100)
+    if win:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 9.0})
+    else:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 1.0, "P1": 9.0})
+    return match_id
+
+
+def _record_scenario(stat):
+    def scenario(client, ids, db, sgid, day, win, out_of_scope=False):
+        leader = "P0" if win else "P1"
+        stats = {n: {stat: 99 if n == leader else 1} for n in NAMES}
+        return _ingest(client, ids, sgid, day, stats=stats)
+
+    return scenario
+
+
+def _cs_per_min_scenario(client, ids, db, sgid, day, win, out_of_scope=False):
+    """out_of_scope=True → duration_s NULL: o maçta KİMSE cs_per_min alamaz."""
+    if out_of_scope:
+        return _ingest(client, ids, sgid, day, duration_s=None)
+    leader = "P0" if win else "P1"
+    stats = {n: {"cs": 300 if n == leader else 1} for n in NAMES}
+    return _ingest(client, ids, sgid, day, duration_s=DURATION_S, stats=stats)
+
+
+def _role_duel_scenario(client, ids, db, sgid, day, win, out_of_scope=False):
+    """out_of_scope=True → TOP'ta P5'i JUNGLE'a kaydırıp P0'ın rolünü 1 slota düşürür."""
+    if out_of_scope:
+        match_id = _ingest(client, ids, sgid, day, positions={"P5": "JUNGLE"})
+        _set_perf(db, match_id, ids, FLAT)
+        return match_id
+    match_id = _ingest(client, ids, sgid, day)
+    if win:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 9.0, "P5": 1.0})
+    else:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 1.0, "P5": 9.0})
+    return match_id
+
+
+def _quad_stats(has_damage, has_gold, has_cs):
+    """P0 üç metrikte de (damage/gold/cs) TEK BAŞINA lider olsun isteniyorsa 99,
+    değilse P8 lider olsun diye 99 alır (P0 kesin dışarıda kalır, eşitlik değil)."""
+    def field(has):
+        return {
+            n: 99 if (has and n == "P0") or (not has and n == "P8") else 1
+            for n in NAMES
+        }
+
+    damage_vals, gold_vals, cs_vals = (
+        field(has_damage), field(has_gold), field(has_cs)
+    )
+    return {
+        n: {
+            "damage_to_champs": damage_vals[n],
+            "gold": gold_vals[n],
+            "cs": cs_vals[n],
+        }
+        for n in NAMES
+    }
+
+
+def _quad_match(
+    client, ids, db, sgid, day, *,
+    has_mvp=True, has_damage=True, has_gold=True, has_cs=True,
+    duration_s=DURATION_S,
+):
+    """perfect_quad senaryosu: dört bileşen bağımsız açılıp kapatılabilir."""
+    match_id = _ingest(
+        client, ids, sgid, day, winner_team=100, duration_s=duration_s,
+        stats=_quad_stats(has_damage, has_gold, has_cs),
+    )
+    if has_mvp:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 9.0})
+    else:
+        _set_perf(db, match_id, ids, {**FLAT, "P0": 1.0, "P1": 9.0})
+    return match_id
+
+
+def _perfect_quad_scenario(client, ids, db, sgid, day, win, out_of_scope=False):
+    """TIER_SCENARIOS ile uyumlu imza: win yalnız MVP bileşenini değiştirir
+    (diğer üçü hep P0'da), out_of_scope duration_s'i NULL yapar."""
+    if out_of_scope:
+        return _quad_match(client, ids, db, sgid, day, duration_s=None)
+    return _quad_match(client, ids, db, sgid, day, has_mvp=win)
+
+
+TIER_SCENARIOS = {
+    "mvp": _mvp_scenario,
+    "vision": _record_scenario("vision_score"),
+    "damage": _record_scenario("damage_to_champs"),
+    "gold": _record_scenario("gold"),
+    "cs_per_min": _cs_per_min_scenario,
+    "role_duel": _role_duel_scenario,
+    "perfect_quad": _perfect_quad_scenario,
+}
+
+
+@pytest.mark.parametrize("key", list(TIER_SCENARIOS))
+def test_stellar_quest_best_tracks_the_longest_consecutive_run(client, ids, db, key):
+    """Kazan/kazan/KAYIP/kazan/kazan/kazan → en uzun ardışık seri 3 (son üçü)."""
+    scenario = TIER_SCENARIOS[key]
+    pattern = [True, True, False, True, True, True]
+    for i, win in enumerate(pattern):
+        scenario(client, ids, db, f"sq-{key}-{i}", _day(i + 1), win)
+    badge = _by_key(client, ids["P0"])[key]
+    assert badge["stellar_quest"] == {"target": 3, "best": 3, "met": True}
+
+
+@pytest.mark.parametrize("key", list(TIER_SCENARIOS))
+def test_stellar_quest_not_met_when_no_run_reaches_three(client, ids, db, key):
+    """Hiçbir ardışık seri 3'e ulaşmıyor (en uzunu 2) → met False."""
+    scenario = TIER_SCENARIOS[key]
+    pattern = [True, True, False, True, True, False]
+    for i, win in enumerate(pattern):
+        scenario(client, ids, db, f"sn-{key}-{i}", _day(i + 1), win)
+    badge = _by_key(client, ids["P0"])[key]
+    assert badge["stellar_quest"]["best"] == 2
+    assert badge["stellar_quest"]["met"] is False
+
+
+def test_stellar_quest_broken_by_out_of_scope_match_cs_per_min(client, ids):
+    """cs_per_min: duration_s NULL o maçta KİMSEYİ ödüllendirmez → seriyi kırar."""
+    _cs_per_min_scenario(client, ids, None, "cs-a-0", _day(1), True)
+    _cs_per_min_scenario(client, ids, None, "cs-a-1", _day(2), True)
+    _cs_per_min_scenario(client, ids, None, "cs-a-oos", _day(3), True, out_of_scope=True)
+    _cs_per_min_scenario(client, ids, None, "cs-a-3", _day(4), True)
+    badge = _by_key(client, ids["P0"])["cs_per_min"]
+    assert badge["stellar_quest"] == {"target": 3, "best": 2, "met": False}
+
+
+def test_stellar_quest_broken_by_out_of_scope_match_role_duel(client, ids, db):
+    """role_duel: rolde tam 2 slot yoksa o maç DEĞERLENDİRİLMEZ → seriyi kırar."""
+    _role_duel_scenario(client, ids, db, "rd-a-0", _day(1), True)
+    _role_duel_scenario(client, ids, db, "rd-a-1", _day(2), True)
+    _role_duel_scenario(client, ids, db, "rd-a-oos", _day(3), True, out_of_scope=True)
+    _role_duel_scenario(client, ids, db, "rd-a-3", _day(4), True)
+    badge = _by_key(client, ids["P0"])["role_duel"]
+    assert badge["stellar_quest"] == {"target": 3, "best": 2, "met": False}
+
+
+def test_stellar_quest_broken_by_out_of_scope_match_perfect_quad(client, ids, db):
+    """perfect_quad: dört bileşenden biri (cs_per_min→duration_s) hesaplanamazsa
+    o maç bu rozetin dışındadır ve seriyi kırar (mvp/role_duel'le aynı desen)."""
+    _quad_match(client, ids, db, "pq-b0", _day(1))
+    _quad_match(client, ids, db, "pq-b1", _day(2))
+    _quad_match(client, ids, db, "pq-boos", _day(3), duration_s=None)
+    _quad_match(client, ids, db, "pq-b3", _day(4))
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["stellar_quest"] == {"target": 3, "best": 2, "met": False}
+
+
+def test_stellar_requires_diamond_count_without_quest_stays_diamond_via_api(
+    client, ids
+):
+    """12 galibiyet ama HİÇ ardışık 3 yok → `diamond` kalır (üstteki API testinin
+    stellar_quest'e odaklı hâli — `_tier` birim testleriyle çapraz doğrulanır)."""
+    pattern = (["P0", "P1"] * 12)[:24]
+    _vision_series(client, ids, "dqs", pattern)
+    badge = _by_key(client, ids["P0"])["vision"]
+    assert badge["count"] == 12
+    assert badge["tier"] == "diamond"
+    assert badge["stellar_quest"] == {"target": 3, "best": 1, "met": False}
+
+
+# ==========================================================================
+# perfect_quad — "Kusursuz Dörtlük" (ID 28, NADİR ölçek, Teoman 2026-08-19)
+# ==========================================================================
+def test_perfect_quad_requires_all_four_components(client, ids, db):
+    """Dört bileşenden BİRİ eksikse rozet yok; hepsi varsa 1 rozet."""
+    _quad_match(client, ids, db, "pq-nomvp", _day(1), has_mvp=False)
+    _quad_match(client, ids, db, "pq-nodmg", _day(2), has_damage=False)
+    _quad_match(client, ids, db, "pq-nogold", _day(3), has_gold=False)
+    _quad_match(client, ids, db, "pq-nocs", _day(4), has_cs=False)
+    assert _count(client, ids["P0"], "perfect_quad") == 0
+
+    m5 = _quad_match(client, ids, db, "pq-all", _day(5))
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["count"] == 1
+    assert badge["last_match_id"] == m5
+
+
+def test_perfect_quad_is_repeatable_and_has_no_best_value(client, ids, db):
+    """Tekrarlanabilir; kendi başına ölçülebilir bir değeri YOKTUR (narrative sınıfı)."""
+    m1 = _quad_match(client, ids, db, "pq-r1", _day(1))
+    m2 = _quad_match(client, ids, db, "pq-r2", _day(2))
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["count"] == 2
+    assert badge["last_match_id"] == m2
+    assert (badge["best_match_id"], badge["best_value"]) == (None, None)
+
+
+def test_perfect_quad_excluded_when_cs_per_min_out_of_scope(client, ids, db):
+    """cs_per_min'in duration_s şartı birebir geçerli: duration NULL → quad da yok."""
+    _quad_match(client, ids, db, "pq-oos", _day(1), duration_s=None)
+    assert _count(client, ids["P0"], "perfect_quad") == 0
+
+
+def test_perfect_quad_mvp_component_follows_the_mvp_tiebreak_not_raw_perf(
+    client, ids, db
+):
+    """MVP tekliği: perf EŞİT olsa da mvp'nin KENDİ kırılımı (kills) devreye
+    girer ve TEK bir kazanan belirler; quad da aynı kazananı izler."""
+    stats = _quad_stats(True, True, True)
+    stats["P0"]["kills"] = 10
+    stats["P1"]["kills"] = 1
+    match_id = _ingest(client, ids, "pq-tie", _day(1), winner_team=100, stats=stats)
+    _set_perf(db, match_id, ids, {**FLAT, "P0": 9.0, "P1": 9.0})  # perf eşit
+    assert _count(client, ids["P0"], "mvp") == 1
+    assert _count(client, ids["P0"], "perfect_quad") == 1
+    assert _count(client, ids["P1"], "mvp") == 0
+    assert _count(client, ids["P1"], "perfect_quad") == 0
+
+
+def test_perfect_quad_uses_the_rare_tier_scale(client, ids, db):
+    """NADİR ölçek: 4 ardışık Kusursuz Dörtlük → platinum (4), görev de dolu."""
+    matches = [
+        _quad_match(client, ids, db, f"pq-t{i}", _day(i + 1)) for i in range(4)
+    ]
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["count"] == 4
+    assert badge["tier"] == "platinum"
+    assert badge["next_tier_count"] == 6
+    assert badge["stellar_quest"] == {"target": 3, "best": 4, "met": True}
+    assert badge["last_match_id"] == matches[-1]
+
+
+def test_perfect_quad_diamond_without_quest_via_api(client, ids, db):
+    """6 Kusursuz Dörtlük ama HİÇ 3-ardışık yok (araya MVP'siz maç girer) →
+    NADİR ölçekte diamond kalır, stellar olmaz.
+
+    Aradaki maç düz `_ingest` DEĞİLDİR: tüm katılımcılar BASE_STATS'ta EŞİT
+    olduğundan mvp'nin kendi kırılımı (kills eşit → ... → player_id küçük) P0'ı
+    yine MVP yapardı (quad'ı YANLIŞLIKLA tekrar tetikler) — bu yüzden araya
+    `has_mvp=False` konur (yalnız MVP bileşenini kırar, `_perfect_quad_scenario`
+    ile aynı desen).
+    """
+    for i in range(6):
+        _quad_match(client, ids, db, f"pq-alt-quad-{i}", _day(2 * i + 1))
+        _quad_match(
+            client, ids, db, f"pq-alt-filler-{i}", _day(2 * i + 2), has_mvp=False
+        )
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["count"] == 6
+    assert badge["tier"] == "diamond"
+    assert badge["stellar_quest"]["met"] is False
+
+
+def test_perfect_quad_diamond_and_quest_together_yields_stellar(client, ids, db):
+    """6 ardışık Kusursuz Dörtlük (ara YOK) → sayaç elmasta VE görev dolu → stellar."""
+    for i in range(6):
+        _quad_match(client, ids, db, f"pq-stellar-{i}", _day(i + 1))
+    badge = _by_key(client, ids["P0"])["perfect_quad"]
+    assert badge["count"] == 6
+    assert badge["tier"] == "stellar"
+    assert badge["stellar_quest"] == {"target": 3, "best": 6, "met": True}
 
 
 # ==========================================================================
@@ -619,12 +1074,19 @@ def test_matches_played_counts_only_valid_matches(client, ids):
 def test_badge_catalog_shape_and_order(client):
     body = client.get("/api/v1/badges").json()
     assert body["roster_size"] == 0
-    assert [b["id"] for b in body["badges"]] == list(range(1, 28))
+    assert [b["id"] for b in body["badges"]] == list(range(1, 29))
     assert [b["key"] for b in body["badges"]] == list(BADGE_KEYS)
     first = body["badges"][0]
     assert first == {
         "id": 1, "key": "mvp", "class": "record", "source": "valid",
-        "tiered": True, "one_time": False, "holders": 0, "holders_pct": None,
+        "tiered": True, "tier_scale": "standard", "one_time": False,
+        "holders": 0, "holders_pct": None,
+    }
+    last = body["badges"][-1]
+    assert last == {
+        "id": 28, "key": "perfect_quad", "class": "narrative", "source": "valid",
+        "tiered": True, "tier_scale": "rare", "one_time": False,
+        "holders": 0, "holders_pct": None,
     }
     classes = {b["class"] for b in body["badges"]}
     assert classes <= {
@@ -632,6 +1094,12 @@ def test_badge_catalog_shape_and_order(client):
         "identity", "milestone", "roulette",
     }
     assert {b["source"] for b in body["badges"]} == {"valid", "roulette"}
+    # tier_scale yalnız kademeli rozetlerde dolu.
+    for b in body["badges"]:
+        if b["tiered"]:
+            assert b["tier_scale"] in ("standard", "rare")
+        else:
+            assert b["tier_scale"] is None
 
 
 def test_badge_catalog_holders_and_roster_size(client, ids):

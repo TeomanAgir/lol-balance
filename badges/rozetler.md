@@ -3,33 +3,34 @@
 ## Görselleri nasıl ekliyorsun (ucu açık hat — kod değişikliği GEREKMEZ)
 
 **Görsel dosya adı = ID**, konum **`webui/assets/badges/`**:
-`webui/assets/badges/1.png` … `27.png` (öneri: kare, şeffaf zeminli PNG, ~512×512,
+`webui/assets/badges/1.png` … `28.png` (öneri: kare, şeffaf zeminli PNG, ~512×512,
 koyu arayüzde okunaklı; `.webp` de desteklenir).
 
 ⚠️ **Dosya adında SIFIR DOLGUSU YOK:** `1.png` doğru, `01.png` YANLIŞTIR (arayüz `1.png`
-ister, sıfır dolgulu dosya hiç yüklenmez). Aralık dışı ad (`28.png`) ve harfli ad
+ister, sıfır dolgulu dosya hiç yüklenmez). Aralık dışı ad (`29.png` gibi) ve harfli ad
 (`mvp.png`) da geçersizdir. Bir test bu kuralı zorlar: yanlış adlandırılmış dosya CI'da
 açık bir mesajla yakalanır, sessizce görünmez kalmaz.
 
 Akış: dosyayı bu klasöre koy → commit + push (main'e merge = otomatik deploy) → rozet
 sitede o görselle çıkar. **Arayüz görselin varlığını çalışma anında anlar**: dosya yoksa
 rozet mevcut basit simge/metin görünümünde kalır, dosya varsa madalyon otomatik devreye
-girer. Yani 27'sini birden bitirmen gerekmez, teker teker ekleyebilirsin ve hiçbir
+girer. Yani 28'ini birden bitirmen gerekmez, teker teker ekleyebilirsin ve hiçbir
 aşamada kod/liste güncellemesi gerekmez (ID sırası dondurulmuş olduğu için eşleşme sabit).
 
 `badges/rozetler.md` (bu dosya) yalnız KATALOG REFERANSIDIR — görseller buraya değil,
 `webui/assets/badges/` altına konur.
 
-**Kademe (bronz/gümüş/altın) GÖRSEL GEREKTİRMEZ.** 01-06 arası rozetler kademelidir;
-kademe ayrımını web arayüzü çerçeve + ışıma + etiketle verir (Teoman kararı). Yani
-kademeli rozet için de TEK görsel çizilir.
+**KADEME GÖRSEL GEREKTİRMEZ.** Altı kademe vardır: bronz · gümüş · altın · platin ·
+elmas · **Stellar**. Kademeli rozetler: **01-06 ve 28**. Kademe ayrımını web arayüzü
+çerçeve + ışıma + etiketle verir (Teoman kararı) — Stellar ayrıca gökkuşağı/CD-kırınımı
+çerçevesi alır. Yani kademeli rozet için de TEK görsel çizilir.
 
 Sıra sınıflara göre gruplu ve **DONDURULMUŞTUR**: görsel üretimi başladıktan sonra
 araya rozet girmez, yeni rozet listenin SONUNA eklenir. Kazanım kurallarının kesin
 tanımı (eşitlik kırılımları, NULL kuralları, blok ayrıklığı, kademe eşikleri):
 `docs/api_contract.md` §2 "Rozetler". Karar günlüğü: `docs/CHANGE_REQUESTS.md` 2026-08-19.
 
-## Rekor rozetleri — KADEMELİ (bronz / gümüş / altın)
+## Rekor rozetleri — KADEMELİ (bronz → gümüş → altın → platin → elmas → Stellar)
 | ID | İSİM | AÇIKLAMA | key |
 |---|---|---|---|
 | 01 | MVP | Kazanan takımın maçtaki en yüksek performans skorlu oyuncusuna verilir | `mvp` |
@@ -85,12 +86,22 @@ tanımı (eşitlik kırılımları, NULL kuralları, blok ayrıklığı, kademe 
 | 27 | Kumarbaz | 5 kez Rulet Galibi olana verilir | `gambler` |
 
 ## Notlar
-- **Kademeli olanlar yalnız 01-06.** Kademe, rozet sayısının maç başına oranına bakar
-  (gümüş 0.20, altın 0.32; en az 8 maç şartı) — çok oynayan otomatik altın olmaz.
-- 07-09 "rekor kırma" sınıfı kademelenmez: kendi rekorunu kırmak deneyimle ZORLAŞIR,
-  orana bağlı kademe çaylağı ödüllendirirdi.
+- **Kademeli olanlar: 01-06 ve 28.** Kademe KÜMÜLATİF SAYAÇLADIR ve ASLA DÜŞMEZ:
+  standart ölçek bronz 1 · gümüş 3 · altın 5 · platin 8 · elmas 12; nadir ölçek (yalnız
+  28 Kusursuz Dörtlük) bronz 1 · gümüş 2 · altın 3 · platin 4 · elmas 6.
+  **Stellar sayaçla kazanılmaz:** elmas eşiği + o rozeti 3 MAÇ ÜST ÜSTE kazanma görevi.
+- 07-09 "rekor kırma" sınıfı kademelenmez: kendi rekorunu kırmak deneyimle ZORLAŞIR.
 - Tek seferlik rozetler: 19-24 ve 27. Diğerleri tekrarlanabilir (sayaç taşır).
 - Kilitli rozetlerde arayüz ilerleme gösterir (ör. Demirbaş 20 → "17/20").
 - Eşikler bu grubun ölçeğine göre kalibre edilmiştir (25 valid maç, 19 oyuncu, 2026-08-19).
   **Yeniden kalibrasyon tetikleyicisi: 50 ve 100 valid maç** — o noktalarda birkaç rozet
   fazla yayılacağı için eşikler yükseltilir (CHANGE_REQUESTS'e işlenerek).
+
+## Sonradan eklenen (katalog SONUNA eklenir — ID sırası dondurulmuştur)
+| ID | İSİM | AÇIKLAMA | key |
+|---|---|---|---|
+| 28 | Kusursuz Dörtlük | Aynı maçta MVP olup en yüksek hasarı, en çok gold'u ve en yüksek CS'i birden almış oyuncuya verilir | `perfect_quad` |
+
+`perfect_quad` KADEMELİDİR ama **nadir ölçek** kullanır (bronz 1 · gümüş 2 · altın 3 ·
+platin 4 · elmas 6); Stellar görevi "3 maç üst üste Kusursuz Dörtlük"tür ve bilinçli
+olarak fiilen ulaşılamaz bir efsane eşiğidir.
