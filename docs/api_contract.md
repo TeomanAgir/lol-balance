@@ -416,6 +416,9 @@ GET /roulette/current
 
 POST /matches/{id}/roulette/unlink
 → 200 {"status": "valid", "matches_replayed": 19, "role_matches_replayed": 19}
+
+POST /roulette/clear
+→ 200 {"deleted": 3}
 ```
 
 Kurallar:
@@ -435,6 +438,13 @@ Kurallar:
 - **Unlink (yanlış otomatik eşleşme):** maç `roulette` değilse `409`, bilinmeyen maç
   `404`. Başarıda maç `valid` olur, oturum `cancelled` olur ve HER İKİ evren auto-replay
   koşar (maç rating'e girer — sıra-dışı ingest replay'iyle aynı mekanizma).
+- **Liste temizleme (Teoman, 2026-08-19):** `POST /roulette/clear`, maça BAĞLANMAMIŞ
+  (`match_id IS NULL`, yani `open` + `cancelled`) TÜM oturum satırlarını SİLER ve silinen
+  sayıyı döner (`{"deleted": n}`; hiç yoksa 0). `linked` oturumlara DOKUNULMAZ (maç
+  detayındaki rulet bölümü ve rozetler onlardan türetilir). Rating'e/replay'e sıfır etki.
+  Normal `X-API-Key` yeterlidir (çekiliş de herkese açık — eğlence modu yüzeyi; admin
+  anahtarı GEREKMEZ). Kullanım: oynanmayan çekilişlerin birikimini ve açık oturumun
+  24 saat penceresinde sonraki custom'a yanlış oto-bağlanma riskini temizler.
 - Rozet türetimi §2 "Rozetler", maç yanıtındaki `roulette` alanı §3'tedir. Ters yönde
   manuel bağlama (valid → roulette) YOKTUR (bilinçli minimalizm; gerekirse ayrı karar).
 
