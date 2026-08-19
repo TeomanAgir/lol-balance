@@ -202,6 +202,9 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   }
   .sb-app.sb-open .sb-nav { transform: translateX(0); }
   .sb-app.sb-open .sb-scrim { opacity: 1; pointer-events: auto; }
+  /* Kontrol Paneli'nin sticky başlığı mobil üst barın ALTINA yapışır
+     (bar: 8+8 dolgu + 44px düğme = 60px), yoksa üst üste binerlerdi. */
+  .cp-top { top: 60px; }
 }
 
 /* ── Ana yerleşim ── */
@@ -1438,20 +1441,14 @@ button.hl-role:hover { border-color: var(--brass-dim); }
      desteklemeyen tarayıcıda buradaki metin 16px'e kısılmaz. */
   .match-teams .pos-ico { --pos-ico: 16px; }
 }
-.match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 /* fix-2: .btn-void kaldırıldı — herkese açık void düğmesi Geçmiş kartından
-   çıktı, eylem yalnız Kontrol Paneli'ndedir (.cp-btn.cp-danger). */
-.btn-roles {
-  font-size: 13px;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 14px;
-  min-height: 40px;
-}
-.btn-roles:hover { color: var(--brass); border-color: var(--brass-dim); }
+   çıktı, eylem yalnız Kontrol Paneli'ndedir (.cp-btn.cp-danger).
+   fix-3: .match-actions ve .btn-roles de kaldırıldı — rol düzenleyicinin
+   arayüzü de Kontrol Paneli'ne taşındı (kart artık salt gösterimdir). */
 
-/* ── Rol düzeltme paneli (PUT /matches/{id}/positions) ── */
+/* ── Rol düzeltme paneli (PUT /matches/{id}/positions) ──
+   fix-3'ten beri YALNIZ Kontrol Paneli'nin maç satırında açılır; sınıf adları
+   (bileşenin kendi adları) korundu, kabuğu .cp-row verir. */
 .role-editor {
   margin-top: 12px;
   border-top: 1px solid var(--line);
@@ -1482,14 +1479,11 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   font-size: 14px;
   padding: 4px 8px;
 }
-.btn-save-roles { margin-top: 12px; font-size: 14px; padding: 10px 20px; min-height: 44px; }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
 
 /* ── Maç detayı (GÖREV 8) — "md-" öneki bu görünüme aittir ──
    Kart tıklanabilir; klavye girişi başlıktaki .md-open düğmesidir. */
 .match-card { cursor: pointer; }
-.match-card .role-editor,
-.match-card .match-actions { cursor: default; }
 .md-open {
   font: inherit;
   color: var(--muted);
@@ -2913,7 +2907,7 @@ main.pa-wide { max-width: 1080px; }
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 .cp-badge {
   font-family: var(--display);
@@ -2935,16 +2929,106 @@ main.pa-wide { max-width: 1080px; }
 }
 .cp-lock:hover { color: var(--text); border-color: var(--brass-dim); }
 
-.cp-sec { margin-bottom: 28px; }
-.cp-sec-title {
-  font-family: var(--display);
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--brass);
-  margin-bottom: 4px;
+/* fix-3 iç düzen: sticky başlık + sekme şeridi, altında TEK bölüm.
+   .cp-sec / .cp-sec-title (alt alta dizili üç bölüm) kaldırıldı; bölüm
+   başlığının işini sekmeler görüyor. */
+.cp-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;   /* mobil üst bar (15) ALTINDA, içerik üstünde */
+  background: var(--bg);
+  padding-top: 2px;
+  margin-bottom: 14px;
 }
+.cp-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;          /* dar ekranda taşma yerine yatay kaydırma */
+  scrollbar-width: none;
+}
+.cp-tabs::-webkit-scrollbar { display: none; }
+.cp-tab {
+  font-family: var(--display);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  white-space: nowrap;
+  padding: 10px 14px;
+  min-height: 44px;
+  border-bottom: 2px solid transparent;
+}
+.cp-tab:hover:not(:disabled) { color: var(--text); }
+.cp-tab.active { color: var(--brass); border-bottom-color: var(--brass); }
+.cp-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Panel gövdesi odak hedefidir (yeniden çizimde son çare): görünür halka
+   yalnız klavye odağında çizilir. */
+.cp-pane:focus { outline: none; }
+.cp-pane:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
+
 .cp-sec-note { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+
+/* Araç çubuğu: arama + durum süzgeci + sonuç sayacı. Sayaç role="status"
+   taşır (liste değişimi ekran okuyucuya sayı olarak bildirilir). */
+.cp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cp-search, .cp-psearch, .cp-filter {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  padding: 8px 10px;
+  min-height: 40px;
+}
+.cp-search, .cp-psearch { flex: 1 1 180px; min-width: 0; }
+.cp-filter { flex: 0 0 auto; }
+.cp-count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* Uzun liste KENDİ alanında kayar: sayfa kısa kalır, sticky başlık ve araç
+   çubuğu her zaman görünür (Teoman: "sürekli aşağı kaydırmayalım"). */
+.cp-scroll {
+  max-height: clamp(300px, 58vh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px 2px 0;
+}
+
+/* Meşgul kilidi: eylem sürerken liste soluklaşır, düğmeler disabled olur. */
+.cp-shell.cp-busy { cursor: progress; }
+.cp-shell.cp-busy .cp-scroll { opacity: 0.65; }
+
+/* Bakım sekmesindeki sayaç kartları. */
+.cp-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.cp-stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cp-stat b {
+  display: block;
+  font-family: var(--display);
+  font-size: 20px;
+  letter-spacing: 0;
+  color: var(--text);
+}
 .cp-none { font-size: 14px; color: var(--muted); }
 
 .cp-btn {
@@ -2983,6 +3067,17 @@ main.pa-wide { max-width: 1080px; }
 }
 .cp-status.cp-st-valid { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .cp-status.cp-st-roulette { color: var(--brass); border-color: var(--brass-dim); }
+/* fix-3: void rozetinin RENGİ yoktu — geçerli maçtan ayırt edilemiyordu.
+   Dil .void-badge ile aynı (soluk, çerçeveli, kalın), dolgu bu satırda
+   göze çarpsın diye eklendi; satırın tamamı da soluklaşır. */
+.cp-status.cp-st-void {
+  color: var(--text);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  border-color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.cp-row.cp-voided { opacity: 0.72; }
+.cp-row.cp-voided:hover, .cp-row.cp-voided:focus-within { opacity: 1; }
 /* Takım özeti: dar ekranda alt alta, geniş ekranda yan yana. min-width:0
    şart — aksi halde uzun ad listesi grid çocuğunu taşırır (fix-2 dersi). */
 .cp-teams { display: grid; gap: 2px; font-size: 13px; }
@@ -2990,8 +3085,13 @@ main.pa-wide { max-width: 1080px; }
 .cp-team.blue { color: var(--blue); }
 .cp-team.red { color: var(--red); }
 .cp-vs { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-.cp-row-act { display: flex; justify-content: flex-end; }
+.cp-row-act { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: flex-end; }
 .cp-no-act { font-size: 12px; color: var(--muted); align-self: center; }
+/* Satır içi rol düzenleyici satırın TÜM genişliğini kaplar (geniş ekranda
+   .cp-row iki sütunlu grid'e döner). */
+.cp-row .role-editor { grid-column: 1 / -1; margin-top: 4px; }
+.cp-row .re-row .p-who { flex: 1 1 auto; min-width: 0; }
+.cp-rsave { margin-top: 10px; }
 
 .cp-players { list-style: none; display: grid; gap: 8px; }
 .cp-prow {

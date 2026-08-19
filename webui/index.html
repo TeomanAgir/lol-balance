@@ -346,16 +346,20 @@
     <div id="health-body" aria-live="polite"></div>
   </section>
 
-  <!-- ═══ Kontrol Paneli (fix-2) — şifre korumalı idari yüzey ═══ -->
+  <!-- ═══ Kontrol Paneli (fix-2; iç düzen fix-3) — şifre korumalı idari yüzey ═══ -->
   <!-- Sayfa girişte şifre sorar; şifre YALNIZ bellekte tutulur (localStorage'a
        YAZILMAZ) ve her sayfa yenilemesinde yeniden istenir. Doğrulama yan
        etkisiz GET /admin/ping (204) iledir; idari çağrılar X-API-Key'e EK
        olarak X-Admin-Key taşır (api_contract "Admin anahtarı"). İçerik tamamen
        app.js'te kurulur (loadControl → renderControlGate | renderControlPanel):
-       maç listesi + Void/Geri Al, tam replay, oyuncu adı düzeltme. -->
+       sekmeli panel — Maçlar (tüm maçlar + arama/süzgeç, Void/Geri Al, rol
+       düzeltme, rulet bağını çözme) · Oyuncular (ad düzeltme) · Bakım (replay).
+       fix-3: aria-live BURADAN KALDIRILDI — 200 satırlık liste her çizimde
+       baştan okunuyordu; canlı bildirim artık sonuç sayacındadır (role=status)
+       ve sonuç metinleri toast'ta duyurulur. -->
   <section id="view-control" class="view" hidden>
     <p class="view-hint" data-i18n="control.hint"></p>
-    <div id="control-body" aria-live="polite"></div>
+    <div id="control-body"></div>
   </section>
 
 </main>

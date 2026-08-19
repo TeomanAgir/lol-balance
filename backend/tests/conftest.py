@@ -120,6 +120,24 @@ def make_roster_payload(
     }
 
 
+@pytest.fixture(autouse=True)
+def admin_rate_limit_reset(monkeypatch):
+    """Admin hız sınırı (api_contract "Hız sınırı", fix-3) test izolasyonu.
+
+    Sayaç SÜREÇ BELLEĞİNDEDİR: testler arasında sızarsa yanlış anahtar sınayan
+    testler 403 yerine 429 görürdü. Ayrıca başarısız denemedeki sabit gecikme
+    sıfırlanır — süre ayarlanabilir olduğu için (modül sabiti) süite yavaşlık
+    getirmez. Gecikmenin/limitin KENDİSİNİ sınayan testler değerleri kendisi
+    ayarlar.
+    """
+    from app import deps
+
+    deps.reset_admin_rate_limit()
+    monkeypatch.setattr(deps, "ADMIN_FAIL_DELAY_S", 0.0)
+    yield
+    deps.reset_admin_rate_limit()
+
+
 @pytest.fixture
 def db_path(tmp_path):
     return tmp_path / "test.db"

@@ -9,6 +9,8 @@ import sqlite3
 
 from rating import Engine, ParticipantStats, Rating
 
+from .tx import maybe_transaction
+
 # match_participants'taki stat kolonları — ParticipantStats alanlarıyla birebir.
 # Rol evreni (role_ratings.py) aynı kolonları okur, bu yüzden public.
 STAT_FIELDS = (
@@ -243,14 +245,23 @@ def is_out_of_order(
     return row is not None
 
 
-def replay(conn: sqlite3.Connection, engine_version: str) -> int:
+def replay(
+    conn: sqlite3.Connection,
+    engine_version: str,
+    *,
+    join_transaction: bool = False,
+) -> int:
     """Aktif engine_version'ın rating_history'sini siler ve valid maçları
     played_at sırasıyla yeniden işler. İşlenen maç sayısını döner.
 
     Diğer engine_version'ların satırlarına dokunulmaz (db_schema ilke 3).
+
+    `join_transaction=True`: kendi transaction'ını AÇMAZ, çağıranınkine katılır
+    (api_contract §5 atomiklik notu — void/unvoid/unlink'te durum yazımı ve
+    replay tek transaction olmalıdır).
     """
     engine = Engine(version=engine_version)
-    with conn:
+    with maybe_transaction(conn, join_transaction):
         conn.execute(
             "DELETE FROM rating_history WHERE engine_version = ?", (engine_version,)
         )

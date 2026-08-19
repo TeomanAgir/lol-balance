@@ -47,5 +47,7 @@ rating (OpenSkill blend50, ana + rol evreni) → web UI (framework'süz).
 
 ## E2E deseni (orkestratör koşar; worker'a bilgi)
 `backend/data/lol_balance.db` scratchpad'e kopyalanır → `API_KEY=e2e-test-key
-DB_PATH=... uvicorn` (port 8123+) → `POST /admin/replay` → senaryo → tarayıcı doğrulaması.
+ADMIN_KEY=e2e-admin-key DB_PATH=... uvicorn` (port 8123+) → `POST /admin/replay`
+(fix-2'den beri `X-API-Key` YANINDA `X-Admin-Key` ister; ADMIN_KEY verilmezse 503,
+ASCII olmayan değer de 503 — fix-3) → senaryo → tarayıcı doğrulaması.
 Scratchpad oturumlar arası silinir; her seferinde yeniden kurulur.

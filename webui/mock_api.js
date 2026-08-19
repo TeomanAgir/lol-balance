@@ -1057,8 +1057,12 @@
       return json({ deleted });
     }
 
+    // fix-3: unlink İDARİ uç oldu (api_contract §4.5 + "Korunan uçların TAM
+    // listesi") — arayüzü de maç detayından Kontrol Paneli'ne taşındı.
     const unlinkMatch = path.match(/^\/matches\/(\d+)\/roulette\/unlink$/);
     if (method === "POST" && unlinkMatch) {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
       const match = matches.find(m => m.id === Number(unlinkMatch[1]));
       if (!match) return err(404, "Maç bulunamadı.");
       if (match.status !== "roulette") return err(409, "Bu maç rulet maçına bağlı değil.");
@@ -1084,9 +1088,14 @@
         return err(409, "Maç bir rulet maçı; rulet maçları zaten rating'e katılmıyor, void edilemez.");
       if (match.status === "void") return err(422, "Bu maç zaten void işaretli.");
       match.status = "void";
+      // fix-3: yanıt contract §3'teki TAM şekli taşır (rol evreni sayacı +
+      // engine_version); eksik alanlar UI'da sessizce "undefined" oluyordu.
+      const valid = matches.filter(m => m.status === "valid");
       return json({
         match_id: match.id, status: "void",
-        matches_replayed: matches.filter(m => m.status === "valid").length,
+        matches_replayed: valid.length,
+        role_matches_replayed: valid.filter(roleEligible).length,
+        engine_version: "openskill-pl-blend20-v1",
       });
     }
 
@@ -1100,9 +1109,12 @@
       if (match.status !== "void")
         return err(409, `Maç void değil (durum: ${match.status}); unvoid yalnız void maçlarda çalışır.`);
       match.status = "valid";
+      const valid = matches.filter(m => m.status === "valid");
       return json({
         match_id: match.id, status: "valid",
-        matches_replayed: matches.filter(m => m.status === "valid").length,
+        matches_replayed: valid.length,
+        role_matches_replayed: valid.filter(roleEligible).length,
+        engine_version: "openskill-pl-blend20-v1",
       });
     }
 
@@ -1124,10 +1136,34 @@
       });
     }
 
-    // Oyuncu adı düzeltme (Kontrol Paneli): İDARİ UÇ DEĞİLDİR — normal
-    // X-API-Key yeter (gerçek backend'le parite).
+    // Oyuncu ekleme (api_contract §2): fix-3'te İDARİ uç oldu. Web UI'da
+    // arayüzü henüz yok; mock'ta contract paritesi için duruyor.
+    if (method === "POST" && path === "/players") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      let body = {};
+      try { body = JSON.parse(opts.body); } catch { /* gövde JSON değil */ }
+      const name = String(body.display_name == null ? "" : body.display_name).trim();
+      if (!name) return err(422, "display_name zorunlu.");
+      const p = {
+        id: Math.max(...players.map(x => x.id)) + 1,
+        display_name: name,
+        riot_id: body.riot_id || null,
+        puuid: null,
+        matches_played: 0,
+        rating: { mu: 25.0, sigma: 8.333, ordinal: 0.0, perf_avg: 1.0, score: 0.0 },
+        role_ratings: POS.reduce((acc, r) => { acc[r] = defaultRole(); return acc; }, {}),
+      };
+      players.push(p);
+      return json({ id: p.id }, 201);
+    }
+
+    // Oyuncu adı düzeltme (Kontrol Paneli): fix-3'te İDARİ uç oldu — normal
+    // X-API-Key artık YETMEZ, X-Admin-Key de gerekir (gerçek backend'le parite).
     const patchPlayer = path.match(/^\/players\/(\d+)$/);
     if (method === "PATCH" && patchPlayer) {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
       const p = players.find(x => x.id === Number(patchPlayer[1]));
       if (!p) return err(404, "Oyuncu bulunamadı.");
       let body = {};

@@ -205,14 +205,20 @@ def void_match(
         # sessizce 200 dönmek replay'i boşuna koştururdu ve "void geri alındı
         # mı" karışıklığı yaratırdı (geri alma ayrı uçtur: /unvoid).
         raise HTTPException(422, detail="Bu maç zaten void işaretli.")
+    # Void, geçmişi değiştirir → HER İKİ evrende otomatik replay
+    # (api_contract §5; rol evreni GÖREV 0). Durum yazımı + iki replay TEK
+    # transaction'dır (fix-3): replay patlarsa status da geri alınır, aksi
+    # hâlde maç void görünürken rating'ler void öncesinde kalırdı.
     with conn:
         conn.execute(
             "UPDATE matches SET status = 'void' WHERE id = ?", (match_id,)
         )
-    # Void, geçmişi değiştirir → HER İKİ evrende otomatik replay
-    # (api_contract §5; rol evreni GÖREV 0).
-    matches_replayed = replay(conn, settings.engine_version)
-    role_matches_replayed = replay_roles(conn, settings.engine_version)
+        matches_replayed = replay(
+            conn, settings.engine_version, join_transaction=True
+        )
+        role_matches_replayed = replay_roles(
+            conn, settings.engine_version, join_transaction=True
+        )
     return {
         "match_id": match_id,
         "status": "void",
@@ -250,12 +256,17 @@ def unvoid_match(
                 "maçlarda çalışır."
             ),
         )
+    # Durum yazımı + iki evrenin replay'i TEK transaction (api_contract §5).
     with conn:
         conn.execute(
             "UPDATE matches SET status = 'valid' WHERE id = ?", (match_id,)
         )
-    matches_replayed = replay(conn, settings.engine_version)
-    role_matches_replayed = replay_roles(conn, settings.engine_version)
+        matches_replayed = replay(
+            conn, settings.engine_version, join_transaction=True
+        )
+        role_matches_replayed = replay_roles(
+            conn, settings.engine_version, join_transaction=True
+        )
     return {
         "match_id": match_id,
         "status": "valid",
@@ -265,7 +276,10 @@ def unvoid_match(
     }
 
 
-@router.post("/matches/{match_id}/roulette/unlink")
+@router.post(
+    "/matches/{match_id}/roulette/unlink",
+    dependencies=[Depends(require_admin_key)],
+)
 def unlink_roulette(
     match_id: int,
     conn: sqlite3.Connection = Depends(get_db),
@@ -276,6 +290,9 @@ def unlink_roulette(
     Maç `valid` olur, oturum `cancelled` olur ve HER İKİ evren replay koşar
     (maç rating'e girer — sıra-dışı ingest replay'iyle aynı mekanizma).
     Ters yönde manuel bağlama (valid → roulette) YOKTUR.
+
+    fix-3: `X-Admin-Key` İSTER — maçı rating'e sokan bir durum değişimidir,
+    void/unvoid ile aynı sınıftadır (api_contract "Korunan uçların TAM listesi").
     """
     row = conn.execute(
         "SELECT id, status FROM matches WHERE id = ?", (match_id,)
@@ -290,9 +307,16 @@ def unlink_roulette(
                 "unlink yalnız roulette maçlarda çalışır."
             ),
         )
-    unlink_match(conn, match_id)
-    matches_replayed = replay(conn, settings.engine_version)
-    role_matches_replayed = replay_roles(conn, settings.engine_version)
+    # Durum yazımı (maç + oturum) ve iki evrenin replay'i TEK transaction
+    # (api_contract §5, fix-3): replay patlarsa maç `roulette` kalır.
+    with conn:
+        unlink_match(conn, match_id, join_transaction=True)
+        matches_replayed = replay(
+            conn, settings.engine_version, join_transaction=True
+        )
+        role_matches_replayed = replay_roles(
+            conn, settings.engine_version, join_transaction=True
+        )
     return RouletteUnlinkResponse(
         status="valid",
         matches_replayed=matches_replayed,
