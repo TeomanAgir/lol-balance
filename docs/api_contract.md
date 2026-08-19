@@ -263,13 +263,14 @@ POST /matches/{id}/void            → maçı void işaretler ve HER İKİ evren
                                      Kontrol Paneli'ndedir). `status='roulette'` maçta
                                      409 — rulet maçı zaten rating dışıdır, void
                                      edilemez (Teoman, 2026-08-19; çözüm unlink'tir);
-                                     `status='void'` maçta 422 (mevcut davranış)
+                                     `status='void'` maçta 422
 POST /matches/{id}/unvoid          → void maçı `valid`'e döndürür + HER İKİ evrende
                                      replay (void'un simetriği; fix-2). `X-Admin-Key`
                                      İSTER. Bilinmeyen id → 404; `status != 'void'` →
-                                     409 (Türkçe detail). Yanıt şekli void'unkiyle
+                                     409 (Türkçe detail). Yanıt void'unkiyle birebir
                                      simetrik: {"match_id", "status": "valid",
-                                     "matches_replayed"}
+                                     "matches_replayed", "role_matches_replayed",
+                                     "engine_version"}
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
 
