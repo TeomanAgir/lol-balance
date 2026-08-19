@@ -180,6 +180,18 @@ def void_match(
     ).fetchone()
     if row is None:
         raise HTTPException(404, detail=f"Maç bulunamadı: {match_id}.")
+    if row["status"] == "roulette":
+        # api_contract §3 (Teoman, 2026-08-19): rulet maçı zaten rating
+        # dışıdır; void'un tek işlevi maçı rating'den çıkarmaktır, bu yüzden
+        # anlamsız. Yanlış eşleşmenin çözümü unlink'tir.
+        raise HTTPException(
+            409,
+            detail=(
+                f"Maç bir rulet maçı (durum: {row['status']}); rulet maçları "
+                "zaten rating'e katılmıyor, void edilemez. Yanlış eşleşmeyi "
+                "çözmek için unlink kullanın."
+            ),
+        )
     with conn:
         conn.execute(
             "UPDATE matches SET status = 'void' WHERE id = ?", (match_id,)

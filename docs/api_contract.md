@@ -249,7 +249,10 @@ GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı
                                      maç detayına atlama)
 PUT  /matches/{id}/items           → katılımcı envanterlerini yazar (GÖREV 14
                                      backfill-items; rating'e etkisi YOK, replay koşmaz)
-POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler
+POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler.
+                                     `status='roulette'` maçta 409 — rulet maçı zaten
+                                     rating dışıdır, void edilemez (Teoman, 2026-08-19;
+                                     yanlış eşleşme çözümü unlink'tir)
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
 
@@ -472,9 +475,11 @@ tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui
   (Data Dragon `item.json` tr_TR + en_US'ten üretilir; `desc_*` düz metin, HTML etiketleri temizlenir).
   `completed` (GÖREV 23): "tamamlanmış eşya" bayrağı — SR'da satın alınabilir, başka eşyaya
   DÖNÜŞMEYEN (`into` yok), bileşenlerden ÜRETİLEN (`from` var) eşyalar; trinket/tüketilebilir/bot
-  eşyaları hariç. Kesin sezgisel `fetch_ddragon.py`'dedir; kabul ölçütü: klasik efsanevi
-  eşyalar (ör. 3031 Ebedi Kılıç, 3026 Koruyucu Melek) `true`, bileşen/tüketilebilir/trinket/
-  botlar `false`. Rulet eşya havuzu = `completed: true` olanlar (istemci süzer).
+  eşyaları hariç; ayrıca DD'nin mod/kuyruk VARYANTI kayıtları (aynı eşyanın 6 haneli id'li
+  ikizi — gerçek maç envanteri hep KANONİK id bildirir) hariç. Kesin sezgisel
+  `fetch_ddragon.py`'dedir; kabul ölçütü: klasik efsanevi eşyalar (ör. 3031 Ebedi Kılıç,
+  3026 Koruyucu Melek) `true`, bileşen/tüketilebilir/trinket/botlar ve mod varyantları
+  `false`. Rulet eşya havuzu = `completed: true` olanlar (istemci süzer).
 - `champions.json` — `{"<championName>": {"icon": "champion/<Name>.png"}}` (ad eşleşmesi
   participants.champion string'iyle)
 - `item/<id>.png`, `champion/<Name>.png` — ikonlar

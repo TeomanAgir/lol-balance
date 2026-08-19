@@ -276,6 +276,10 @@
     });
   })();
 
+  // api_contract §3: `roulette` alanı HER maçta bulunur — bağlı oturum yoksa
+  // null. Tek yerden tamamlanır ki her maç kurucusuna elle eklenmesin.
+  matches.forEach(m => { if (m.roulette === undefined) m.roulette = null; });
+
   matches.sort((a, b) => Date.parse(b.played_at) - Date.parse(a.played_at)); // en yeni başta
 
   // ── Yardımcılar ──
@@ -1045,6 +1049,10 @@
     if (method === "POST" && voidMatch) {
       const match = matches.find(m => m.id === Number(voidMatch[1]));
       if (!match) return err(404, "Maç bulunamadı.");
+      // api_contract §3 (Teoman, 2026-08-19): rulet maçı zaten rating dışıdır,
+      // void anlamsız → 409 (gerçek backend'le parite; unlink 409'uyla aynı kalıp).
+      if (match.status === "roulette")
+        return err(409, "Maç bir rulet maçı; rulet maçları zaten rating'e katılmıyor, void edilemez.");
       if (match.status === "void") return err(422, "Bu maç zaten void işaretli.");
       match.status = "void";
       return json({ match_id: match.id, status: "void" });
@@ -1061,6 +1069,8 @@
         duration_s: body.duration_s,
         winner_team: body.winner_team,
         status: "valid",
+        // Elle girilen maç rulet oturumuna bağlanmaz (api_contract §3: null).
+        roulette: null,
         participants: body.participants.map(pt => {
           const p = players.find(x => x.id === pt.player_id);
           const won = pt.team === body.winner_team;

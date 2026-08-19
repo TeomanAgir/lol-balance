@@ -522,17 +522,18 @@ def test_roulette_match_excluded_from_valid_statistics(client):
     assert any(m["id"] == match_id for m in client.get("/api/v1/matches").json())
 
 
-def test_void_endpoint_still_works_on_roulette_match(client, db):
-    """Mevcut davranış belgelenir: void ucu rulet maçında da çalışır — maç
-    void olur, iki evren replay edilir (no-op), oturum linked kalır."""
+def test_void_roulette_match_409(client, db):
+    """api_contract §3 (Teoman, 2026-08-19): rulet maçı zaten rating dışıdır,
+    void anlamsızdır → 409. Replay TETİKLENMEZ, maç `roulette` kalır, rating
+    satırları değişmez (zaten yok). Yanlış eşleşmenin çözümü unlink'tir."""
     ids, session, match_id = _link_setup(client)
+    before = _rating_rows(db)
     resp = client.post(f"/api/v1/matches/{match_id}/void")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["status"] == "void"
-    assert body["matches_replayed"] == 0  # başka valid maç yok
-    assert _match_status(db, match_id) == "void"
-    # Oturum linked kalır (void ucu rulet oturumuna dokunmaz — mevcut davranış).
+    assert resp.status_code == 409, resp.text
+    assert "rulet" in resp.json()["detail"]
+    assert _match_status(db, match_id) == "roulette"
+    assert _rating_rows(db) == before == (0, 0)
+    # Oturum linked kalır (void reddedildi, hiçbir şeye dokunmadı).
     assert _session_row(db, session["session_id"]) == {
         "status": "linked",
         "match_id": match_id,
