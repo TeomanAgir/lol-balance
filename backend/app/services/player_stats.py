@@ -11,15 +11,29 @@ hiçbir metriğe girmez.
 from __future__ import annotations
 
 import sqlite3
-from fractions import Fraction
 
 from rating import ROLES
 
 from .items import load_items
 
-# api_contract §2: sinerji için en az 2 ortak maç, en fazla 3 kayıt döner.
-SYNERGY_MIN_MATCHES = 2
-SYNERGY_LIMIT = 3
+# --------------------------------------------------------------------------
+# Sinerji katsayıları (api_contract §2 `synergy`, GÖREV 22 — 2026-08-19)
+# --------------------------------------------------------------------------
+# Bunlar GÖSTERİM ayarıdır, dondurulmuş rating spec'i DEĞİLDİR: değişmeleri
+# replay gerektirmez, yalnız contract güncellemesi ister. Bu yüzden modül
+# seviyesinde ADLANDIRILMIŞ sabitlerdir (contract adlarıyla birebir).
+SYNERGY_MIN_TOGETHER = 4  # MIN_TOGETHER: aday olma eşiği (n >= 4)
+SYNERGY_SHRINKAGE_M = 4.0  # M: küçük örneklemi 0'a çeken shrinkage sabiti
+SYNERGY_W_WR = 0.5  # W_WR: winrate lift ağırlığı
+SYNERGY_W_PERF = 0.5  # W_PERF: perf lift ağırlığı
+SYNERGY_PERF_SCALE = 3.4  # PERF_SCALE: perf farkını winrate ölçeğine getirir
+# solo(Z) boşsa (oyuncunun çift dışında hiç maçı yok) wr_solo nötr kabul edilir.
+SYNERGY_NEUTRAL_WR_SOLO = 0.5
+SYNERGY_LIMIT = 3  # yanıta en fazla 3 kayıt
+
+# Yuvarlama yalnız YANITTA; hesap ve sıralama ham değerle (api_contract §2).
+SYNERGY_SCORE_PRECISION = 3
+SYNERGY_PERF_DELTA_PRECISION = 2
 
 # api_contract §2 `top_items` (GÖREV 14): en fazla 10 kayıt.
 TOP_ITEMS_LIMIT = 10
@@ -150,50 +164,207 @@ def _top_items(rows: list[sqlite3.Row]) -> list[dict]:
     ]
 
 
-def _synergy(conn: sqlite3.Connection, player_id: int) -> list[dict]:
-    """AYNI TAKIMDA ≥2 valid maç oynanmış takım arkadaşları (api_contract §2).
+def _mean(values: list[float]) -> float | None:
+    """Ortalama; hiç değer yoksa None ("hesaplanamıyor" ayrı bir durumdur)."""
+    if not values:
+        return None
+    return sum(values) / len(values)
 
-    Sıralama: winrate azalan → matches_together azalan → display_name
-    alfabetik; ilk 3 kayıt. Winrate karşılaştırması Fraction ile tam yapılır
-    (float yuvarlaması eşitlikleri bozmasın).
+
+def _perf_lift(
+    matches: dict[int, tuple[bool, float | None]], together: set[int]
+) -> float:
+    """`ort(perf | together) − ort(perf | solo)` (api_contract §2 `perf_lift`).
+
+    `perf_score`'u NULL olan maç hiçbir ortalamaya girmez. Taraflardan biri
+    hesaplanamıyorsa (o kümede hiç perf'li maç yok) lift 0 sayılır — yokluk
+    "kötü oynadı" demek değildir.
+
+    Toplama SIRASI match_id artan olarak sabittir; replay perf_score'ları
+    bit-bit yeniden ürettiği için yanıt da bit-bit korunur.
+    """
+    together_perfs: list[float] = []
+    solo_perfs: list[float] = []
+    for match_id in sorted(matches):
+        perf = matches[match_id][1]
+        if perf is None:
+            continue
+        (together_perfs if match_id in together else solo_perfs).append(perf)
+    together_avg = _mean(together_perfs)
+    solo_avg = _mean(solo_perfs)
+    if together_avg is None or solo_avg is None:
+        return 0.0
+    return together_avg - solo_avg
+
+
+def _wr_solo(
+    matches: dict[int, tuple[bool, float | None]], together: set[int]
+) -> float:
+    """Çiftin DIŞINDAKİ maçların winrate'i; solo küme boşsa nötr 0.5."""
+    solo = [win for match_id, (win, _) in matches.items() if match_id not in together]
+    if not solo:
+        return SYNERGY_NEUTRAL_WR_SOLO
+    return sum(1 for win in solo if win) / len(solo)
+
+
+def synergy_score(
+    n: int,
+    wins_together: int,
+    wr_solo_x: float,
+    wr_solo_y: float,
+    perf_lift_x: float,
+    perf_lift_y: float,
+) -> tuple[float, float]:
+    """(score, perf_delta) — api_contract §2 `synergy` formülünün TAMAMI.
+
+    `score = n/(n+M) * (W_WR * wr_lift + W_PERF * PERF_SCALE * perf_delta)`
+    `wr_lift = wins(together)/n − (wr_solo(X) + wr_solo(Y))/2`
+    `perf_delta = (perf_lift(X) + perf_lift(Y)) / 2`
+
+    Saf fonksiyondur (DB bilmez): formülün her parçası tek başına sınanabilsin
+    diye ayrı durur. Yuvarlama YOKTUR — o yalnız yanıt katmanındadır.
+    """
+    perf_delta = (perf_lift_x + perf_lift_y) / 2
+    wr_lift = wins_together / n - (wr_solo_x + wr_solo_y) / 2
+    shrinkage = n / (n + SYNERGY_SHRINKAGE_M)
+    score = shrinkage * (
+        SYNERGY_W_WR * wr_lift + SYNERGY_W_PERF * SYNERGY_PERF_SCALE * perf_delta
+    )
+    return score, perf_delta
+
+
+def synergy_sort_key(item: tuple[float, dict]) -> tuple:
+    """(ham score, yanıt kaydı) → sıralama anahtarı (api_contract §2).
+
+    `score` azalan → `matches_together` azalan → `display_name` alfabetik.
+    Karşılaştırma HAM score iledir; yanıttaki yuvarlanmış değer sıralamayı
+    etkilemez.
+    """
+    score, entry = item
+    return (-score, -entry["matches_together"], entry["display_name"])
+
+
+def _player_matches(
+    conn: sqlite3.Connection, player_ids: list[int], engine_version: str
+) -> dict[int, dict[int, tuple[bool, float | None]]]:
+    """player_id → {match_id: (kazandı mı, perf_score)} (yalnız valid maçlar).
+
+    `perf_score` AKTİF engine'in `rating_history` satırından okunur; backend
+    perf'i KENDİ hesaplamaz (rating paketinin yazdığı değer tek kaynaktır —
+    badges/MVP ile birebir aynı yol). LEFT JOIN: satırı olmayan katılımcının
+    perf'i NULL'dır, maçın kendisi yine sayılır (W/L tarafına girer).
+    """
+    placeholders = ",".join("?" for _ in player_ids)
+    rows = conn.execute(
+        "SELECT mp.player_id, mp.match_id,"
+        " CASE WHEN mp.team = m.winner_team THEN 1 ELSE 0 END AS win,"
+        " rh.perf_score "
+        "FROM match_participants mp "
+        "JOIN matches m ON m.id = mp.match_id "
+        "LEFT JOIN rating_history rh ON rh.match_id = mp.match_id"
+        " AND rh.player_id = mp.player_id AND rh.engine_version = ? "
+        f"WHERE m.status = 'valid' AND mp.player_id IN ({placeholders}) "
+        "ORDER BY mp.match_id, mp.id",
+        (engine_version, *player_ids),
+    ).fetchall()
+    by_player: dict[int, dict[int, tuple[bool, float | None]]] = {
+        pid: {} for pid in player_ids
+    }
+    for row in rows:
+        by_player[row["player_id"]][row["match_id"]] = (
+            bool(row["win"]),
+            row["perf_score"],
+        )
+    return by_player
+
+
+def _synergy(
+    conn: sqlite3.Connection, player_id: int, engine_version: str
+) -> list[dict]:
+    """Birlikte EN İYİ OYNANAN takım arkadaşları (api_contract §2, GÖREV 22).
+
+    Eski tanım (salt birlikte-winrate, eşik 2) canlı veride gürültü olduğu
+    ÖLÇÜLEREK terk edildi (CHANGE_REQUESTS 2026-08-19). Yeni ölçüt lift'tir:
+    çift birlikteyken normalinden ne kadar iyi oynuyor/kazanıyor.
+
+    Aday: aynı takımda `n >= MIN_TOGETHER` valid maç. Yanıta yalnız
+    `score > 0` girer (pozitif sinerji yoksa sahte birinci gösterilmez);
+    sıralama ham `score` azalan → `matches_together` azalan → `display_name`
+    alfabetik; en fazla 3 kayıt.
     """
     rows = conn.execute(
         "SELECT o.player_id AS player_id, p.display_name AS display_name,"
-        " COUNT(*) AS matches_together,"
-        " SUM(CASE WHEN o.team = m.winner_team THEN 1 ELSE 0 END) AS wins_together "
+        " me.match_id AS match_id "
         "FROM match_participants me "
         "JOIN matches m ON m.id = me.match_id "
         "JOIN match_participants o ON o.match_id = me.match_id"
         "  AND o.team = me.team AND o.player_id <> me.player_id "
         "JOIN players p ON p.id = o.player_id "
         "WHERE me.player_id = ? AND m.status = 'valid' "
-        "GROUP BY o.player_id, p.display_name "
-        "HAVING COUNT(*) >= ? "
-        "ORDER BY o.player_id",
-        (player_id, SYNERGY_MIN_MATCHES),
+        "ORDER BY o.player_id, me.match_id",
+        (player_id,),
     ).fetchall()
-    ordered = sorted(
-        rows,
-        key=lambda r: (
-            -Fraction(r["wins_together"], r["matches_together"]),
-            -r["matches_together"],
-            r["display_name"],
-        ),
+
+    together: dict[int, set[int]] = {}
+    names: dict[int, str] = {}
+    for row in rows:
+        together.setdefault(row["player_id"], set()).add(row["match_id"])
+        names[row["player_id"]] = row["display_name"]
+    candidates = sorted(
+        pid for pid, shared in together.items()
+        if len(shared) >= SYNERGY_MIN_TOGETHER
     )
-    return [
-        {
-            "player_id": r["player_id"],
-            "display_name": r["display_name"],
-            "matches_together": r["matches_together"],
-            "wins_together": r["wins_together"],
-            "winrate": _winrate(r["wins_together"], r["matches_together"]),
-        }
-        for r in ordered[:SYNERGY_LIMIT]
-    ]
+    if not candidates:
+        return []
+
+    matches = _player_matches(conn, [player_id, *candidates], engine_version)
+    mine = matches[player_id]
+
+    scored: list[tuple[float, dict]] = []
+    for pid in candidates:
+        shared = together[pid]
+        n = len(shared)
+        theirs = matches[pid]
+        wins_together = sum(1 for match_id in shared if mine[match_id][0])
+        score, perf_delta = synergy_score(
+            n,
+            wins_together,
+            _wr_solo(mine, shared),
+            _wr_solo(theirs, shared),
+            _perf_lift(mine, shared),
+            _perf_lift(theirs, shared),
+        )
+        if score <= 0:
+            continue
+        scored.append(
+            (
+                score,
+                {
+                    "player_id": pid,
+                    "display_name": names[pid],
+                    "matches_together": n,
+                    "wins_together": wins_together,
+                    "winrate": _winrate(wins_together, n),
+                    "score": round(score, SYNERGY_SCORE_PRECISION),
+                    # `+ 0.0`: çok küçük negatif fark yuvarlanınca IEEE -0.0
+                    # üretir ve JSON'a "-0.0" diye düşerdi; işaret sıfırlanır
+                    # (değer aynı, yalnız gösterim).
+                    "perf_delta": round(perf_delta, SYNERGY_PERF_DELTA_PRECISION) + 0.0,
+                },
+            )
+        )
+    scored.sort(key=synergy_sort_key)
+    return [entry for _, entry in scored[:SYNERGY_LIMIT]]
 
 
-def player_stats(conn: sqlite3.Connection, player_id: int) -> dict | None:
-    """Oyuncu profil istatistikleri; oyuncu yoksa None (router 404 üretir)."""
+def player_stats(
+    conn: sqlite3.Connection, player_id: int, engine_version: str
+) -> dict | None:
+    """Oyuncu profil istatistikleri; oyuncu yoksa None (router 404 üretir).
+
+    `engine_version` yalnız sinerjinin perf tarafı içindir: `perf_score` AKTİF
+    engine'in `rating_history` satırlarından okunur (badges/MVP ile aynı yol).
+    """
     player = conn.execute(
         "SELECT id, display_name, riot_id FROM players WHERE id = ?", (player_id,)
     ).fetchone()
@@ -220,6 +391,6 @@ def player_stats(conn: sqlite3.Connection, player_id: int) -> dict | None:
         "kda": _kda(rows),
         "favorite_champion": _favorite_champion(rows),
         "favorite_role": _favorite_role(rows),
-        "synergy": _synergy(conn, player_id),
+        "synergy": _synergy(conn, player_id, engine_version),
         "top_items": _top_items(rows),
     }
