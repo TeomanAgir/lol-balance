@@ -65,7 +65,7 @@ PATCH /players/{id}                → kısmi güncelleme (display_name)
 ```
 `ordinal = mu - 3*sigma` (W/L çekirdeğinin muhafazakâr tahmini). `perf_avg` ve `score`
 harman engine alanlarıdır (bkz. rating_contract.md "Harman Engine"): aktif version bir
-harman engine'i iken (bugün `openskill-pl-blend20-v1`) `score` efektif rating'dir ve
+harman engine'i iken (bugün `openskill-pl-blend30-s2-v1`) `score` efektif rating'dir ve
 **leaderboard `score` ile sıralanır**; harman olmayan version'larda `perf_avg = null`,
 `score = ordinal`.
 Misafir/üye ayrımı yoktur; ingest'te bilinmeyen puuid otomatik oyuncu oluşturur (bkz. db_schema).
@@ -159,7 +159,7 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
 GET /players/{id}/rating-history
 → 200 {
   "player_id": 3,
-  "engine_version": "openskill-pl-blend20-v1",
+  "engine_version": "openskill-pl-blend30-s2-v1",
   "points": [
     {"match_id": 12, "played_at": "2026-08-11T20:41:03Z", "win": true,
      "champion": "Ahri", "position": "MIDDLE",
@@ -620,7 +620,7 @@ Body: {
   "top_n": 3                        // en dengeli kaç alternatif dönsün (default 3)
 }
 → 200 {
-  "engine_version": "openskill-pl-blend20-v1",
+  "engine_version": "openskill-pl-blend30-s2-v1",
   "suggestions": [
     {
       "team_100": [{"player_id": 1, "position": "TOP"},
