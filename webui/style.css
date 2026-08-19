@@ -540,32 +540,28 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   margin-bottom: 8px;
 }
 .ps-empty { color: var(--muted); font-size: 14px; }
+/* GÖREV 22: başlığın altındaki kısa açıklama satırı (skorun ne anlama geldiği) —
+   tooltip yerine daima görünür metin, dokunmatik ekranda da okunsun diye. */
+.ps-hint { color: var(--muted); font-size: 12px; margin: -2px 0 10px; max-width: 52ch; }
 
-.syn-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--brass-dim);
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-.syn-top .syn-name { font-size: 18px; font-weight: 700; color: var(--brass); }
-.syn-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.syn-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .syn-rest { list-style: none; margin-top: 8px; display: grid; gap: 6px; }
 .syn-rest li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
 }
-.syn-link { padding: 0; text-align: left; font-weight: 600; transition: color 0.12s; }
+.syn-link { padding: 0; text-align: left; font-weight: 600; transition: color 0.12s; min-width: 0; overflow-wrap: anywhere; }
 .syn-link:hover { color: var(--brass); }
+/* skor + ortak-maç metni birlikte sağa yaslanır, dar ekranda tek blok olarak sarar */
+.syn-stats { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.syn-score { font-weight: 700; font-variant-numeric: tabular-nums; cursor: help; }
 
 /* ── Rating tarihçesi grafiği (GÖREV 10) — "ph-" öneki profil tarihçesine aittir ──
    Grafik satır içi SVG'dir ve viewBox ile kapsayıcıya oranlı ölçeklenir; eksen

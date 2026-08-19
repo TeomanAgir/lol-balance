@@ -365,18 +365,25 @@
     top_items: [],
   });
 
+  // Oyuncunun tüm valid maçlarını (m, kendi participant satırı) döner — playerStats
+  // ("mine") ve GÖREV 22 sinerji hesabı (aday arkadaşın KENDİ solo maçları için) ortak kullanır.
+  function validMatchesFor(pid) {
+    const list = [];
+    for (const m of matches) {
+      if (m.status !== "valid") continue;
+      const part = m.participants.find(x => x.player_id === pid);
+      if (part) list.push({ m, part });
+    }
+    return list;
+  }
+
   function playerStats(id) {
     const p = players.find(x => x.id === id);
     if (!p) return null;
     // Ece (matches_played: 0) → contract'taki tüm null/boş yolları temsil eden senaryo.
     if (!p.matches_played) return emptyStats(p);
 
-    const mine = [];
-    for (const m of matches) {
-      if (m.status !== "valid") continue;
-      const part = m.participants.find(x => x.player_id === id);
-      if (part) mine.push({ m, part });
-    }
+    const mine = validMatchesFor(id);
     if (!mine.length) return emptyStats(p);
 
     const wins = mine.filter(({ m, part }) => m.winner_team === part.team).length;
@@ -432,28 +439,72 @@
       .sort((a, b) => b[1] - a[1] || POS.indexOf(a[0]) - POS.indexOf(b[0]))[0];
     const favorite_role = favR ? { role: favR[0], matches: favR[1] } : null;
 
-    // synergy: AYNI TAKIMDA oynanan valid maçlar, en az 2 ortak maç, en fazla 3 kayıt.
-    const mates = new Map();
-    for (const { m, part } of mine) {
-      const won = m.winner_team === part.team;
+    // synergy [YENİDEN TANIMLANDI — GÖREV 22, api_contract §2]: "birlikteyken diğer
+    // maçlarına göre ne kadar iyi oynadınız" (winrate-lift + perf-lift harmanı).
+    // perf_score gerçek formülü backend/rating paketindedir; burada YALNIZ şekli
+    // doğrulamak için deterministik bir vekil (perfProxy) kullanılır — sayılar
+    // backend'le birebir eşleşmek zorunda değil (mock kuralı).
+    const SYN_MIN_TOGETHER = 4, SYN_M = 4, SYN_W_WR = 0.5, SYN_W_PERF = 0.5, SYN_PERF_SCALE = 3.4;
+    const togetherByMate = new Map(); // player_id -> [{m, part: mine-satırı}]
+    for (const row of mine) {
+      const { m, part } = row;
       for (const other of m.participants) {
         if (other.player_id === id || other.team !== part.team) continue;
-        const e = mates.get(other.player_id) || {
-          player_id: other.player_id, display_name: other.display_name,
-          matches_together: 0, wins_together: 0,
-        };
-        e.matches_together++;
-        if (won) e.wins_together++;
-        mates.set(other.player_id, e);
+        if (!togetherByMate.has(other.player_id)) togetherByMate.set(other.player_id, []);
+        togetherByMate.get(other.player_id).push(row);
       }
     }
-    const synergy = [...mates.values()]
-      .filter(e => e.matches_together >= 2)
-      .map(e => ({ ...e, winrate: +(e.wins_together / e.matches_together).toFixed(3) }))
-      .sort((a, b) => b.winrate - a.winrate ||
+    const winrateOf = (list) => {
+      if (!list.length) return 0.5; // solo(Z) boşsa contract: 0.5
+      const w = list.filter(({ m, part }) => m.winner_team === part.team).length;
+      return w / list.length;
+    };
+    // perfProxy ham birimleri (kill*3+... büyüklüğünde) gerçek perf_score'un
+    // ~1.0 ortalamalı ölçeğinden çok büyük — badges (mvp/bench) yalnız SIRALAMA
+    // kullandığı için sorun değil, ama burada FARK (perf_delta) doğrudan gösterime
+    // gidiyor. /100 ölçeklemesi contract örneğindeki büyüklüğe (score≈0.25,
+    // perf_delta≈0.2) yaklaştırır — yalnız GÖRÜNÜM gerçekçiliği, hesap etkilenmez.
+    const perfAvgOf = (list) => {
+      const vals = list.map(({ part }) => perfProxy(part)).filter(v => typeof v === "number");
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length / 100 : null;
+    };
+    const synergy = [...togetherByMate.entries()]
+      .map(([matePid, together]) => {
+        const n = together.length;
+        const mate = players.find(x => x.id === matePid);
+        const wins_together = together.filter(({ m, part }) => m.winner_team === part.team).length;
+        const togetherIds = new Set(together.map(({ m }) => m.id));
+        const soloXlist = mine.filter(({ m }) => !togetherIds.has(m.id));
+        const soloYlist = validMatchesFor(matePid).filter(({ m }) => !togetherIds.has(m.id));
+        const wrLift = wins_together / n - (winrateOf(soloXlist) + winrateOf(soloYlist)) / 2;
+        const perfXTogether = perfAvgOf(together);
+        const perfYTogether = perfAvgOf(together.map(({ m }) => ({ part: m.participants.find(x => x.player_id === matePid) })));
+        const perfXSolo = perfAvgOf(soloXlist);
+        const perfYSolo = perfAvgOf(soloYlist);
+        const liftX = (perfXTogether != null && perfXSolo != null) ? perfXTogether - perfXSolo : 0;
+        const liftY = (perfYTogether != null && perfYSolo != null) ? perfYTogether - perfYSolo : 0;
+        const perf_delta = (liftX + liftY) / 2;
+        const shrink = n / (n + SYN_M);
+        const score = shrink * (SYN_W_WR * wrLift + SYN_W_PERF * SYN_PERF_SCALE * perf_delta);
+        return {
+          player_id: matePid, display_name: mate ? mate.display_name : `#${matePid}`,
+          matches_together: n, wins_together,
+          winrate: +(wins_together / n).toFixed(3),
+          score: +score.toFixed(3), perf_delta: +perf_delta.toFixed(2),
+        };
+      })
+      .filter(e => e.matches_together >= SYN_MIN_TOGETHER && e.score > 0)
+      .sort((a, b) => b.score - a.score ||
                       b.matches_together - a.matches_together ||
                       a.display_name.localeCompare(b.display_name))
       .slice(0, 3);
+    // GÖREV 22 SENARYO: Selin (13, en az maçlı — 5) doğal hesapta eşiği zar zor
+    // geçen tek bir aday buluyor (score sıfıra çok yakın). "Kayda değer sinerji
+    // yok" boş-durum yolunun mock'ta GÜVENİLİR biçimde denenebilmesi için burada
+    // bilerek boşaltılır (dosyadaki diğer SENARYO BAYRAKLARI ile aynı desen —
+    // ör. m===1'de position null). UI: profil.synergy_empty, toplam maç sayısıyla
+    // ("5 maç") bağlam verir.
+    if (id === 13) synergy.length = 0;
 
     // top_items (GÖREV 14): yalnız items DOLU maçlar (null olanlar atlanır);
     // aynı maçta aynı eşya BİR KEZ sayılır; sıra sayım azalan → item_id artan;
