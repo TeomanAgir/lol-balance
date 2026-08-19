@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from rating import ROLES, Engine, Rating
 
 from ..config import Settings, get_settings
-from ..deps import get_db
+from ..deps import get_db, require_admin_key
 from ..schemas import (
     PlayerBadgesOut,
     PlayerCreate,
@@ -188,11 +188,19 @@ def player_badge_list(
     return badges
 
 
-@router.post("/players", status_code=201)
+@router.post(
+    "/players", status_code=201, dependencies=[Depends(require_admin_key)]
+)
 def create_player(
     body: PlayerCreate,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
+    """Roster'a elle oyuncu ekler (api_contract §2).
+
+    fix-3: `X-Admin-Key` İSTER — giriş noktası Kontrol Paneli'dir. Collector
+    bu ucu KULLANMAZ (yalnız `GET /players` okur), bu yüzden korumaya alınması
+    arkadaşların exe'sini etkilemez.
+    """
     with conn:
         cur = conn.execute(
             "INSERT INTO players (riot_id, display_name) VALUES (?, ?)",
@@ -201,12 +209,19 @@ def create_player(
     return {"id": cur.lastrowid}
 
 
-@router.patch("/players/{player_id}")
+@router.patch(
+    "/players/{player_id}", dependencies=[Depends(require_admin_key)]
+)
 def patch_player(
     player_id: int,
     body: PlayerPatch,
     conn: sqlite3.Connection = Depends(get_db),
 ) -> dict:
+    """Oyuncu adını düzeltir (api_contract §2).
+
+    fix-3: `X-Admin-Key` İSTER — ad düzeltme yalnız Kontrol Paneli'nden yapılır.
+    Collector bu ucu KULLANMAZ.
+    """
     row = conn.execute(
         "SELECT id FROM players WHERE id = ?", (player_id,)
     ).fetchone()
