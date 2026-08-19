@@ -288,6 +288,22 @@
   const err = (status, detail) => json({ detail }, status);
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // ── İdari anahtar (fix-2, api_contract "Admin anahtarı") ──
+  // Mock'ta SABİT SAHTE bir anahtar kullanılır; gerçek şifreyle ilgisi yoktur
+  // ve olamaz (repo public). Kontrol Paneli'ni mock modunda denemek için
+  // giriş ekranına bu değer yazılır.
+  const MOCK_ADMIN_KEY = "mock-admin-key";
+  // Gerçek backend'de ADMIN_KEY yapılandırılmamışsa uçlar 503 döner; mock'ta
+  // bu yolu denemek için aşağıdaki bayrak konsoldan true yapılabilir.
+  window.MOCK_ADMIN_KEY_MISSING = false;
+  const adminGuard = (opts) => {
+    if (window.MOCK_ADMIN_KEY_MISSING)
+      return err(503, "Yönetim anahtarı sunucuda yapılandırılmamış (ADMIN_KEY); idari uçlar kapalı.");
+    const given = (opts.headers || {})["X-Admin-Key"];
+    if (given !== MOCK_ADMIN_KEY) return err(403, "Yönetim anahtarı eksik veya hatalı.");
+    return null;
+  };
+
   // Takıma rol atar: açgözlü (en yüksek rol skoru önce), eşitlikte ilk bulunan kalır.
   // Gerçek atama backend'de (126 ayrım × 120 atama); burada sadece şekil doğru olsun diye.
   // fixed = {player_id, position} verilirse o oyuncu o role sabitlenir (nemesis maçı).
@@ -1045,8 +1061,12 @@
       return json({ status: "valid", matches_replayed: replayed, role_matches_replayed: replayed });
     }
 
+    // İdari uçlar (fix-2): X-API-Key'e EK olarak X-Admin-Key ister.
+    // adminGuard null dönerse anahtar geçerlidir, aksi halde hazır hata yanıtı.
     const voidMatch = path.match(/^\/matches\/(\d+)\/void$/);
     if (method === "POST" && voidMatch) {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
       const match = matches.find(m => m.id === Number(voidMatch[1]));
       if (!match) return err(404, "Maç bulunamadı.");
       // api_contract §3 (Teoman, 2026-08-19): rulet maçı zaten rating dışıdır,
@@ -1055,7 +1075,60 @@
         return err(409, "Maç bir rulet maçı; rulet maçları zaten rating'e katılmıyor, void edilemez.");
       if (match.status === "void") return err(422, "Bu maç zaten void işaretli.");
       match.status = "void";
-      return json({ match_id: match.id, status: "void" });
+      return json({
+        match_id: match.id, status: "void",
+        matches_replayed: matches.filter(m => m.status === "valid").length,
+      });
+    }
+
+    // Void'un simetriği (api_contract §3, fix-2): yalnız void maçta çalışır.
+    const unvoidMatch = path.match(/^\/matches\/(\d+)\/unvoid$/);
+    if (method === "POST" && unvoidMatch) {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      const match = matches.find(m => m.id === Number(unvoidMatch[1]));
+      if (!match) return err(404, "Maç bulunamadı.");
+      if (match.status !== "void")
+        return err(409, `Maç void değil (durum: ${match.status}); unvoid yalnız void maçlarda çalışır.`);
+      match.status = "valid";
+      return json({
+        match_id: match.id, status: "valid",
+        matches_replayed: matches.filter(m => m.status === "valid").length,
+      });
+    }
+
+    // Admin anahtarı doğrulama ucu (api_contract §5): 204, yan etkisiz.
+    if (method === "GET" && path === "/admin/ping") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      return new Response(null, { status: 204 });
+    }
+
+    if (method === "POST" && path === "/admin/replay") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      const valid = matches.filter(m => m.status === "valid");
+      return json({
+        matches_replayed: valid.length,
+        role_matches_replayed: valid.filter(roleEligible).length,
+        engine_version: "openskill-pl-blend20-v1",
+      });
+    }
+
+    // Oyuncu adı düzeltme (Kontrol Paneli): İDARİ UÇ DEĞİLDİR — normal
+    // X-API-Key yeter (gerçek backend'le parite).
+    const patchPlayer = path.match(/^\/players\/(\d+)$/);
+    if (method === "PATCH" && patchPlayer) {
+      const p = players.find(x => x.id === Number(patchPlayer[1]));
+      if (!p) return err(404, "Oyuncu bulunamadı.");
+      let body = {};
+      try { body = JSON.parse(opts.body); } catch { /* gövde JSON değil */ }
+      if (body.display_name !== undefined && body.display_name !== null) {
+        const name = String(body.display_name).trim();
+        if (!name) return err(422, "display_name boş olamaz.");
+        p.display_name = name;
+      }
+      return json({ id: p.id, display_name: p.display_name, riot_id: p.riot_id });
     }
 
     if (method === "POST" && path === "/ingest/match") {

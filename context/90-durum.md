@@ -1,6 +1,37 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-08-16 (orkestratör)
+Son güncelleme: 2026-08-19 (orkestratör)
+
+## 2026-08-19: fix-2 — Kontrol Paneli + isim tazeleme + mobil stack (PR #64/#65/#66)
+- Görev listesi artık `modules/` klasöründe (yerel-only; new_modules.md kalktı).
+- **fix-2a (PR #64, CANLIDA):** puuid eşleşmesinde isim tazeleme — riot_id her zaman,
+  display_name yalnız özelleştirilmemişse; DUPLICATE ingest'te de çalışır (backfill
+  adları onarır). `refresh_player_name(s)` @ backend/app/services/ingest.py.
+- **fix-2c (PR #65, CANLIDA):** Geçmiş kartında ≤420px'te takım sütunları alt alta
+  (mavi üst) + `.match-teams > .team { min-width:0 }`. Eski "<410px taşma" kapandı;
+  Sıralama ~330px taşması hâlâ AÇIK.
+- **fix-2b (PR #66):** Kontrol Paneli — sol panelde şifreli sayfa (`cp-`); şifre yalnız
+  bellekte, `GET /admin/ping` ile doğrulanır. `ADMIN_KEY` env (k8s secret, optional
+  ref; DEĞER REPODA YOK — bkz. hafıza/CHANGE_REQUESTS) + `X-Admin-Key` katmanı:
+  void (artık 422 void-üstüne-void) / YENİ unvoid (valid + iki evren replay) /
+  /admin/replay / ping. Geçmiş kartındaki herkese açık void düğmesi KALDIRILDI.
+  Panel v1: maç void/geri al listesi + tüm-replay + oyuncu adı düzeltme (PATCH).
+  E2E tarayıcıda PASS (şifre kapısı 403/204, void↔unvoid+replay determinizmi,
+  rename, 359px stack).
+- **Deploy sonrası bekleyen:** (1) VPS'te secret'a ADMIN_KEY eklenmesi (Teoman;
+  komut PR #66 gövdesinde) — yoksa idari uçlar 503. (2) Canlı maç #22 (1736190243,
+  yanlış void) yeni unvoid ucuyla geri getirilecek. (3) Oyuncu #5 "YETİ VE PİÇİ"
+  yeni nick'i: Teoman söylerse PATCH, yoksa arkadaş backfill'i otomatik düzeltir.
+
+## 2026-08-17/19: GÖREV 18-23 (PR #56-#63) — hepsi CANLIDA
+- 18 Geçmiş delta = efektif score farkı · 19 KDA gösterimi · 20 Manuel ekranı
+  kaldırıldı (Sağlık kendi satırında) · 21 Seçim danışmanı (S3, advisor.js, rafta
+  değil ama 21-FIX'e evrildi) · 21-FIX Eşleşme Optimizasyonu (M1 Sahne, mo-;
+  S3 rafta) + negatif counter uyarısı · 22 sol panel gruplaması (GRUP ORTAMI /
+  ŞAMPİYON SEÇİMİ) · 23 RULET (PR #63): çekiliş ekranı, migration 0006,
+  /roulette uçları, oto-eşleşme/unlink, 3 rozet, `status='roulette'` rating dışı,
+  void edilemez (409); eşya havuzu kanonik id düzeltmesi (132→112, mod
+  varyantları elendi).
 
 ## 2026-08-16: aktif engine `openskill-pl-blend20-v1` — CANLIDA TAMAM
 - Teoman kararı (simülasyon destekli, CHANGE_REQUESTS 2026-08-16): W/L %20 + perf %80

@@ -1,8 +1,10 @@
 # lol-balance — Kubernetes manifests (VPS cluster'a uyarlanmış)
 # Uygulayan: VPS agent, 2026-08-11. Kaynak brief: deploy/VPS_AGENT_BRIEF.md
 # NOT: Secret'lar bu dosyada DEĞİL — imperatif oluşturulur:
-#   kubectl -n lol-balance create secret generic lol-balance-secrets --from-literal=API_KEY=<değer>
+#   kubectl -n lol-balance create secret generic lol-balance-secrets \
+#     --from-literal=API_KEY=<değer> --from-literal=ADMIN_KEY=<değer>
 #   kubectl -n lol-balance create secret docker-registry ghcr-pull ... (apps ns'inden kopyalandı)
+# ADMIN_KEY (fix-2) idari uçların ikinci anahtarıdır; yoksa o uçlar 503 verir.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -48,6 +50,20 @@ spec:
                 name: lol-balance-secrets
           # DB_PATH ve WEBUI_DIR image içinde tanımlı (/data/lol_balance.db, /app/webui)
           # ENGINE_VERSION verilmez: image default'u aktif version'dır
+          env:
+            # İdari uçların ikinci anahtarı (api_contract "Admin anahtarı", fix-2):
+            # void / unvoid / admin replay / admin ping bunu ister. Değer YALNIZ
+            # secret'ta yaşar — repo public, hiçbir dosyaya yazılmaz:
+            #   kubectl -n lol-balance patch secret lol-balance-secrets \
+            #     -p '{"stringData":{"ADMIN_KEY":"<değer>"}}'
+            # optional: true — secret'ta anahtar henüz yokken deploy KIRILMAZ;
+            # o durumda backend idari uçlara 503 döner (yüzey kapalı kalır).
+            - name: ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lol-balance-secrets
+                  key: ADMIN_KEY
+                  optional: true
           volumeMounts:
             - name: data
               mountPath: /data

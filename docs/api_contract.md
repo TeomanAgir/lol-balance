@@ -2,6 +2,14 @@
 
 Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (tek shared secret; arkadaş grubu ölçeği için yeterli, kullanıcı bazlı auth bilinçli olarak kapsam dışı).
 
+**Admin anahtarı (fix-2, Teoman 2026-08-19):** İdari uçlar (`/matches/{id}/void`,
+`/matches/{id}/unvoid`, `/admin/replay`, `/admin/ping`) `X-API-Key`'e EK olarak
+`X-Admin-Key` header'ı ister. Değer backend'e `ADMIN_KEY` env değişkeniyle verilir
+(k8s secret; REPOYA ASLA YAZILMAZ — repo public). `ADMIN_KEY` yapılandırılmamışsa bu
+uçlar 503 döner (Türkçe `detail`: admin anahtarı yapılandırılmamış); header yok/yanlışsa
+403. Web UI'daki giriş noktası "Kontrol Paneli" sayfasıdır: sayfa şifreyi her ziyarette
+sorar, yalnız bellekte tutar (localStorage'a YAZILMAZ) ve `GET /admin/ping` ile doğrular.
+
 ## 1. Ingest
 `POST /ingest/match` — bkz. `ingest_contract.md` (tek doğruluk kaynağı orası).
 
@@ -249,10 +257,20 @@ GET  /matches/{id}                 → tek maç; liste elemanıyla birebir aynı
                                      maç detayına atlama)
 PUT  /matches/{id}/items           → katılımcı envanterlerini yazar (GÖREV 14
                                      backfill-items; rating'e etkisi YOK, replay koşmaz)
-POST /matches/{id}/void            → maçı void işaretler ve rating replay tetikler.
-                                     `status='roulette'` maçta 409 — rulet maçı zaten
-                                     rating dışıdır, void edilemez (Teoman, 2026-08-19;
-                                     yanlış eşleşme çözümü unlink'tir)
+POST /matches/{id}/void            → maçı void işaretler ve HER İKİ evrende replay
+                                     tetikler. `X-Admin-Key` İSTER (fix-2 — herkese
+                                     açık void kaldırıldı; web UI'da düğme yalnız
+                                     Kontrol Paneli'ndedir). `status='roulette'` maçta
+                                     409 — rulet maçı zaten rating dışıdır, void
+                                     edilemez (Teoman, 2026-08-19; çözüm unlink'tir);
+                                     `status='void'` maçta 422
+POST /matches/{id}/unvoid          → void maçı `valid`'e döndürür + HER İKİ evrende
+                                     replay (void'un simetriği; fix-2). `X-Admin-Key`
+                                     İSTER. Bilinmeyen id → 404; `status != 'void'` →
+                                     409 (Türkçe detail). Yanıt void'unkiyle birebir
+                                     simetrik: {"match_id", "status": "valid",
+                                     "matches_replayed", "role_matches_replayed",
+                                     "engine_version"}
 PUT  /matches/{id}/positions       → katılımcı rollerini günceller (GÖREV 0)
 ```
 
@@ -425,8 +443,11 @@ Kurallar:
 POST /admin/replay                 → HER İKİ evreni yeniden kurar: ana rating_history +
                                      role_rating_history (aktif engine_version için siler,
                                      valid maçları kronolojik sırayla yeniden işler).
-                                     Dönen: {matches_replayed, role_matches_replayed,
-                                             engine_version}
+                                     `X-Admin-Key` İSTER (fix-2; Kontrol Paneli'nden
+                                     tetiklenir). Dönen: {matches_replayed,
+                                     role_matches_replayed, engine_version}
+GET  /admin/ping                   → 204; `X-Admin-Key` doğrulama ucu (fix-2 — Kontrol
+                                     Paneli giriş şifresini bununla sınar; yan etkisiz)
 GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
                                      (harman olmayan version'da score = ordinal;
                                       role_ratings alanı burada da döner, bkz. §2)
