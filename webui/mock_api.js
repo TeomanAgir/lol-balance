@@ -38,6 +38,17 @@
   const effScoreAt = (mu, sigma, pavg) =>
     +(0.2 * mu + 0.8 * (25 + 20 * (pavg - 1)) - 3 * sigma).toFixed(2);
 
+  // Sıra değişimi (api_contract §5): YALNIZ /leaderboard'da döner, /players'ta
+  // yoktur. Oyuncu id → rank_delta; listede dört hâlin dördü de bulunsun diye
+  // sabit bir örnek dağılım: yükselen (+), düşen (−), değişmeyen (0) ve
+  // karşılaştırılamayan (null: 14'ün hiç maçı yok — önceki anda rating satırı
+  // olmayan oyuncuda sahte yükseliş gösterilmez; panelden eklenen yeni oyuncu da
+  // haritada bulunmadığı için null alır).
+  const RANK_DELTA = {
+    1: 0, 2: 2, 3: -1, 4: 1, 5: -2, 6: 3, 7: 0,
+    8: -1, 9: 0, 10: 1, 11: -3, 12: 0, 13: 1, 14: null,
+  };
+
   const CHAMPS = ["Ahri", "Lee Sin", "Jinx", "Thresh", "Darius", "Yasuo", "Lux", "Ezreal", "Vi", "Orianna"];
   const POS = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 
@@ -68,6 +79,27 @@
       rr[role] = { mu, sigma, perf_avg: perf, score: roleScoreOf(mu, sigma, perf), matches };
     });
     p.role_ratings = rr;
+  });
+
+  // KALABALIK ROL (profil rol sıralaması penceresi, 2026-08-19): pencere
+  // "lider → ayraç → ±3 komşuluk → ayraç → sonuncu" düzenindedir, yani TAM
+  // hâlini görebilmek için o rolde EN AZ 10 oyuncu gerekir (9 satır sığar).
+  // Yukarıdaki ana/ikincil dağılım role başına ~6 kişi bırakıyor; bu yüzden
+  // ORTA koridoru bilerek doldurulur: maçı olan HER oyuncunun (13 kişi) orada
+  // birkaç maçı olur → biri 1., biri sonuncu, çoğu ortalarda. Diğer roller
+  // seyrek kalır, böylece "az oyuncu → tam liste, ayraç yok" hâli de görülür;
+  // EMPTY_ROLE ise hiç oynanmamış rolün (tıklanamaz simge) örneğidir.
+  const CROWD_ROLE = "MIDDLE";
+  players.forEach(p => {
+    if (CROWD_ROLE === EMPTY_ROLE) return; // iki senaryo bayrağı çakışmasın
+    if (!p.matches_played || p.role_ratings[CROWD_ROLE].matches) return;
+    const matches = 2 + (p.id % 4);
+    const mu = +(p.rating.mu - 1.4).toFixed(2);
+    const sigma = +Math.max(1.5, p.rating.sigma + 2.2).toFixed(3);
+    const perf = +((p.rating.perf_avg == null ? 1.0 : p.rating.perf_avg) - 0.09).toFixed(2);
+    p.role_ratings[CROWD_ROLE] = {
+      mu, sigma, perf_avg: perf, score: roleScoreOf(mu, sigma, perf), matches,
+    };
   });
 
   // Rol evreni uygunluğu (rating_contract "Rol Rating Evreni" §3): 10 katılımcının
@@ -1301,7 +1333,11 @@
     if (method === "GET" && path === "/badges") return json(badgeCatalogPayload());
 
     if (method === "GET" && path === "/leaderboard")
-      return json([...players].sort((a, b) => b.rating.score - a.rating.score));
+      return json(
+        [...players]
+          .sort((a, b) => b.rating.score - a.rating.score)
+          .map(p => ({ ...p, rank_delta: RANK_DELTA[p.id] === undefined ? null : RANK_DELTA[p.id] }))
+      );
 
     if (method === "GET" && path === "/highlights/weekly") return json(weeklyHighlights());
 

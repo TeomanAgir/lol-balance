@@ -24,7 +24,7 @@ STAT_FIELDS = (
 )
 
 
-def replay_order_by(alias: str = "") -> str:
+def replay_order_by(alias: str = "", *, desc: bool = False) -> str:
     """Replay'in maç sıralama anahtarı — TEK doğruluk noktası.
 
     Değişmez 3 ("incremental sonuç == tam replay sonucu") bu anahtara bağlıdır;
@@ -32,11 +32,16 @@ def replay_order_by(alias: str = "") -> str:
     (`rating_history`) aynı ifadeyi paylaşır ki hiçbiri diğerinden kayamasın.
     `alias`, maç tablosuna JOIN'de takma ad verildiğinde (`m`) geçilir.
 
+    `desc=True` aynı anahtarın TERSİ'ni verir ("en yeni maç" arayanlar için;
+    `rank_delta` referans anı böyle bulunur — anahtar yine tek yerde tanımlı
+    kalsın diye ayrı bir ORDER BY yazılmaz).
+
     `is_out_of_order` bu ifadeyi SQL WHERE'e çevirir; oradaki karşılaştırma
     burasıyla birlikte düşünülür (bkz. o fonksiyonun docstring'i).
     """
     prefix = f"{alias}." if alias else ""
-    return f"ORDER BY {prefix}played_at, {prefix}id"
+    direction = " DESC" if desc else ""
+    return f"ORDER BY {prefix}played_at{direction}, {prefix}id{direction}"
 
 
 def current_ratings(
