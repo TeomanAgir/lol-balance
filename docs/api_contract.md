@@ -112,9 +112,38 @@ rating'e girmez — Faz 2 pair-synergy rating modeli AYRI ve hâlâ kapsam dış
   hiç şampiyonlu maç yoksa `null`.
 - `favorite_role`: position null hariç en çok oynanan rol; eşitlikte kanonik sıra
   (TOP < JUNGLE < MIDDLE < BOTTOM < UTILITY); hiç yoksa `null`.
-- `synergy`: AYNI TAKIMDA birlikte oynanan valid maçlar; en az 2 ortak maç; sıralama
-  winrate azalan → matches_together azalan → display_name alfabetik; en fazla 3 kayıt
-  döner (UI ilkini "en yüksek sinerji" olarak vurgular). Uygun kimse yoksa `[]`.
+- `synergy` [YENİDEN TANIMLANDI — GÖREV 22, Teoman 2026-08-19]: "birlikteyken daha iyi
+  oynuyor musunuz" ölçüsü. Eski tanım (salt birlikte-winrate, eşik 2) canlı veride
+  gürültü olduğu ölçülerek terk edildi (split-half korelasyon −0.22, permütasyon
+  p=0.70, oyuncuların %39'unda birinci sıra 2-3 maça dayanıyordu; ayrıntı
+  CHANGE_REQUESTS 2026-08-19). Yanıt şekli:
+  ```json
+  {"player_id": 7, "display_name": "Fugori", "matches_together": 5, "wins_together": 4,
+   "winrate": 0.8, "score": 0.255, "perf_delta": 0.18}
+  ```
+  Tanım (X = oyuncu, Y = aday arkadaş; hepsi yalnız valid maçlar):
+  - `together` = X ve Y'nin AYNI TAKIMDA olduğu maçlar, `n = |together|`;
+    **aday olma eşiği `n >= 4`** (MIN_TOGETHER).
+  - `solo(Z)` = Z'nin valid maçları EKSİ `together` (yani çiftin dışındaki maçları).
+  - `perf_lift(Z) = ort(perf_score(Z, together)) − ort(perf_score(Z, solo(Z)))`;
+    perf_score'u olmayan maç ortalamaya GİRMEZ; taraflardan birinde ortalama
+    hesaplanamıyorsa (hiç perf'li maç yok) o oyuncunun lift'i `0` sayılır.
+    `perf_delta = (perf_lift(X) + perf_lift(Y)) / 2`.
+  - `wr_lift = wins(together)/n − (wr_solo(X) + wr_solo(Y))/2`, burada
+    `wr_solo(Z) = wins(solo(Z))/|solo(Z)|`, `solo(Z)` boşsa `0.5`.
+  - `score = n/(n+M) * (W_WR * wr_lift + W_PERF * PERF_SCALE * perf_delta)` —
+    `M=4` (shrinkage; küçük örneklem ortalamaya çekilir), `W_WR=W_PERF=0.5`,
+    `PERF_SCALE=3.4` (perf farkını winrate ölçeğine getiren katsayı).
+  - Yanıta yalnız **`score > 0`** olanlar girer, en fazla 3 kayıt; sıralama `score`
+    azalan → `matches_together` azalan → `display_name` alfabetik (hesap HAM değerle,
+    yuvarlama yalnız yanıtta: `score` ve `perf_delta` 3 ve 2 ondalık). Uygun/pozitif
+    kimse yoksa `[]` (UI "kayda değer sinerji yok" der; sahte birinci GÖSTERMEZ).
+  - Bu bir GÖSTERİM katmanıdır: rating'e girmez, `perf_score` tanımına dokunmaz
+    (rating paketinden okunur, kopyalanmaz), replay determinizmi şarttır. Katsayılar
+    (`M`, `W_*`, `PERF_SCALE`, `MIN_TOGETHER`) gösterim ayarıdır — dondurulmuş rating
+    spec'i DEĞİLDİR; değişmeleri replay gerektirmez, yalnız contract güncellemesi ister.
+  - UI başlığı "en sinerjili takım arkadaşın" DEĞİL, "birlikte en iyi oynadıkların"
+    dilindedir (modülün iddiası veriyle örtüşsün diye; Teoman kararı).
 - `top_items` (GÖREV 14): oyuncunun `items` bilgisi DOLU valid maçlarındaki eşya
   sayımları — `[{"item_id": 3031, "matches": 5}]`, en fazla 10 kayıt, sıralama
   sayım azalan → item_id artan. Aynı maçta aynı eşya bir kez sayılır. Hiç items'lı
