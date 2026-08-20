@@ -33,11 +33,18 @@ class BlendParams:
     """Harman (efektif rating) sabitleri — engine version'ına dondurulmuş.
 
     mu_eff = (1-w) * mu + w * (mu_0 + k * (p_avg - 1))
+    score  = mu_eff - s * sigma
+
+    `s` (sigma katsayısı) BAĞIMSIZ bir eksendir ve YALNIZCA harman score'unu
+    ilgilendirir: `Rating.ordinal` (W/L çekirdeğinin muhafazakâr tahmini)
+    her zaman `mu - 3*sigma`'dır ve bu sabitten ETKİLENMEZ
+    (rating_contract "Harman Engine — blend30-s2 → API etkisi").
     """
 
     mu_0: float
     k: float
     w: float
+    s: float
 
 
 # Bilinen version string'leri ve bağlı parametreler.
@@ -49,6 +56,9 @@ class BlendParams:
 # hem harman teriminde sayılırsa çift sayım olur (contract "Model" §1).
 # blend20 ile blend50 arasındaki TEK fark harman ağırlığıdır (w): version
 # adındaki sayı W/L (mu) payını söyler (blend20 → mu %20, performans %80).
+# blend30-s2'de İKİ fark vardır: w (mu payı %30 → w=0.70) ve sigma katsayısı
+# (s=2; version adındaki "s2"). Diğer her şey (W/L çekirdeği, perf hesabı)
+# aynıdır. Eski harman version'ları s=3 ile DONDURULMUŞTUR.
 _VERSIONS = {
     "openskill-pl-v1": {
         "model": dict(_BASE_PARAMS),
@@ -69,12 +79,17 @@ _VERSIONS = {
     "openskill-pl-blend50-v1": {
         "model": dict(_BASE_PARAMS),
         "perf": None,
-        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.5),
+        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.5, s=3.0),
     },
     "openskill-pl-blend20-v1": {
         "model": dict(_BASE_PARAMS),
         "perf": None,
-        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.8),
+        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.8, s=3.0),
+    },
+    "openskill-pl-blend30-s2-v1": {
+        "model": dict(_BASE_PARAMS),
+        "perf": None,
+        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.70, s=2.0),
     },
 }
 
@@ -86,6 +101,12 @@ class Rating:
 
     @property
     def ordinal(self) -> float:
+        """W/L çekirdeğinin muhafazakâr tahmini — TANIMI DEĞİŞMEZ.
+
+        Katsayı 3.0 burada bilinçli olarak SABİTTİR: harman version'larının
+        `s` sabiti (bkz. BlendParams) yalnızca `EffectiveRating.score`'u
+        ilgilendirir, ordinal'i asla (rating_contract blend30-s2 "API etkisi").
+        """
         return self.mu - 3.0 * self.sigma
 
 
@@ -95,7 +116,7 @@ class EffectiveRating:
 
     mu_eff: float
     sigma: float
-    score: float  # mu_eff - 3*sigma
+    score: float  # mu_eff - S*sigma (S = aktif version'ın BlendParams.s'i)
 
 
 class Engine:
@@ -169,13 +190,14 @@ class Engine:
         return compute_perf_scores(s100, s200, duration_s)
 
     def effective(self, mu: float, sigma: float, p_avg: float) -> EffectiveRating:
-        """Efektif rating: mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)).
+        """Efektif rating: mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)),
+        score = mu_eff - S*sigma (S version'a dondurulmuş sigma katsayısı).
 
         Yalnızca harman version'larında (`openskill-pl-blend50-v1`,
-        `openskill-pl-blend20-v1`) geçerlidir; diğerlerinde ValueError (yanlış
-        version'la sıralama üretmek sessiz veri bozulması olur, erken patlasın).
-        p_avg: oyuncunun kariyer perf ortalaması; maçı olmayan oyuncu için
-        1.0 geçilir.
+        `openskill-pl-blend20-v1`, `openskill-pl-blend30-s2-v1`) geçerlidir;
+        diğerlerinde ValueError (yanlış version'la sıralama üretmek sessiz veri
+        bozulması olur, erken patlasın). p_avg: oyuncunun kariyer perf
+        ortalaması; maçı olmayan oyuncu için 1.0 geçilir.
         """
         if self._blend is None:
             blend_versions = sorted(
@@ -187,7 +209,7 @@ class Engine:
             )
         b = self._blend
         mu_eff = (1.0 - b.w) * mu + b.w * (b.mu_0 + b.k * (p_avg - 1.0))
-        return EffectiveRating(mu_eff=mu_eff, sigma=sigma, score=mu_eff - 3.0 * sigma)
+        return EffectiveRating(mu_eff=mu_eff, sigma=sigma, score=mu_eff - b.s * sigma)
 
     def predict_win(self, team100: list[Rating], team200: list[Rating]) -> float:
         self._check_team(team100, "team100")

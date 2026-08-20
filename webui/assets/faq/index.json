@@ -22,8 +22,8 @@
         "en": "We won but my score barely moved. Why?"
       },
       "summary": {
-        "tr": "W/L skorun yalnızca %20'si; skoru asıl oynatan maç içi performansındır.",
-        "en": "W/L is only 20% of the score; what really moves it is your in-game performance."
+        "tr": "W/L skorun yalnızca %30'u; skoru asıl oynatan maç içi performansındır.",
+        "en": "W/L is only 30% of the score; what really moves it is your in-game performance."
       },
       "file": {
         "tr": "tr/kazandik-skor-az-artti.md",
@@ -78,12 +78,12 @@
     {
       "slug": "yeni-oyuncu-sifir",
       "title": {
-        "tr": "Yeni gelen arkadaşım neden 0'da?",
-        "en": "Why is my newly joined friend at 0?"
+        "tr": "Yeni gelen arkadaşım neden ~8.33'te?",
+        "en": "Why is my newly joined friend at ~8.33?"
       },
       "summary": {
-        "tr": "Herkes 0'dan başlar: nötr güç tahmini eksi tam belirsizlik.",
-        "en": "Everyone starts at 0: a neutral strength estimate minus full uncertainty."
+        "tr": "Herkes ~8.33'ten başlar: nötr güç tahmini eksi tam belirsizlik.",
+        "en": "Everyone starts at ~8.33: a neutral strength estimate minus full uncertainty."
       },
       "file": {
         "tr": "tr/yeni-oyuncu-sifir.md",

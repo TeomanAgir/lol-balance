@@ -2,17 +2,17 @@
 
 > Bu rehber oyuncular içindir; teknik tanım değildir. Bağlayıcı spesifikasyon
 > repo'daki `docs/rating_contract.md` dosyasındadır (aktif engine:
-> `openskill-pl-blend20-v1`).
+> `openskill-pl-blend30-s2-v1`).
 
 Leaderboard'daki o tek sayı rastgele değil: her custom maçtan sonra aynı
 kurallarla, herkes için aynı şekilde yeniden hesaplanıyor. İşte adım adım tüm mutfak.
 
 ## Büyük resim
 
-**Skor = %20 kazanmak + %80 nasıl oynadığın − belirsizlik payı**
+**Skor = %30 kazanmak + %70 nasıl oynadığın − belirsizlik payı**
 
 ```
- %20 W/L  |  %80 Performans (KDA · hasar · gold · CS · vizyon)
+ %30 W/L  |  %70 Performans (KDA · hasar · gold · CS · vizyon)
 ```
 
 Bu ikisinin harmanından bir "efektif güç" çıkar; sistem senden ne kadar emin
@@ -69,18 +69,24 @@ istikrar kazanır.
 ## 4. Harman ve görünen skor
 
 Şimdi iki dünya birleşir. Önce performans ortalaması mu ile aynı ölçeğe
-çevrilir, sonra **%20 W/L + %80 performans** ağırlığıyla harmanlanır:
+çevrilir, sonra **%30 W/L + %70 performans** ağırlığıyla harmanlanır:
 
 ```
-mu_eff = 0.2 × mu + 0.8 × (25 + 20 × (P_avg − 1))
-SKOR   = mu_eff − 3 × sigma
+mu_eff = 0.3 × mu + 0.7 × (25 + 20 × (P_avg − 1))
+SKOR   = mu_eff − 2 × sigma
 ```
 
-"− 3 × sigma" şu demek: sistem, gücünden emin olmadığı kadarını skorundan
+"− 2 × sigma" şu demek: sistem, gücünden emin olmadığı kadarını skorundan
 **peşinen düşer**. Az maç oynamış birinin skoru bu yüzden baskıdır; maç
 oynadıkça sigma düşer ve gerçek gücün skora yansır. Hiç maçı olmayan oyuncu
-tam 0'dan başlar (25 − 3 × 8.33 = 0) — leaderboard'da nötr görünmesinin
+~8.33'ten başlar (25 − 2 × 8.33 ≈ 8.33) — leaderboard'da nötr görünmesinin
 sebebi bu.
+
+> **Ölçek notu:** bu sürüme kadar sigma katsayısı 3 idi ve W/L payı %20'ydi;
+> hiç maçı olmayan oyuncu tam 0'dan başlıyordu. Katsayı 3'ten 2'ye inince
+> tüm skorlar (herkesinki, aynı oranda) **~7 puan yukarı kaydı** — bu bir
+> "herkes birden iyileşti" değil, yalnızca gösterim ölçeğinin değişmesi.
+> Sıralama anlamı aynı kalır.
 
 ## Uçtan uca bir örnek
 
@@ -89,14 +95,14 @@ bilançosu artıda), sigma = 7.36 (hâlâ epey belirsizlik var), P_avg = 1.27
 (maçlarında ortalamanın %27 üstünde oynuyor).
 
 ```
-mu_eff = 0.2 × 26.29 + 0.8 × (25 + 20 × 0.27)
-       = 5.26 + 0.8 × 30.33 = 29.52
+mu_eff = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
+       = 7.89 + 0.7 × 30.33 = 29.12
 
-SKOR   = 29.52 − 3 × 7.36 = 7.45
+SKOR   = 29.12 − 2 × 7.36 = 14.40
 ```
 
-Dikkat: skorunun 24.3 puanı performanstan, 5.3 puanı W/L'den geliyor — ama
-22.1 puan belirsizliğe gitti. Bu oyuncu maç oynamaya devam ettikçe sigma
+Dikkat: skorunun 21.2 puanı performanstan, 7.9 puanı W/L'den geliyor — ama
+14.7 puan belirsizliğe gitti. Bu oyuncu maç oynamaya devam ettikçe sigma
 düşecek ve skoru, oyunu hiç değişmese bile yükselecek.
 
 ## Rol skorları: aynı hesap, rol başına ayrı defter
