@@ -78,12 +78,12 @@
     {
       "slug": "yeni-oyuncu-sifir",
       "title": {
-        "tr": "Yeni gelen arkadaşım neden 0'da?",
-        "en": "Why is my newly joined friend at 0?"
+        "tr": "Yeni gelen arkadaşım neden ~8.33'te?",
+        "en": "Why is my newly joined friend at ~8.33?"
       },
       "summary": {
-        "tr": "Herkes 0'dan başlar: nötr güç tahmini eksi tam belirsizlik; eksi skorlar da normaldir.",
-        "en": "Everyone starts at 0: a neutral strength estimate minus full uncertainty — and negative scores are normal."
+        "tr": "Herkes ~8.33'ten başlar: nötr güç tahmini eksi tam belirsizlik.",
+        "en": "Everyone starts at ~8.33: a neutral strength estimate minus full uncertainty."
       },
       "file": {
         "tr": "tr/yeni-oyuncu-sifir.md",

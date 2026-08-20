@@ -82,21 +82,15 @@ SCORE  = mu_eff − 2 × sigma
 "− 2 × sigma" means: the system **deducts up front** however much of your
 strength it isn't sure about. That's why a player with few matches has a
 suppressed score; as matches accumulate, sigma shrinks and your real strength
-shows through. For a player with no matches the raw value is
-25 − 2 × 8.33 ≈ 8.33.
+shows through. A player with no matches starts at roughly 8.33
+(25 − 2 × 8.33 ≈ 8.33) — which is why newcomers look neutral on the leaderboard.
 
-> **Display note — a 0 baseline:** The formula itself hasn't changed (the
-> 30%/70% blend and − 2 × sigma are the same), but the interface **subtracts
-> that neutral value (≈ 8.33) from every score** before showing it. So a player
-> with no matches reads exactly **0.0** on the leaderboard and scores are again
-> read from a 0 baseline. This is only a display shift: the ranking, the gaps
-> between players and per-match changes like "+0.35" are unaffected (the shift
-> cancels out in a difference).
->
-> A natural consequence: **negative scores are normal.** Anyone below the
-> neutral line reads as negative — part of the group is there today, with the
-> lowest score at ≈ −3.8. A negative score is not a "bad player" label; it only
-> says that this person's current form sits below neutral.
+> **Scale note:** before this update the sigma coefficient was 3 and the W/L
+> share was 20%; a player with no matches started at exactly 0. Now that the
+> coefficient dropped from 3 to 2, every score (everyone's, by the same
+> amount) **shifted up by roughly 7 points**. That isn't "everyone got
+> better" — it's just the display scale changing. The ranking itself is
+> unaffected.
 
 ## An end-to-end example
 
@@ -105,18 +99,15 @@ balance), sigma = 7.36 (still plenty of uncertainty), P_avg = 1.27 (they play
 27% above the match average).
 
 ```
-mu_eff    = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
-          = 7.89 + 0.7 × 30.40 = 29.17
+mu_eff = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
+       = 7.89 + 0.7 × 30.33 = 29.12
 
-RAW       = 29.17 − 2 × 7.36 = 14.45
-DISPLAYED = 14.45 − 8.33 = 6.12
+SCORE  = 29.12 − 2 × 7.36 = 14.40
 ```
 
-Notice: 21.3 points of that raw value come from performance and 7.9 from W/L —
-but 14.7 points went to uncertainty. The **6.12** you see on screen is that raw
-value measured against the neutral line (≈ 8.33). As this player keeps playing,
-sigma will drop and their score will rise even if their play doesn't change at
-all.
+Notice: 21.2 points of that score come from performance and 7.9 from W/L — but
+14.7 points went to uncertainty. As this player keeps playing, sigma will drop
+and their score will rise even if their play doesn't change at all.
 
 ## Role scores: the same math, a separate ledger per role
 
@@ -124,8 +115,7 @@ Alongside your main score, a **separate score** is kept for each role (TOP,
 JUNGLE, MID, BOT, SUPPORT). The formula is exactly the same; the only
 difference is that each role counts only **the matches you played in that
 role**. For a match to enter the role ledger, all 10 players' roles must be
-known and each team must have exactly one of each of the 5 roles. Role scores
-use the same display shift: a role you have never played reads **0.0**.
+known and each team must have exactly one of each of the 5 roles.
 
 **Team balancing uses these role scores:** when splitting 10 players into
 teams, the system tries to place everyone in their strongest role while
