@@ -291,34 +291,6 @@ Alan şekilleri DEĞİŞMEZ: `rating: {mu, sigma, ordinal, perf_avg, score}`, le
 harman `score` S=2 kullanır. Aktif version `ENGINE_VERSION` config'iyle seçilir;
 `openskill-pl-blend30-s2-v1`'e geçiş **REPLAY GEREKTİRİR (iki evren)**.
 
-## Gösterim ofseti (display offset) — SUNUM KATMANI, veri DEĞİL
-
-**Karar dayanağı:** Teoman, 2026-08-20. S=3 → S=2 geçişinde nötr skor 0'dan ≈8.33'e
-kaydı (3*sigma_0 = 3*(25/3) = 25 = mu_0 denkliği bozulduğu için). Teoman skorun yine
-**0 tabanından** başlamasını istedi; negatif skorlar (canlıda 20 oyuncudan 6'sı, en
-düşük ≈ −3.78) bilerek kabul edildi.
-
-**Kural:** ofset YALNIZCA arayüzde uygulanır; API `score` alanları ve `rating_history`
-HAM kalır.
-
-```
-gosterilen_score = score - NEUTRAL_SCORE
-NEUTRAL_SCORE    = mu_0 - S*sigma_0        (aktif engine'in maçsız oyuncu skoru)
-                 = 25 - 2*(25/3) ≈ 8.3333  (blend30-s2)
-```
-
-1. **Ofset sabit bir sayı olarak GÖMÜLMEZ**, nötr skordan türetilir: S ileride yeniden
-   değişirse taban kendiliğinden 0'da kalır. Bir test bunu kilitler (arayüzdeki sabit,
-   rating engine'inin ürettiği nötr skorla eşleşmelidir).
-2. **Uygulanır:** ana `score`, rol `score` (rol nötrü de aynı ofsetle 0'a oturur) ve
-   bunların grafik/liste gösterimleri.
-3. **UYGULANMAZ:** `ordinal` (farklı büyüklük; dengeleme buna bakar), `mu`, `sigma`,
-   `perf_avg` ve **fark/delta değerleri** (maç sonrası skor değişimi, sıralama oku —
-   ofset farkta zaten sadeleşir; ikinci kez çıkarmak hatadır).
-4. **Dengeleme etkilenmez** (ordinal üzerinden çalışır); sıralama, rozetler ve replay
-   determinizmi etkilenmez.
-5. **REPLAY GEREKTİRMEZ** — ham veri değişmez, yalnız sunum değişir.
-
 ## Test yükümlülükleri (blend30-s2)
 
 - mu/sigma geçmişi `openskill-pl-v1` (ve blend20/blend50) replay'iyle bit-bit aynı.
@@ -326,8 +298,6 @@ NEUTRAL_SCORE    = mu_0 - S*sigma_0        (aktif engine'in maçsız oyuncu skor
 - Efektif skor: bilinen üçlülerde beklenen mu_eff/score
   (ör. mu=25, sigma=25/3, P_avg=1 → mu_eff=25, score≈8.33; P_avg=1.25 → mu_eff = 0.3*mu + 0.7*30).
 - Maçsız oyuncu nötr (score ≈ 8.33); score monotonluğu (P_avg arttıkça score artar) korunur.
-  Bu bölümdeki tüm score değerleri HAM'dır (API'nin döndürdüğü); arayüz bunları
-  "Gösterim ofseti" bölümündeki kuralla 0 tabanına çekerek gösterir.
 - **Önceki version testleri değişmeden geçmeye devam eder** (blend20/blend50/perf/pl
   tanımlı kalır).
 

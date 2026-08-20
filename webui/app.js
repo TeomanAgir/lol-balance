@@ -90,30 +90,8 @@
     toastTimer = setTimeout(() => { el.hidden = true; }, 5000);
   }
 
-  // ── Gösterim ofseti (rating_contract "Gösterim ofseti") ───────
-  // Aktif engine (openskill-pl-blend30-s2-v1) maçsız oyuncuya 0 değil ≈8.33
-  // verir (mu_0 − S*sigma_0 = 25 − 2*(25/3)); Teoman skorun 0 TABANINDAN
-  // başlamasını istedi. Bu SUNUM KATMANIDIR: API `score` alanları,
-  // `rating_history` ve mock_api HAM kalır, çıkarma yalnız ekrana basarken
-  // yapılır. Sabit tek yerde durur ve `webui/tests/test_score_offset.py`
-  // onu rating engine'inin ürettiği nötr skorla karşılaştırır — S ileride
-  // yine değişirse test kırılır, taban sessizce kaymaz.
-  //
-  // UYGULANMAZ: ordinal / mu / sigma / perf_avg / rank_delta ve FARK-DELTA
-  // değerleri (maç sonrası skor değişimi bir farktır; ofset farkta zaten
-  // sadeleşir, ikinci kez çıkarmak HATA olurdu).
-  const SCORE_OFFSET = 25 - 2 * (25 / 3);
-  // Sayı olmayan değer (null/undefined) OLDUĞU GİBİ geçer: num1() gibi
-  // çağıranların "—" yolu korunsun.
-  const displayScore = (s) => (typeof s === "number" ? s - SCORE_OFFSET : s);
-
   // Birincil değer rating.score'dur (harman engine; harman-dışı version'da score = ordinal).
-  // "-0.0" ASLA basılmaz: API score'u 2 ondalığa yuvarlar (nötr = 8.33), ofset
-  // tam nötr sabittir (8.3333…) → maçsız oyuncunun farkı −0.0033 çıkar ve
-  // toFixed(1) bunu "-0.0" yazardı. Bu eksi işareti bir bilgi değil, yuvarlama
-  // artığıdır (aynı şey ±0.05 bandındaki her değer için geçerli).
-  const fix1 = (x) => { const s = x.toFixed(1); return s === "-0.0" ? "0.0" : s; };
-  const fmtRating = (x) => fix1(x);
+  const fmtRating = (x) => x.toFixed(1);
   // İkincil bilgi: W/L çekirdeği (ordinal) + kariyer performans çarpanı.
   // perf_avg null ise (harman-dışı version) gösterilmez — score zaten ordinal'dir.
   const ratingSub = (r) =>
@@ -157,10 +135,10 @@
       if (!v || typeof v.score !== "number") return "";
       const zero = !v.matches;
       const title = t("common.role_cell_title",
-        { role: roleName(r), score: fmtRating(displayScore(v.score)), matches: v.matches });
+        { role: roleName(r), score: fmtRating(v.score), matches: v.matches });
       return `<div class="role-cell${zero ? " zero" : ""}" title="${title}">
           <span class="rc-role">${roleAbbr(r)}</span>
-          <span class="rc-score">${fmtRating(displayScore(v.score))}</span>
+          <span class="rc-score">${fmtRating(v.score)}</span>
           <span class="rc-matches">${v.matches}</span>
         </div>`;
     }).join("");
@@ -519,7 +497,7 @@
       card.classList.toggle("selected", state.selected.has(p.id));
       card.innerHTML =
         `<span class="p-name">${esc(p.display_name)}</span>` +
-        `<span class="p-meta">${fmtRating(displayScore(p.rating.score))} · ${t("common.n_matches", { n: p.matches_played })}</span>` +
+        `<span class="p-meta">${fmtRating(p.rating.score)} · ${t("common.n_matches", { n: p.matches_played })}</span>` +
         roleCells(p.role_ratings);
       card.addEventListener("click", () => {
         if (state.selected.has(p.id)) state.selected.delete(p.id);
@@ -1593,7 +1571,7 @@
       return `<tr>
          <td class="rank">${i + 1}</td>
          <td class="player"><span class="pname"><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button>${rankDeltaHtml(p.rank_delta)}</span></td>
-         <td class="num strong">${fmtRating(displayScore(p.rating.score))}${subHtml}</td>
+         <td class="num strong">${fmtRating(p.rating.score)}${subHtml}</td>
          <td class="num">${p.matches_played}</td>
        </tr>`;
     }).join("");
@@ -1690,7 +1668,7 @@
     showView(state.profileFrom);
   });
 
-  const num1 = (x) => (typeof x === "number" ? fix1(x) : "—");
+  const num1 = (x) => (typeof x === "number" ? x.toFixed(1) : "—");
   const num2 = (x) => (typeof x === "number" ? x.toFixed(2) : "—");
   // winrate contract'ta 0..1 oran ve null olabilir. Yüzde biçimi dile göre değişir
   // (tr "%50", en "50%") — common.percent anahtarı taşır.
@@ -1731,10 +1709,6 @@
   //   · Yayın DOLGU ORANI oyuncunun KENDİ rolleri arasındadır: score mu_eff−2σ
   //     olduğu için mutlak bir tavan yoktur; kendi en iyi rolü %100 sayılır
   //     (kartın altındaki not bunu yazar).
-  //     GÖREV 28: oran HAM score üzerinden hesaplanmaya DEVAM EDER (gösterim
-  //     ofseti yalnız kutudaki SAYIYA uygulanır). Ofsetli değerle oranlansaydı
-  //     nötrün altındaki her rol 0'a kırpılır ve yay boşalırdı — bu bir
-  //     gösterim kararı değil, görselin anlamını değiştirmek olurdu.
   // 270°'lik yay: r=26 → çevrenin %75'i = 122.5 birim; boşluk aşağıda kalsın
   // diye grup 135° döndürülür. Hiç oynanmamış rol SOLUK ve yaysızdır.
   function k2Gauges(rr) {
@@ -1765,7 +1739,7 @@
              aria-haspopup="dialog" aria-expanded="false"
              aria-label="${esc(t("profile.role_rank_open", { role: roleName(r) }))}">${dial}</button>`;
       return `<div class="k2-gg${off ? " k2-off" : ""}">${wrap}
-        <span class="k2-gg-v">${off ? "—" : fmtRating(displayScore(v.score))}</span>
+        <span class="k2-gg-v">${off ? "—" : fmtRating(v.score)}</span>
         <span class="k2-gg-n">${off ? t("profile.role_unplayed") : t("common.n_matches", { n: v.matches })}</span>
       </div>`;
     }).join("");
@@ -1950,7 +1924,7 @@
            ${show.length ? `<span class="k2-lbl">${t("profile.showcase_label")}</span>` : ""}
            <h2 class="k2-cap-nm">${esc(p.display_name)}</h2>
            ${p.riot_id ? `<span class="k2-riot">${esc(p.riot_id)}</span>` : ""}
-           ${rp ? `<div class="k2-cap-sc"><b>${fmtRating(displayScore(rp.rating.score))}</b>` +
+           ${rp ? `<div class="k2-cap-sc"><b>${fmtRating(rp.rating.score)}</b>` +
              `<span class="k2-sc-u">${t("common.points_word")}</span></div>` : ""}
          </div>
          <div class="k2-stage">
@@ -2150,15 +2124,12 @@
          aria-label="${esc(t("profile.hist_point_aria", {
            date: fmtDate(q.p.played_at),
            result: histResult(q.p),
-           score: fmtRating(displayScore(Number(q.p.score_after))),
+           score: fmtRating(Number(q.p.score_after)),
          }))}"/>`).join("");
 
-    // Eksen etiketi de gösterim ofsetlidir; GEOMETRİ ham değerlerle kurulur
-    // (lo/hi göreceli olduğu için sabit bir kaydırma çizimi değiştirmez —
-    // grafiğin şekli aynı kalır, yalnız etiketler 0 tabanına oturur).
     const yaxis = gridY.map(y => {
       const v = lo + ((y1 - y) / (y1 - y0)) * (hi - lo);
-      return `<span class="ph-ytick" style="top:${(y / PH.H * 100).toFixed(2)}%">${fmtRating(displayScore(v))}</span>`;
+      return `<span class="ph-ytick" style="top:${(y / PH.H * 100).toFixed(2)}%">${fmtRating(v)}</span>`;
     }).join("");
     const xaxis = `<div class="ph-xaxis"><span>${esc(fmtDay(pts[0].played_at))}</span>` +
       (pts.length > 1 ? `<span>${esc(fmtDay(pts[pts.length - 1].played_at))}</span>` : "") +
@@ -2257,7 +2228,7 @@
         <span class="ph-pop-line">${esc(histKda(p.stats))}</span>
         <span class="ph-pop-foot">
           <span class="ph-pop-res ${p.win ? "win" : "loss"}">${histResult(p)}</span>
-          <span class="ph-pop-score">${fmtRating(displayScore(Number(p.score_after)))}<small>${t("common.points_word")}</small></span>
+          <span class="ph-pop-score">${fmtRating(Number(p.score_after))}<small>${t("common.points_word")}</small></span>
         </span>
         <span class="ph-pop-hint">${t("profile.hist_pop_hint")}</span>
       </button>`;
@@ -2930,7 +2901,7 @@
     }
     return `<button type="button" class="hl-role" data-player="${d.player_id}">${label}
         <span class="hl-name">${esc(d.display_name)}</span>
-        <span class="hl-value">${num1(displayScore(d.score))}</span>
+        <span class="hl-value">${num1(d.score)}</span>
         <span class="hl-sub">${t("common.n_matches", { n: d.matches_in_window })}</span>
       </button>`;
   }
@@ -3013,11 +2984,8 @@
         : "";
       const rs = h.rising_star;
       const up = rs && rs.delta >= 0;
-      // best_player.score GÜNCEL leaderboard score'udur → ofsetlenir.
-      // rising_star.delta ise pencere içi ORDINAL FARKIDIR → ofsetlenmez
-      // (hem ordinal, hem fark: ofset zaten sadeleşir).
       const bestValue = h.best_player
-        ? `<span class="hl-value">${num1(displayScore(h.best_player.score))}<span class="hl-unit">${t("common.points_word")}</span></span>`
+        ? `<span class="hl-value">${num1(h.best_player.score)}<span class="hl-unit">${t("common.points_word")}</span></span>`
         : "";
       box.innerHTML = head +
         hlCard("hero", t("highlights.best_player"), h.best_player, bestValue) +
@@ -3073,7 +3041,7 @@
           <span class="rb-name">—</span>
         </button>`;
     }
-    const score = fmtRating(displayScore(top.r.score));
+    const score = fmtRating(top.r.score);
     return `<button type="button" class="rift-bub" style="${pos}" data-role="${role}"
               aria-label="${t("map.bubble_aria", { role: roleName(role), name: esc(top.p.display_name), score })}">
         <span class="rb-role">${roleAbbr(role)}</span>
@@ -3121,7 +3089,7 @@
       `<li class="rr-row">
          <span class="rr-rank">${i + 1}</span>
          <button type="button" class="rr-name" data-player="${p.id}">${esc(p.display_name)}</button>
-         <span class="rr-score">${fmtRating(displayScore(r.score))}</span>
+         <span class="rr-score">${fmtRating(r.score)}</span>
          <span class="rr-matches">${t("common.n_matches", { n: r.matches })}</span>
        </li>`).join("") + `</ol>`;
   }
@@ -3719,8 +3687,6 @@
             // GÖREV 18: delta = EFEKTİF score farkı (api_contract §3) — W/L çekirdek
             // mu farkı değil. Eski cache'li yanıtta score alanları yoksa mu farkına
             // düşülür (hata fırlatılmaz); renk sınıfları (up/down) aynı kalır.
-            // GÖREV 28: burada gösterim ofseti UYGULANMAZ — bu bir FARKtır,
-            // ofset çıkarmada sadeleşir (displayScore(a)−displayScore(b) = a−b).
             const rcDelta = rc
               ? (rc.score_after != null && rc.score_before != null
                   ? rc.score_after - rc.score_before

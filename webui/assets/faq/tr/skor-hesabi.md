@@ -78,20 +78,15 @@ SKOR   = mu_eff − 2 × sigma
 
 "− 2 × sigma" şu demek: sistem, gücünden emin olmadığı kadarını skorundan
 **peşinen düşer**. Az maç oynamış birinin skoru bu yüzden baskıdır; maç
-oynadıkça sigma düşer ve gerçek gücün skora yansır. Hiç maçı olmayan oyuncunun
-ham değeri 25 − 2 × 8.33 ≈ 8.33'tür.
+oynadıkça sigma düşer ve gerçek gücün skora yansır. Hiç maçı olmayan oyuncu
+~8.33'ten başlar (25 − 2 × 8.33 ≈ 8.33) — leaderboard'da nötr görünmesinin
+sebebi bu.
 
-> **Gösterim notu — taban 0:** Formülün kendisi değişmedi (%30/%70 harman ve
-> − 2 × sigma aynı), ama arayüz **her skordan bu nötr değeri (≈ 8.33) çıkarıp**
-> gösterir. Böylece maçsız oyuncu tabelada tam **0.0** görünür ve skorlar yine
-> 0 tabanından okunur. Bu yalnızca bir gösterim kaydırmasıdır: sıralama,
-> oyuncular arasındaki farklar ve maç sonrası "+0.35" gibi değişimler
-> etkilenmez (kaydırma farkta zaten sadeleşir).
->
-> Doğal sonucu: **eksi skorlar normaldir.** Nötr çizginin altında kalan herkes
-> eksi görünür — bugün grubun bir bölümü öyle, en düşük skor ≈ −3.8. Eksi bir
-> skor "kötü oyuncu" damgası değildir; yalnızca o kişinin şu andaki gidişatının
-> nötrün altında olduğunu söyler.
+> **Ölçek notu:** bu sürüme kadar sigma katsayısı 3 idi ve W/L payı %20'ydi;
+> hiç maçı olmayan oyuncu tam 0'dan başlıyordu. Katsayı 3'ten 2'ye inince
+> tüm skorlar (herkesinki, aynı oranda) **~7 puan yukarı kaydı** — bu bir
+> "herkes birden iyileşti" değil, yalnızca gösterim ölçeğinin değişmesi.
+> Sıralama anlamı aynı kalır.
 
 ## Uçtan uca bir örnek
 
@@ -100,16 +95,14 @@ bilançosu artıda), sigma = 7.36 (hâlâ epey belirsizlik var), P_avg = 1.27
 (maçlarında ortalamanın %27 üstünde oynuyor).
 
 ```
-mu_eff  = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
-        = 7.89 + 0.7 × 30.40 = 29.17
+mu_eff = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
+       = 7.89 + 0.7 × 30.33 = 29.12
 
-HAM     = 29.17 − 2 × 7.36 = 14.45
-GÖRÜNEN = 14.45 − 8.33 = 6.12
+SKOR   = 29.12 − 2 × 7.36 = 14.40
 ```
 
-Dikkat: ham değerin 21.3 puanı performanstan, 7.9 puanı W/L'den geliyor — ama
-14.7 puan belirsizliğe gitti. Ekranda gördüğün **6.12** ise bu ham değerin nötr
-çizgiye (≈ 8.33) göre farkıdır. Bu oyuncu maç oynamaya devam ettikçe sigma
+Dikkat: skorunun 21.2 puanı performanstan, 7.9 puanı W/L'den geliyor — ama
+14.7 puan belirsizliğe gitti. Bu oyuncu maç oynamaya devam ettikçe sigma
 düşecek ve skoru, oyunu hiç değişmese bile yükselecek.
 
 ## Rol skorları: aynı hesap, rol başına ayrı defter
@@ -118,8 +111,7 @@ Ana skorun yanında her rol için (TOP, JUNGLE, MID, BOT, SUPPORT) **ayrı bir
 skor** tutulur. Formül birebir aynıdır; tek fark, her rolün yalnızca **o rolde
 oynadığın maçları** saymasıdır. Bir maçın rol defterine girmesi için 10
 oyuncunun da rolünün bilinmesi ve her takımda 5 rolün birer kez bulunması
-gerekir. Rol skorları da aynı gösterim kaydırmasıyla çizilir: hiç oynamadığın
-bir rol **0.0** görünür.
+gerekir.
 
 **Takım dengeleme bu rol skorlarını kullanır:** sistem 10 kişiyi takımlara
 ayırırken herkesi en güçlü olduğu role yerleştirmeye çalışarak en adil
