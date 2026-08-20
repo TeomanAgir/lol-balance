@@ -3,7 +3,7 @@
 > 🇬🇧 English: [rating_guide_EN.md](rating_guide_EN.md)
 >
 > Bu rehber oyuncular içindir; teknik tanım değildir. Bağlayıcı spesifikasyon
-> `docs/rating_contract.md`'dedir (aktif engine: `openskill-pl-blend20-v1`).
+> `docs/rating_contract.md`'dedir (aktif engine: `openskill-pl-blend25-v1`).
 
 Leaderboard'daki o tek sayı rastgele değil: her custom maçtan sonra aynı
 kurallarla, herkes için aynı şekilde yeniden hesaplanıyor. İşte adım adım tüm mutfak.
