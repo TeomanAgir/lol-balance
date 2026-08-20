@@ -22,8 +22,8 @@
         "en": "We won but my score barely moved. Why?"
       },
       "summary": {
-        "tr": "W/L skorun yalnızca %20'si; skoru asıl oynatan maç içi performansındır.",
-        "en": "W/L is only 20% of the score; what really moves it is your in-game performance."
+        "tr": "W/L skorun yalnızca %25'i; skoru asıl oynatan maç içi performansındır.",
+        "en": "W/L is only 25% of the score; what really moves it is your in-game performance."
       },
       "file": {
         "tr": "tr/kazandik-skor-az-artti.md",

@@ -1866,7 +1866,7 @@
   //   .k2-hero > .k2-hero-in > .k2-cap + .k2-stage(.k2-nbs-l | .pb-plinth | .k2-nbs-r)
   //   .k2-body > .k2-sec(rating + roller ikilisi) → sinerji → rozet kuyruğu → diğer
   // Konseptte OLUP bilinçli olarak ALINMAYANLAR (Teoman'ın düzeltmeleri):
-  //   · puanın altındaki `openskill-pl-blend20-v1 · mu_eff − 3σ` satırı (.cap-eng)
+  //   · puanın altındaki `openskill-pl-blend25-v1 · mu_eff − 3σ` satırı (.cap-eng)
   //   · vitrindeki "EN NADİR 1/2/3" sıra etiketleri (.pl-rank)
   //   · vitrindeki nadirlik yüzdesi ve çubuğu (.pl-meta / .rar-cells) — nadirlik
   //     yalnız bilgi baloncuğunda

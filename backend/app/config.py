@@ -37,7 +37,7 @@ def get_settings() -> Settings:
     return Settings(
         api_key=api_key,
         db_path=os.environ.get("DB_PATH", str(BACKEND_DIR / "data" / "lol_balance.db")),
-        engine_version=os.environ.get("ENGINE_VERSION", "openskill-pl-blend20-v1"),
+        engine_version=os.environ.get("ENGINE_VERSION", "openskill-pl-blend25-v1"),
         webui_dir=os.environ.get("WEBUI_DIR", str(BACKEND_DIR.parent / "webui")),
         # Boş string de "yapılandırılmamış" sayılır (k8s secret'ta anahtar
         # tanımlı ama değeri boşsa idari uçlar herkese açılmasın).

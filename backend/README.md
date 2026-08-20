@@ -48,7 +48,7 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
 | `API_KEY` | evet | — | Tüm `/api/v1` isteklerinde beklenen `X-API-Key` değeri |
 | `ADMIN_KEY` | hayır | — | İdari uçların (`/matches/{id}/void`, `/matches/{id}/unvoid`, `/matches/{id}/roulette/unlink`, `POST /players`, `PATCH /players/{id}`, `/admin/replay`, `/admin/ping`) EK olarak beklediği `X-Admin-Key` değeri. Tanımlı değilse bu uçlar `503` döner (yüzey kapalı); yanlış/eksik header `403`. **Yalnız ASCII** olabilir (fix-3): header'lar latin-1 taşındığı için Türkçe karakterli anahtar doğru girilse bile doğrulanamaz — backend böyle bir anahtarda idari uçlarda `503` + açıklayıcı hata döner, uygulamanın geri kalanı çalışır. Prod'da değer yalnız k8s secret'ında yaşar |
 | `DB_PATH` | hayır | `backend/data/lol_balance.db` | SQLite dosya yolu |
-| `ENGINE_VERSION` | hayır | `openskill-pl-blend20-v1` | Aktif rating engine versiyonu |
+| `ENGINE_VERSION` | hayır | `openskill-pl-blend25-v1` | Aktif rating engine versiyonu |
 | `WEBUI_DIR` | hayır | `../webui` | Statik servis edilecek dizin |
 
 ## Tasarım notları

@@ -8,9 +8,16 @@ tarafından revize edilmiş hâlidir.
 `openskill-pl-blend50-v1` (bkz. "Harman engine" bölümü).
 `openskill-pl-perf-v1` (çarpan yaklaşımı) tanımlı ve geçerli kalır ama aktif değildir.
 
+**v4 eki (Teoman, 2026-08-20, dördüncü karar):** W/L etkisi %25'e çıkarıldı, performans %75 —
+`openskill-pl-blend25-v1` (bkz. "Harman Engine — blend25" bölümü). AKTİF version budur;
+rol evreni de aynı version'la işler. Gerekçe: kaybetmenin bedeli artsın. Sigma katsayısı
+**3'te KALIR** — 2'ye indirme denendi (`openskill-pl-blend30-s2-v1`) ve Teoman kararıyla
+GERİ ALINDI (PR #75/#76); tüm ölçeği kaydırdığı için istenmedi. Ayrıntı: CHANGE_REQUESTS
+2026-08-20.
+
 **v3 eki (Teoman, 2026-08-16, üçüncü karar):** W/L etkisi %20'ye düşürüldü, performans %80 —
-`openskill-pl-blend20-v1` (bkz. "Harman Engine — blend20" bölümü). AKTİF version budur;
-rol evreni de aynı version'la işler. Karar, canlı 19 maçlık veriyle koşulan %50/%25/%20
+`openskill-pl-blend20-v1` (bkz. "Harman Engine — blend20" bölümü). O tarihte aktif version
+buydu; rol evreni de aynı version'la işlerdi. Karar, canlı 19 maçlık veriyle koşulan %50/%25/%20
 simülasyonuna dayanır (CHANGE_REQUESTS kaydı). `openskill-pl-blend50-v1` tanımlı ve
 geçerli kalır ama aktif değildir.
 
@@ -173,7 +180,7 @@ belirlesin (Teoman: "W/L %50 + diğer işlevseller %50").
 
 ---
 
-# Harman Engine — `openskill-pl-blend20-v1` (AKTİF)
+# Harman Engine — `openskill-pl-blend20-v1` (tanımlı, aktif değil — bkz. blend25)
 
 **Karar dayanağı:** Teoman, 2026-08-16 — "sıralamada çok kötü oyuncular sadece W/L sayesinde
 çok yukarıdalar"; W/L etkisi %20'ye düşürüldü, performans %80'e çıkarıldı. Karar öncesi
@@ -224,6 +231,87 @@ config'iyle seçilir; `openskill-pl-blend20-v1`'e geçiş REPLAY GEREKTİRİR (i
 
 ---
 
+# Harman Engine — `openskill-pl-blend25-v1` (AKTİF)
+
+**Karar dayanağı:** Teoman, 2026-08-20 — "kaybettiğinde cezası biraz daha fazla olmalı".
+Süreç: önce `openskill-pl-blend30-s2-v1` (W/L %30 + sigma katsayısı 2) yazıldı, canlıya
+alındı ve **geri alındı** (PR #75/#76) — Teoman'ın istemediği kısım sigma katsayısının
+2'ye indirilmesiydi: tüm skorları ~+7.9 kaydırıyor, nötr skoru 0'dan ≈8.33'e taşıyordu.
+Nihai karar: **W/L payı %25, sigma katsayısı 3'te KALIR.**
+
+## Model
+
+blend20 ile TEK fark harman ağırlığıdır; diğer her şey (W/L çekirdeği, perf_score hesabı,
+P_avg tanımı, null/nötr kuralları, dengeleme mekaniği) blend50/blend20 bölümlerindeki
+tanımlarla BİREBİR aynıdır:
+
+1. **W/L çekirdeği:** mu/sigma güncellemeleri `openskill-pl-v1` ile birebir aynı (saf
+   PlackettLuce, çarpan yok). blend20/blend50 mu/sigma geçmişiyle bit-bit aynıdır —
+   yalnız efektif skor katmanı değişir.
+2. **Efektif rating:**
+   ```
+   MU_0 = 25, K = 20, W = 0.75          # bu version'a dondurulmuş sabitler
+   mu_eff  = (1-W) * mu + W * (MU_0 + K * (P_avg - 1))
+   score   = mu_eff - 3 * sigma          # görünen/sıralanan değer
+   ```
+   Version adındaki "25", W/L (mu) payını söyler: mu katkısı %25, performans katkısı %75.
+3. **Sigma katsayısı 3'tür ve BU VERSION'DA TARTIŞMAYA KAPALIDIR.** Denenip geri alınan
+   S=2 denemesinin tek pratik sonucu ölçek kaymasıydı (nötr skor 0 → 8.33, gösterim ofseti
+   ihtiyacı). S=3 korunduğu için `3*sigma_0 = 3*(25/3) = 25 = mu_0` denkliği sürer ve
+   **maçsız oyuncu tam 0'da kalır** — gösterim ofseti GEREKMEZ.
+4. **perf_score / P_avg:** fonksiyonlar öncekilerle özdeş; P_avg yalnız AKTİF version'ın
+   valid satırları üzerinden hesaplanır (mevcut kural).
+5. **Maçsız oyuncu:** P_avg = 1.0 → mu_eff = 25, score = 0 (nötr).
+6. **Sabit dondurma kuralı sürer:** W/K/MU_0/S "tuning"i bu version içinde yasaktır;
+   herhangi bir oran değişikliği = yeni version string'i + insan onayı.
+
+## Ölçülen etki (canlı 37 valid maç, 370 katılım, 20 oyuncu)
+
+Ölçüm simülasyonla değil, üretim verisindeki `rating_change` kayıtlarından tam çözümle
+yapıldı (W/L çekirdeği ağırlıktan bağımsız olduğu için mu/sigma geçmişi ortaktır).
+
+| | blend20 (%20) | blend25 (%25) |
+|---|---|---|
+| Kaybedenin ortalama skor değişimi | −0.229 | **−0.278** |
+| Kaybettiği hâlde skoru artan katılım | %30 | **%24** |
+| Kazananın ortalama kazancı | +0.542 | +0.595 |
+
+Sıralama etkisi ılımlı: 20 oyuncudan 9'u yer değiştirir, hepsi 1-2 sıralık komşu takası
+(en büyük hareket +2). En yüksek P_avg'lı oyuncu birinciliğini korur — 2026-08-16'da
+konan kırmızı çizgi sağlanır. Ölçek korunur (lider 8.84 → 8.72), skorlar KAYMAZ.
+
+## Kabul edilen ödünleşimler
+
+- Sertleşme ılımlıdır: kaybeden hâlâ ortalama yarım puandan az kaybeder ve katılımların
+  %24'ünde kaybetmesine rağmen skoru artar (iyi oynadığı için). Bu bilinçlidir — %30 ve
+  %40 seçenekleri 2026-08-16'daki "kötü oyuncular sadece kazanarak yükseliyor" şikâyetini
+  geri getirdiği için elenmişti.
+- Sigma'dan gelen "sadece oynayarak yükselme" primi (maç başına ~+0.18) YERİNDE KALIR;
+  S=3 korunduğu için bu etki azalmaz. Bilinerek kabul edildi.
+- **Çözülmediği açıkça bilinen:** kronik kötü oynayan oyuncunun perf cezası kendi P_avg'ına
+  göre işlediği için ceza almaz (bkz. CHANGE_REQUESTS 2026-08-20, rafa kaldırılan maç-içi
+  havuz önerisi). W ile çözülmez, AYRI karardır.
+
+## API etkisi
+
+blend50/blend20'nin "API etkisi" bölümleri aynen geçerlidir (alan şekilleri değişmez).
+`ordinal` (`mu − 3*sigma`) tanımı zaten değişmedi. Aktif version `ENGINE_VERSION`
+config'iyle seçilir; `openskill-pl-blend25-v1`'e geçiş **REPLAY GEREKTİRİR (iki evren)** —
+yeni version'ın `rating_history` satırları yoktur.
+
+## Test yükümlülükleri (blend25)
+
+- mu/sigma geçmişi `openskill-pl-v1` (ve blend20/blend50) replay'iyle bit-bit aynı.
+- perf_score fonksiyonu öncekilerle birebir aynı değerleri üretir.
+- Efektif skor: bilinen üçlülerde beklenen mu_eff/score
+  (ör. mu=25, sigma=25/3, P_avg=1 → mu_eff=25, **score = 0**; P_avg=1.25 → mu_eff =
+  0.25*mu + 0.75*30).
+- Maçsız oyuncu nötr ve **tam 0** (S=3 denkliği); score monotonluğu korunur.
+- **Önceki version testleri değişmeden geçmeye devam eder** (blend20/blend50/perf/pl
+  tanımlı kalır).
+
+---
+
 # Rol Rating Evreni — aktif blend rol bazlı (GÖREV 0)
 
 **Karar dayanağı:** Teoman, 2026-08-11 — `new_modules.md` GÖREV 0 + sohbet kararları
@@ -235,7 +323,7 @@ config'iyle seçilir; `openskill-pl-blend20-v1`'e geçiş REPLAY GEREKTİRİR (i
    mu/sigma. `role ∈ {TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY}`. İki evren ayrı hesaplanır,
    birbirini asla etkilemez.
 2. **Formül ana AKTİF engine ile BİREBİR aynı:** aktif harman version'ının sabitleri
-   (bugün `openskill-pl-blend20-v1`: MU_0=25, K=20, W=0.8), saf W/L PlackettLuce
+   (bugün `openskill-pl-blend25-v1`: MU_0=25, K=20, W=0.75), saf W/L PlackettLuce
    çekirdeği (çarpan yok), aynı default parametreler. `engine_version` string'i ana
    evrenin AKTİF version'ıyla AYNIDIR; evren ayrımı tabloyla yapılır
    (`role_rating_history`, bkz. db_schema migration 0003). Aktif version değişince
@@ -250,7 +338,7 @@ config'iyle seçilir; `openskill-pl-blend20-v1`'e geçiş REPLAY GEREKTİRİR (i
 5. **P_avg rol bazındadır:** `P_avg(player, role) = AVG(role_rating_history.perf_score)`
    — yalnız valid maçlar, yalnız bu engine_version, yalnız o rolün satırları.
    `mu_eff_role = (1-W)*mu_role + W*(25 + 20*(P_avg_role - 1))` (W = aktif version'ın
-   perf ağırlığı; blend20'de 0.8), `score_role = mu_eff_role - 3*sigma_role`.
+   perf ağırlığı; blend25'te 0.75), `score_role = mu_eff_role - 3*sigma_role`.
 6. **Hiç oynanmamış rol:** default prior + P_avg=1.0 → score 0 (nötr).
 7. **Position düzeltmesi** (`PUT /matches/{id}/positions`) rol evreninde replay tetikler;
    ana evren bit-bit değişmeden kalır. Rol replay'i her zaman `match_participants.position`'ın

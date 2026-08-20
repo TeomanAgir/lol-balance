@@ -2,17 +2,17 @@
 
 > Bu rehber oyuncular içindir; teknik tanım değildir. Bağlayıcı spesifikasyon
 > repo'daki `docs/rating_contract.md` dosyasındadır (aktif engine:
-> `openskill-pl-blend20-v1`).
+> `openskill-pl-blend25-v1`).
 
 Leaderboard'daki o tek sayı rastgele değil: her custom maçtan sonra aynı
 kurallarla, herkes için aynı şekilde yeniden hesaplanıyor. İşte adım adım tüm mutfak.
 
 ## Büyük resim
 
-**Skor = %20 kazanmak + %80 nasıl oynadığın − belirsizlik payı**
+**Skor = %25 kazanmak + %75 nasıl oynadığın − belirsizlik payı**
 
 ```
- %20 W/L  |  %80 Performans (KDA · hasar · gold · CS · vizyon)
+ %25 W/L  |  %75 Performans (KDA · hasar · gold · CS · vizyon)
 ```
 
 Bu ikisinin harmanından bir "efektif güç" çıkar; sistem senden ne kadar emin
@@ -69,10 +69,10 @@ istikrar kazanır.
 ## 4. Harman ve görünen skor
 
 Şimdi iki dünya birleşir. Önce performans ortalaması mu ile aynı ölçeğe
-çevrilir, sonra **%20 W/L + %80 performans** ağırlığıyla harmanlanır:
+çevrilir, sonra **%25 W/L + %75 performans** ağırlığıyla harmanlanır:
 
 ```
-mu_eff = 0.2 × mu + 0.8 × (25 + 20 × (P_avg − 1))
+mu_eff = 0.25 × mu + 0.75 × (25 + 20 × (P_avg − 1))
 SKOR   = mu_eff − 3 × sigma
 ```
 
@@ -89,13 +89,13 @@ bilançosu artıda), sigma = 7.36 (hâlâ epey belirsizlik var), P_avg = 1.27
 (maçlarında ortalamanın %27 üstünde oynuyor).
 
 ```
-mu_eff = 0.2 × 26.29 + 0.8 × (25 + 20 × 0.27)
-       = 5.26 + 0.8 × 30.33 = 29.52
+mu_eff = 0.25 × 26.29 + 0.75 × (25 + 20 × 0.27)
+       = 6.57 + 0.75 × 30.40 = 6.57 + 22.80 = 29.37
 
-SKOR   = 29.52 − 3 × 7.36 = 7.45
+SKOR   = 29.37 − 3 × 7.36 = 29.37 − 22.08 = 7.29
 ```
 
-Dikkat: skorunun 24.3 puanı performanstan, 5.3 puanı W/L'den geliyor — ama
+Dikkat: skorunun 22.8 puanı performanstan, 6.6 puanı W/L'den geliyor — ama
 22.1 puan belirsizliğe gitti. Bu oyuncu maç oynamaya devam ettikçe sigma
 düşecek ve skoru, oyunu hiç değişmese bile yükselecek.
 

@@ -47,8 +47,10 @@ class BlendParams:
 # "blend" None ise efektif rating harmanı yoktur (effective() ValueError).
 # blend version'larında perf bilinçli olarak None'dır: performans hem çarpanda
 # hem harman teriminde sayılırsa çift sayım olur (contract "Model" §1).
-# blend20 ile blend50 arasındaki TEK fark harman ağırlığıdır (w): version
-# adındaki sayı W/L (mu) payını söyler (blend20 → mu %20, performans %80).
+# blend20/blend25/blend50 arasındaki TEK fark harman ağırlığıdır (w): version
+# adındaki sayı W/L (mu) payını söyler (blend20 → mu %20, performans %80;
+# blend25 → mu %25, performans %75). Sigma katsayısı 3.0 sabittir (Engine.effective
+# içinde donmuştur) — bu bilinçlidir, version'lar arası değişmez.
 _VERSIONS = {
     "openskill-pl-v1": {
         "model": dict(_BASE_PARAMS),
@@ -75,6 +77,11 @@ _VERSIONS = {
         "model": dict(_BASE_PARAMS),
         "perf": None,
         "blend": BlendParams(mu_0=25.0, k=20.0, w=0.8),
+    },
+    "openskill-pl-blend25-v1": {
+        "model": dict(_BASE_PARAMS),
+        "perf": None,
+        "blend": BlendParams(mu_0=25.0, k=20.0, w=0.75),
     },
 }
 
@@ -172,8 +179,9 @@ class Engine:
         """Efektif rating: mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)).
 
         Yalnızca harman version'larında (`openskill-pl-blend50-v1`,
-        `openskill-pl-blend20-v1`) geçerlidir; diğerlerinde ValueError (yanlış
-        version'la sıralama üretmek sessiz veri bozulması olur, erken patlasın).
+        `openskill-pl-blend20-v1`, `openskill-pl-blend25-v1`) geçerlidir;
+        diğerlerinde ValueError (yanlış version'la sıralama üretmek sessiz veri
+        bozulması olur, erken patlasın).
         p_avg: oyuncunun kariyer perf ortalaması; maçı olmayan oyuncu için
         1.0 geçilir.
         """

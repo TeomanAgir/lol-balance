@@ -135,7 +135,7 @@ def test_role_replay_matches_incremental_bit_for_bit(client, db):
     assert r.json() == {
         "matches_replayed": 3,
         "role_matches_replayed": 3,
-        "engine_version": "openskill-pl-blend20-v1",
+        "engine_version": "openskill-pl-blend25-v1",
     }
     conn = db()
     assert _role_snapshot(conn) == incremental
