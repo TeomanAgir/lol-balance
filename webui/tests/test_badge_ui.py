@@ -572,7 +572,7 @@ def test_showcase_badges_are_not_repeated_in_the_tail():
 
 
 def test_profile_header_has_no_engine_or_formula_line():
-    """Duzeltme 1: puanin altindaki `openskill-pl-blend20-v1 · mu_eff − 3σ`
+    """Duzeltme 1: puanin altindaki `openskill-pl-blend30-s2-v1 · mu_eff − 2σ`
     satiri KALDIRILDI (profilde hic basilmaz)."""
     text = app_text()
     m = re.search(r"const head =\n\s*`(.*?)`;", text, re.DOTALL)
