@@ -69,9 +69,9 @@ aynıdır — bu yüzden maç sonucunun yönü asla değişmez. Statlar
 `update(..., stats100=, stats200=, duration_s=)` ile `ParticipantStats`
 listeleri olarak geçirilir (`from rating import ParticipantStats`).
 
-## Harman version'ları — `openskill-pl-blend50-v1` ve `openskill-pl-blend20-v1`
+## Harman version'ları — `openskill-pl-blend50-v1`, `openskill-pl-blend20-v1`, `openskill-pl-blend25-v1` (AKTİF)
 
-Her iki harman version'ında da mu/sigma güncellemeleri `openskill-pl-v1` ile
+Her üç harman version'ında da mu/sigma güncellemeleri `openskill-pl-v1` ile
 **bit-bit aynıdır** (çarpan yok: performans hem güncellemede hem harmanda
 sayılırsa çift sayım olur). Performansın tüm etkisi efektif rating
 harmanındadır; sabitler version string'ine dondurulmuştur:
@@ -80,12 +80,14 @@ harmanındadır; sabitler version string'ine dondurulmuştur:
 |---|---|---|---|---|
 | `openskill-pl-blend50-v1` | 25 | 20 | 0.5 | %50 |
 | `openskill-pl-blend20-v1` | 25 | 20 | 0.8 | %20 |
+| `openskill-pl-blend25-v1` (AKTİF) | 25 | 20 | 0.75 | %25 |
 
-Version adındaki sayı W/L (mu) payını söyler; iki version arasındaki TEK fark
+Version adındaki sayı W/L (mu) payını söyler; version'lar arasındaki TEK fark
 harman ağırlığıdır (W/L çekirdeği, perf_score hesabı, null/nötr kuralları özdeş).
+Sigma katsayısı (3.0, `Engine.effective` içinde) tüm harman version'larında sabittir.
 
 ```python
-engine = Engine("openskill-pl-blend20-v1")   # veya "openskill-pl-blend50-v1"
+engine = Engine("openskill-pl-blend25-v1")   # aktif; veya blend20/blend50
 
 # Maç başına perf skorları ([0.5, 2.0]; hesaplanamayan katılımcı 1.0).
 # Skor tanımı versiyondan bağımsızdır ve perf-v1 çarpanına giren perf ile
@@ -99,10 +101,11 @@ eff = engine.effective(mu, sigma, p_avg)   # EffectiveRating(mu_eff, sigma, scor
 
 Leaderboard/dengeleme `score` (ve `mu_eff`, `sigma`) üzerinden çalışır;
 `effective()` harman olmayan version'da `ValueError` verir. p_avg=1'de default
-rating için mu_eff=25, score=0 (nötr; her iki harman version'ında aynı).
+rating için mu_eff=25, score=0 (nötr; tüm harman version'larında aynı, S=3
+sabit kaldığı için `3*sigma_0 = 3*(25/3) = 25 = mu_0` denkliği sürer).
 Perf teriminin mu_eff sapması `W*K*(p_avg-1)` ile sınırlıdır: blend50'de
-en fazla +10 / en az −5, blend20'de en fazla +16 / en az −8
-(taban 0.5 olduğu için negatif uca ulaşılamaz).
+en fazla +10 / en az −5, blend20'de en fazla +16 / en az −8, blend25'te
+en fazla +15 / en az −7.5 (taban 0.5 olduğu için negatif uca ulaşılamaz).
 
 ## Version'lama kuralı
 

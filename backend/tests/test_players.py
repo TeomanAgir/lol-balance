@@ -22,7 +22,7 @@ def test_create_and_list_with_default_prior(client):
     assert p["rating"]["mu"] == DEFAULT_MU
     assert abs(p["rating"]["sigma"] - DEFAULT_SIGMA) < 1e-9
     assert abs(p["rating"]["ordinal"] - (DEFAULT_MU - 3 * DEFAULT_SIGMA)) < 1e-9
-    # Harman default'ta (blend20): maçsız oyuncu P_avg=1.0 → mu_eff=25 (nötr),
+    # Harman default'ta (blend25): maçsız oyuncu P_avg=1.0 → mu_eff=25 (nötr),
     # score = 25 - 3*sigma = ordinal.
     assert p["rating"]["perf_avg"] == 1.0
     assert abs(p["rating"]["score"] - p["rating"]["ordinal"]) < 1e-9

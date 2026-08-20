@@ -2,7 +2,7 @@
 
 > This guide is for players; it is not the technical definition. The binding
 > specification lives in `docs/rating_contract.md` in the repository (active
-> engine: `openskill-pl-blend20-v1`).
+> engine: `openskill-pl-blend25-v1`).
 
 That single number on the leaderboard isn't random: after every custom match it
 is recomputed with the same rules, the same way for everyone. Here is the whole
@@ -10,10 +10,10 @@ kitchen, step by step.
 
 ## The big picture
 
-**Score = 20% winning + 80% how you played − an uncertainty margin**
+**Score = 25% winning + 75% how you played − an uncertainty margin**
 
 ```
- 20% W/L  |  80% Performance (KDA · damage · gold · CS · vision)
+ 25% W/L  |  75% Performance (KDA · damage · gold · CS · vision)
 ```
 
 Blending these two produces an "effective strength"; the system then subtracts
@@ -72,10 +72,10 @@ you — consistency wins.
 ## 4. The blend and the visible score
 
 Now the two worlds merge. First the performance average is converted to the
-same scale as mu, then blended with **20% W/L + 80% performance** weights:
+same scale as mu, then blended with **25% W/L + 75% performance** weights:
 
 ```
-mu_eff = 0.2 × mu + 0.8 × (25 + 20 × (P_avg − 1))
+mu_eff = 0.25 × mu + 0.75 × (25 + 20 × (P_avg − 1))
 SCORE  = mu_eff − 3 × sigma
 ```
 
@@ -92,13 +92,13 @@ balance), sigma = 7.36 (still plenty of uncertainty), P_avg = 1.27 (they play
 27% above the match average).
 
 ```
-mu_eff = 0.2 × 26.29 + 0.8 × (25 + 20 × 0.27)
-       = 5.26 + 0.8 × 30.33 = 29.52
+mu_eff = 0.25 × 26.29 + 0.75 × (25 + 20 × 0.27)
+       = 6.57 + 0.75 × 30.40 = 6.57 + 22.80 = 29.37
 
-SCORE  = 29.52 − 3 × 7.36 = 7.45
+SCORE  = 29.37 − 3 × 7.36 = 29.37 − 22.08 = 7.29
 ```
 
-Notice: 24.3 points of that score come from performance and 5.3 from W/L — but
+Notice: 22.8 points of that score come from performance and 6.6 from W/L — but
 22.1 points went to uncertainty. As this player keeps playing, sigma will drop
 and their score will rise even if their play doesn't change at all.
 

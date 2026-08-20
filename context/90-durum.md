@@ -2,6 +2,22 @@
 
 Son güncelleme: 2026-08-19 (orkestratör, gece turu)
 
+## 2026-08-20: aktif engine `openskill-pl-blend25-v1` (W/L %25, sigma katsayısı 3)
+- Teoman kararı: kaybetmenin bedeli artsın → W/L payı %20 → **%25** (`w=0.75`).
+- **Önemli tarihçe:** önce `openskill-pl-blend30-s2-v1` (W/L %30 + sigma katsayısı 2)
+  yazıldı, canlıya alındı, replay koşuldu — ardından **Teoman geri aldı** (PR #75 gösterim
+  ofseti, PR #76 engine). İstenmeyen kısım sigma katsayısının 2'ye inmesiydi: tüm skorları
+  ~+7.9 kaydırıyor, nötr skoru 0'dan 8.33'e taşıyor, telafi için gösterim ofseti gerektiriyordu.
+  **S=3'e dokunma önerileri reddedilir** (contract'ta "TARTIŞMAYA KAPALI" olarak işlendi).
+- Nötr skor **tam 0**'da kalır (`3*sigma_0 = mu_0`), skorlar kaymaz, gösterim ofseti gerekmez.
+  Bir test bunu kilitler (`test_blend25_engine.py`, `score == 0.0` tam eşitlik).
+- Ölçüm (canlı 37 valid maç, üretim `rating_change` kayıtlarından tam çözüm):
+  kaybeden ort. −0.229 → −0.278, pozitif kalan kaybeden %30 → %24, kazanan +0.542 → +0.595;
+  sıralamada 9/20 komşu takası, lider değişmiyor, ölçek korunuyor (8.84 → 8.72).
+- **Geçiş REPLAY GEREKTİRDİ (iki evren)** — yeni version'ın rating_history'si boştu.
+- Rafa kaldırılan öneri (2026-08-20): perf'i kariyer ortalaması yerine maç-içi havuza göre
+  puanlama. Ölçüm destek dezavantajı varsayımını çürüttü (UTILITY 0.970 vs MIDDLE 0.914).
+
 ## 2026-08-19 gece: fix-3 + GÖREV 22 + GÖREV 24 (PR #68, #69, #70)
 - **fix-3 (PR #68, CANLIDA):** idari yüzey sertleştirme — `roulette/unlink` + `POST/PATCH
   /players` admin'e alındı (`positions`/`items` BİLİNÇLİ AÇIK: collector `backfill-*`

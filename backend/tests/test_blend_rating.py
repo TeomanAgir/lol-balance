@@ -1,16 +1,16 @@
-"""Harman engine (openskill-pl-blend20-v1) backend yolu.
+"""Harman engine (openskill-pl-blend25-v1, AKTİF) backend yolu.
 
 Formül matematiği rating paketinde test edilir; buradaki testler backend'in
 perf_score'u yazdığını, P_avg/score'u doğru servis ettiğini ve replay
-determinizmini doğrular. Default ENGINE_VERSION = blend20 olduğundan
+determinizmini doğrular. Default ENGINE_VERSION = blend25 olduğundan
 conftest'in `client` fixture'ı doğrudan kullanılır.
 """
 from __future__ import annotations
 
 from conftest import make_payload
 
-# blend20 sabitleri (rating_contract "Harman Engine — blend20"): W = perf ağırlığı.
-MU_0, K, W = 25.0, 20.0, 0.8
+# blend25 sabitleri (rating_contract "Harman Engine — blend25"): W = perf ağırlığı.
+MU_0, K, W = 25.0, 20.0, 0.75
 
 GOOD_STATS = {
     "kills": 15, "deaths": 1, "assists": 12,
@@ -59,7 +59,7 @@ def test_perf_score_written_on_stats_ingest(client, db):
     ).fetchall()
     assert len(rows) == 10
     for row in rows:
-        assert row["engine_version"] == "openskill-pl-blend20-v1"
+        assert row["engine_version"] == "openskill-pl-blend25-v1"
         assert row["perf_score"] is not None
         assert 0.5 <= row["perf_score"] <= 2.0
 
@@ -122,7 +122,7 @@ def test_balance_works_under_blend(client):
     r = client.post("/api/v1/balance", json={"player_ids": ids, "top_n": 3})
     assert r.status_code == 200
     body = r.json()
-    assert body["engine_version"] == "openskill-pl-blend20-v1"
+    assert body["engine_version"] == "openskill-pl-blend25-v1"
     assert len(body["suggestions"]) == 3
     for s in body["suggestions"]:
         assert len(s["team_100"]) == 5

@@ -3,8 +3,8 @@
 It can happen — **a deliberate design decision**.
 
 When you lose, mu drops, but if you played very well that match, your
-performance score lifts your career average (P_avg). Since 80% of the score
-comes from performance, that gain can outweigh the loss on the 20% W/L side —
+performance score lifts your career average (P_avg). Since 75% of the score
+comes from performance, that gain can outweigh the loss on the 25% W/L side —
 and your total score rises.
 
 In short: **playing well on the losing team is never wasted.** The accepted

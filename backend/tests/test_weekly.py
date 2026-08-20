@@ -14,7 +14,7 @@ from conftest import make_roster_payload
 
 from app.services.weekly import weekly_highlights
 
-ENGINE = "openskill-pl-blend20-v1"
+ENGINE = "openskill-pl-blend25-v1"
 
 # Sabit "şimdi": pencere = 2026-08-13T12:00:00Z < played_at <= 2026-08-20T12:00:00Z
 NOW = datetime(2026, 8, 20, 12, 0, 0, tzinfo=timezone.utc)
@@ -122,7 +122,7 @@ def _ordinal_delta(db, player_id, first_match_id, last_match_id):
 # Pencere DIŞI (2026-08-01..06), her maçı team100 kazanır:
 #   100 = [Zirve, Ali, Burak, Cem, Deniz]  200 = [Emre, Fatma, Gizem, Hakan, Irmak]
 #   → Zirve 6G/0M ile en yüksek güncel score'u alır ve pencerede HİÇ oynamaz.
-#   (blend20'de mu payı %20 olduğundan 3 galibiyet yetmez: az maç = yüksek sigma
+#   (blend25'te mu payı %25 olduğundan 3 galibiyet yetmez: az maç = yüksek sigma
 #   cezası mu avantajını yer; 6 galibiyet Zirve'yi rahat marjla zirvede tutar.)
 # Pencere İÇİ (08-14, 08-16, 08-19), her maçı team100 kazanır:
 #   100 = [Emre, Fatma, Gizem, Hakan, Irmak]  200 = [Ali, Burak, Cem, Deniz, Jale]

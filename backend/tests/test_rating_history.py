@@ -15,7 +15,7 @@ from rating import Engine
 # tanımlı; üçüncü bir kopya çıkarmamak için yeniden kullanılır.
 from test_perf_rating import _client as engine_client
 
-ENGINE_VERSION = "openskill-pl-blend20-v1"
+ENGINE_VERSION = "openskill-pl-blend25-v1"
 
 GOOD_STATS = {
     "kills": 15, "deaths": 1, "assists": 12,
