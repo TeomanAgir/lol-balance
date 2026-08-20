@@ -326,6 +326,8 @@ NEUTRAL_SCORE    = mu_0 - S*sigma_0        (aktif engine'in maçsız oyuncu skor
 - Efektif skor: bilinen üçlülerde beklenen mu_eff/score
   (ör. mu=25, sigma=25/3, P_avg=1 → mu_eff=25, score≈8.33; P_avg=1.25 → mu_eff = 0.3*mu + 0.7*30).
 - Maçsız oyuncu nötr (score ≈ 8.33); score monotonluğu (P_avg arttıkça score artar) korunur.
+  Bu bölümdeki tüm score değerleri HAM'dır (API'nin döndürdüğü); arayüz bunları
+  "Gösterim ofseti" bölümündeki kuralla 0 tabanına çekerek gösterir.
 - **Önceki version testleri değişmeden geçmeye devam eder** (blend20/blend50/perf/pl
   tanımlı kalır).
 
