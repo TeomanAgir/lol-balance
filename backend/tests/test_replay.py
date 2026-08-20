@@ -37,7 +37,7 @@ def test_replay_deterministic_equals_incremental(client, db):
     assert r.json() == {
         "matches_replayed": 3,
         "role_matches_replayed": 0,
-        "engine_version": "openskill-pl-blend30-s2-v1",
+        "engine_version": "openskill-pl-blend20-v1",
     }
 
     conn = db()

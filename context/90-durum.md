@@ -72,24 +72,6 @@ Son güncelleme: 2026-08-19 (orkestratör, gece turu)
   void edilemez (409); eşya havuzu kanonik id düzeltmesi (132→112, mod
   varyantları elendi).
 
-## 2026-08-20: aktif engine `openskill-pl-blend30-s2-v1` (GÖREV 27)
-- Teoman kararı (CHANGE_REQUESTS 2026-08-19): kaybetmenin bedeli artsın →
-  W/L payı %20→%30 (`w=0.70`) VE sigma katsayısı 3→2 (`score = mu_eff - 2*sigma`).
-  %40 seçeneği "kötüler sadece kazanarak yükseliyor" şikâyetini geri getireceği
-  için reddedildi.
-- `BlendParams.s` yeni bağımsız eksen; blend50/blend20 `s=3.0` ile donduruldu.
-  **`Rating.ordinal` = mu − 3σ DEĞİŞMEDİ** (dengeleme hâlâ ordinal üzerinden;
-  bunu değiştirmek davranışsal karar sayılır — rating_contract'ta not düşüldü).
-- Gerçek veri replay'i: mu/sigma/perf 100/100 birebir aynı (W/L çekirdeğine
-  dokunulmadı), score +7.44..+8.27 kaydı (ölçek), 4 komşu yer değiştirdi.
-  Kaybeden ortalaması −0.177→−0.361, pozitif kalan kaybeden %44→%26.
-- Notr skor 0 → ~8.33 (yeni oyuncu); SSS metinleri ve mock_api buna göre yenilendi.
-- **Geçiş REPLAY GEREKTİRİR (iki evren)** — yeni version'ın rating_history'si boş.
-- Rafa kaldırılan öneri (Teoman, 2026-08-20): perf'i kariyer ortalaması yerine
-  maç-içi havuza göre puanlayan model. Ölçüm destek dezavantajı varsayımını
-  çürüttü (UTILITY 0.970 vs MIDDLE 0.914; genel 0.993). "Bir süre mevcut perf
-  sistemi + %30 ile deneyelim" denildi.
-
 ## 2026-08-16: aktif engine `openskill-pl-blend20-v1` — CANLIDA TAMAM
 - Teoman kararı (simülasyon destekli, CHANGE_REQUESTS 2026-08-16): W/L %20 + perf %80
   (`mu_eff = 0.2*mu + 0.8*(25+20*(P_avg-1))`). blend50 tanımlı kaldı, aktif değil.

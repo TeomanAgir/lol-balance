@@ -1706,7 +1706,7 @@
   //     posIconHtml → assets/ddragon/position/*.svg; Geçmiş kartı ve maç
   //     detayıyla aynı varlık ve sınıf, yeni varlık eklenmedi). İkon
   //     çizilemezse etiket düz metin kalır.
-  //   · Yayın DOLGU ORANI oyuncunun KENDİ rolleri arasındadır: score mu_eff−2σ
+  //   · Yayın DOLGU ORANI oyuncunun KENDİ rolleri arasındadır: score mu_eff−3σ
   //     olduğu için mutlak bir tavan yoktur; kendi en iyi rolü %100 sayılır
   //     (kartın altındaki not bunu yazar).
   // 270°'lik yay: r=26 → çevrenin %75'i = 122.5 birim; boşluk aşağıda kalsın
@@ -1866,7 +1866,7 @@
   //   .k2-hero > .k2-hero-in > .k2-cap + .k2-stage(.k2-nbs-l | .pb-plinth | .k2-nbs-r)
   //   .k2-body > .k2-sec(rating + roller ikilisi) → sinerji → rozet kuyruğu → diğer
   // Konseptte OLUP bilinçli olarak ALINMAYANLAR (Teoman'ın düzeltmeleri):
-  //   · puanın altındaki `openskill-pl-blend30-s2-v1 · mu_eff − 2σ` satırı (.cap-eng)
+  //   · puanın altındaki `openskill-pl-blend20-v1 · mu_eff − 3σ` satırı (.cap-eng)
   //   · vitrindeki "EN NADİR 1/2/3" sıra etiketleri (.pl-rank)
   //   · vitrindeki nadirlik yüzdesi ve çubuğu (.pl-meta / .rar-cells) — nadirlik
   //     yalnız bilgi baloncuğunda

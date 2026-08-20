@@ -1,12 +1,12 @@
-# Yeni gelen arkadaşım neden ~8.33'te?
+# Yeni gelen arkadaşım neden 0'da?
 
-Herkes ~8.33'ten başlar: **nötr güç tahmini eksi tam belirsizlik.**
+Herkes 0'dan başlar: **nötr güç tahmini eksi tam belirsizlik.**
 
 Yeni oyuncunun mu'su 25 (nötr), sigma'sı 8.33'tür (sistem onu hiç tanımıyor).
-Skor formülü belirsizliği peşinen düştüğü için başlangıç skoru ~8.33 çıkar:
+Skor formülü belirsizliği peşinen düştüğü için başlangıç skoru tam 0 çıkar:
 
 ```
-25 − 2 × 8.33 ≈ 8.33
+25 − 3 × 8.33 = 0
 ```
 
 Bu bir ceza değildir — sistemin "henüz bir fikrim yok" demesidir. İlk
