@@ -2,7 +2,7 @@
 
 > This guide is for players; it is not the technical definition. The binding
 > specification lives in `docs/rating_contract.md` in the repository (active
-> engine: `openskill-pl-blend30-s2-v1`).
+> engine: `openskill-pl-blend20-v1`).
 
 That single number on the leaderboard isn't random: after every custom match it
 is recomputed with the same rules, the same way for everyone. Here is the whole
@@ -10,10 +10,10 @@ kitchen, step by step.
 
 ## The big picture
 
-**Score = 30% winning + 70% how you played − an uncertainty margin**
+**Score = 20% winning + 80% how you played − an uncertainty margin**
 
 ```
- 30% W/L  |  70% Performance (KDA · damage · gold · CS · vision)
+ 20% W/L  |  80% Performance (KDA · damage · gold · CS · vision)
 ```
 
 Blending these two produces an "effective strength"; the system then subtracts
@@ -72,25 +72,18 @@ you — consistency wins.
 ## 4. The blend and the visible score
 
 Now the two worlds merge. First the performance average is converted to the
-same scale as mu, then blended with **30% W/L + 70% performance** weights:
+same scale as mu, then blended with **20% W/L + 80% performance** weights:
 
 ```
-mu_eff = 0.3 × mu + 0.7 × (25 + 20 × (P_avg − 1))
-SCORE  = mu_eff − 2 × sigma
+mu_eff = 0.2 × mu + 0.8 × (25 + 20 × (P_avg − 1))
+SCORE  = mu_eff − 3 × sigma
 ```
 
-"− 2 × sigma" means: the system **deducts up front** however much of your
+"− 3 × sigma" means: the system **deducts up front** however much of your
 strength it isn't sure about. That's why a player with few matches has a
 suppressed score; as matches accumulate, sigma shrinks and your real strength
-shows through. A player with no matches starts at roughly 8.33
-(25 − 2 × 8.33 ≈ 8.33) — which is why newcomers look neutral on the leaderboard.
-
-> **Scale note:** before this update the sigma coefficient was 3 and the W/L
-> share was 20%; a player with no matches started at exactly 0. Now that the
-> coefficient dropped from 3 to 2, every score (everyone's, by the same
-> amount) **shifted up by roughly 7 points**. That isn't "everyone got
-> better" — it's just the display scale changing. The ranking itself is
-> unaffected.
+shows through. A player with no matches starts at exactly 0
+(25 − 3 × 8.33 = 0) — which is why newcomers look neutral on the leaderboard.
 
 ## An end-to-end example
 
@@ -99,14 +92,14 @@ balance), sigma = 7.36 (still plenty of uncertainty), P_avg = 1.27 (they play
 27% above the match average).
 
 ```
-mu_eff = 0.3 × 26.29 + 0.7 × (25 + 20 × 0.27)
-       = 7.89 + 0.7 × 30.33 = 29.12
+mu_eff = 0.2 × 26.29 + 0.8 × (25 + 20 × 0.27)
+       = 5.26 + 0.8 × 30.33 = 29.52
 
-SCORE  = 29.12 − 2 × 7.36 = 14.40
+SCORE  = 29.52 − 3 × 7.36 = 7.45
 ```
 
-Notice: 21.2 points of that score come from performance and 7.9 from W/L — but
-14.7 points went to uncertainty. As this player keeps playing, sigma will drop
+Notice: 24.3 points of that score come from performance and 5.3 from W/L — but
+22.1 points went to uncertainty. As this player keeps playing, sigma will drop
 and their score will rise even if their play doesn't change at all.
 
 ## Role scores: the same math, a separate ledger per role

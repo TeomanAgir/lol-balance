@@ -21,16 +21,11 @@ def test_create_and_list_with_default_prior(client):
     assert p["matches_played"] == 0
     assert p["rating"]["mu"] == DEFAULT_MU
     assert abs(p["rating"]["sigma"] - DEFAULT_SIGMA) < 1e-9
-    # `ordinal` W/L çekirdeğinin muhafazakâr tahmini olarak mu-3σ KALIR
-    # (aktif version'ın S=2'si ordinal'i etkilemez).
     assert abs(p["rating"]["ordinal"] - (DEFAULT_MU - 3 * DEFAULT_SIGMA)) < 1e-9
-    # Harman default'ta (blend30-s2): maçsız oyuncu P_avg=1.0 → mu_eff=25 (nötr),
-    # score = 25 - 2*sigma ≈ 8.33 (ordinal'den S farkı kadar, yani +1σ yüksek).
+    # Harman default'ta (blend20): maçsız oyuncu P_avg=1.0 → mu_eff=25 (nötr),
+    # score = 25 - 3*sigma = ordinal.
     assert p["rating"]["perf_avg"] == 1.0
-    assert abs(p["rating"]["score"] - (DEFAULT_MU - 2 * DEFAULT_SIGMA)) < 1e-9
-    assert abs(
-        p["rating"]["score"] - p["rating"]["ordinal"] - DEFAULT_SIGMA
-    ) < 1e-9
+    assert abs(p["rating"]["score"] - p["rating"]["ordinal"]) < 1e-9
 
 
 def test_patch_display_name(client):

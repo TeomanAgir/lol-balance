@@ -264,7 +264,7 @@ def test_void_and_unvoid_response_shape(client):
         "engine_version",
     }
     assert voided["role_matches_replayed"] == 1  # kalan tek valid maç
-    assert voided["engine_version"] == "openskill-pl-blend30-s2-v1"
+    assert voided["engine_version"] == "openskill-pl-blend20-v1"
 
     unvoided = client.post(f"/api/v1/matches/{m2}/unvoid").json()
     assert set(unvoided) == set(voided)

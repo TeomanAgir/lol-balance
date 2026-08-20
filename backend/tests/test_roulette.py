@@ -511,8 +511,7 @@ def test_roulette_match_excluded_from_valid_statistics(client):
     players = client.get("/api/v1/players").json()
     me = next(p for p in players if p["id"] == ids[0])
     assert me["matches_played"] == 0
-    # Maçsız oyuncunun nötr score'u (aktif blend30-s2: 25 - 2*25/3 ≈ 8.33).
-    assert me["rating"]["score"] == 25.0 - 2.0 * (25.0 / 3.0)
+    assert me["rating"]["score"] == 0.0
     stats = client.get(f"/api/v1/players/{ids[0]}/stats").json()
     assert stats["totals"] == {
         "matches": 0, "wins": 0, "losses": 0, "winrate": None,

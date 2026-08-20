@@ -135,7 +135,7 @@ def test_role_replay_matches_incremental_bit_for_bit(client, db):
     assert r.json() == {
         "matches_replayed": 3,
         "role_matches_replayed": 3,
-        "engine_version": "openskill-pl-blend30-s2-v1",
+        "engine_version": "openskill-pl-blend20-v1",
     }
     conn = db()
     assert _role_snapshot(conn) == incremental
@@ -363,9 +363,7 @@ def test_role_ratings_default_shape(client):
         assert rr["mu"] == DEFAULT_MU
         assert abs(rr["sigma"] - DEFAULT_SIGMA) < 1e-9
         assert rr["perf_avg"] == 1.0
-        # Rol evreni ANA evrenle AYNI S'i kullanır (aktif blend30-s2: S=2):
-        # 25 - 2*25/3 ≈ 8.33 (nötr nokta; blend20'de 0 idi).
-        assert abs(rr["score"] - (DEFAULT_MU - 2.0 * DEFAULT_SIGMA)) < 1e-9
+        assert abs(rr["score"]) < 1e-9  # 25 - 3*25/3 = 0 (nötr)
         assert rr["matches"] == 0
 
 

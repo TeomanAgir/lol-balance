@@ -69,26 +69,23 @@ aynıdır — bu yüzden maç sonucunun yönü asla değişmez. Statlar
 `update(..., stats100=, stats200=, duration_s=)` ile `ParticipantStats`
 listeleri olarak geçirilir (`from rating import ParticipantStats`).
 
-## Harman version'ları — blend50 / blend20 / **blend30-s2 (aktif)**
+## Harman version'ları — `openskill-pl-blend50-v1` ve `openskill-pl-blend20-v1`
 
-Her harman version'ında mu/sigma güncellemeleri `openskill-pl-v1` ile
+Her iki harman version'ında da mu/sigma güncellemeleri `openskill-pl-v1` ile
 **bit-bit aynıdır** (çarpan yok: performans hem güncellemede hem harmanda
 sayılırsa çift sayım olur). Performansın tüm etkisi efektif rating
 harmanındadır; sabitler version string'ine dondurulmuştur:
 
-| Version | MU_0 | K | W (perf ağırlığı) | mu payı | S (sigma katsayısı) |
-|---|---|---|---|---|---|
-| `openskill-pl-blend50-v1` | 25 | 20 | 0.5 | %50 | 3 |
-| `openskill-pl-blend20-v1` | 25 | 20 | 0.8 | %20 | 3 |
-| `openskill-pl-blend30-s2-v1` (aktif) | 25 | 20 | 0.70 | %30 | **2** |
+| Version | MU_0 | K | W (perf ağırlığı) | mu payı |
+|---|---|---|---|---|
+| `openskill-pl-blend50-v1` | 25 | 20 | 0.5 | %50 |
+| `openskill-pl-blend20-v1` | 25 | 20 | 0.8 | %20 |
 
-Version adındaki sayı W/L (mu) payını, `s2` eki sigma katsayısını söyler.
-blend50 ↔ blend20 arasındaki TEK fark harman ağırlığıdır; blend30-s2'de İKİ
-sabit değişir (W ve S). W/L çekirdeği, perf_score hesabı ve null/nötr kuralları
-üç version'da da özdeştir.
+Version adındaki sayı W/L (mu) payını söyler; iki version arasındaki TEK fark
+harman ağırlığıdır (W/L çekirdeği, perf_score hesabı, null/nötr kuralları özdeş).
 
 ```python
-engine = Engine("openskill-pl-blend30-s2-v1")   # veya blend20 / blend50
+engine = Engine("openskill-pl-blend20-v1")   # veya "openskill-pl-blend50-v1"
 
 # Maç başına perf skorları ([0.5, 2.0]; hesaplanamayan katılımcı 1.0).
 # Skor tanımı versiyondan bağımsızdır ve perf-v1 çarpanına giren perf ile
@@ -96,19 +93,16 @@ engine = Engine("openskill-pl-blend30-s2-v1")   # veya blend20 / blend50
 p100, p200 = engine.perf_scores(stats100, stats200, duration_s)
 
 # Efektif rating (p_avg: kariyer perf ortalaması; maçsız oyuncuda 1.0):
-# mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)),  score = mu_eff - S*sigma
+# mu_eff = (1-W)*mu + W*(MU_0 + K*(p_avg-1)),  score = mu_eff - 3*sigma
 eff = engine.effective(mu, sigma, p_avg)   # EffectiveRating(mu_eff, sigma, score)
 ```
 
-`Rating.ordinal` (= `mu - 3*sigma`) W/L çekirdeğinin muhafazakâr tahminidir ve
-**S'ten etkilenmez**; S yalnızca harman `score`'a girer (`BlendParams.s`).
-
 Leaderboard/dengeleme `score` (ve `mu_eff`, `sigma`) üzerinden çalışır;
 `effective()` harman olmayan version'da `ValueError` verir. p_avg=1'de default
-rating için mu_eff=25; score S=3'te 0, S=2'de ≈8.33 (nötr nokta aynı, yalnız
-gösterim ölçeği kayar). Perf teriminin mu_eff sapması `W*K*(p_avg-1)` ile
-sınırlıdır: blend50'de en fazla +10 / en az −5, blend20'de +16 / −8,
-blend30-s2'de +14 / −7 (taban 0.5 olduğu için negatif uca ulaşılamaz).
+rating için mu_eff=25, score=0 (nötr; her iki harman version'ında aynı).
+Perf teriminin mu_eff sapması `W*K*(p_avg-1)` ile sınırlıdır: blend50'de
+en fazla +10 / en az −5, blend20'de en fazla +16 / en az −8
+(taban 0.5 olduğu için negatif uca ulaşılamaz).
 
 ## Version'lama kuralı
 
