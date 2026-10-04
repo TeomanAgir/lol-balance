@@ -305,6 +305,24 @@ main { container: main / inline-size; }
 /* NOT (GÖREV 24): ".role-strip.long" geniş yerleşim varyantı KALDIRILDI —
    profil artık resmî rol simgeli yay görünümünü kullanıyor (aşağıda "k2-gg"). */
 
+/* ── Roster tazeleme çubuğu (GÖREV 32) — "bl-" öneki Dengele'ye aittir ── */
+.bl-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 10px;
+}
+.bl-refresh {
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 14px;
+  min-height: 40px;
+  white-space: nowrap;
+}
+.bl-refresh:hover { color: var(--brass); border-color: var(--brass-dim); }
+.bl-refresh[disabled] { opacity: 0.55; cursor: default; }
+
 /* ── Yapışkan aksiyon barı ── */
 .action-bar {
   position: sticky;
@@ -3429,11 +3447,14 @@ main.pa-wide { max-width: 1080px; }
 .toast.ok { border-color: var(--ok); }
 .toast.warn { border-color: var(--brass); }
 @media (max-width: 879px) {
+  /* GÖREV 32: Dengele'nin yapışkan aksiyon çubuğu görünürken toast onun
+     ÜSTÜNDE durur — --toast-lift'i app.js (toastPlace) çubuğun ekrandaki
+     üst kenarından ölçüp yazar; çubuk yoksa değişken yoktur, eski konum. */
   .toast {
     top: auto;
     right: 12px;
     left: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: max(calc(12px + env(safe-area-inset-bottom, 0px)), var(--toast-lift, 0px));
     max-width: 480px;
     margin: 0 auto;
   }
@@ -3895,3 +3916,18 @@ main.pa-wide { max-width: 1080px; }
      keyframes'leridir; azaltılmış harekette çark hissi tamamen kapanır. */
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ── Geçmiş: "Daha fazla yükle" (GÖREV 32) — "mc-" öneki Geçmiş'e aittir ── */
+.mc-more {
+  display: block;
+  width: 100%;
+  margin: 14px 0 4px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.mc-more:hover { color: var(--brass); border-color: var(--brass-dim); }
+.mc-more[disabled] { opacity: 0.55; cursor: default; }

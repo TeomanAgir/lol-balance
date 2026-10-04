@@ -302,7 +302,7 @@ def test_popover_reuses_the_badge_tip_dismiss_pattern():
     assert "closeHistPopup(false);" in opener
     assert "closeBuildTip();" in opener
     # Gorunum degisimi / yeniden cizim acik kutuyu birakmaz.
-    view = fn_body(text, "function showView(name, forceReload = false)")
+    view = fn_body(text, "function showView(name, forceReload = false, opts = {})")
     assert "closeRoleRank(false);" in view
 
 

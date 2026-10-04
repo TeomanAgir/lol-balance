@@ -13,11 +13,13 @@ Backend'in `/` altından servis ettiği, build-tool'suz tek sayfalık arayüz. `
 
 ## Mock ile çalıştırma
 
-`index.html`'deki config satırı varsayılan olarak mock'tadır:
+`index.html`'deki config satırı varsayılan olarak **gerçek backend'dedir** (`USE_MOCK: false`). Mock için yerelde `true` yap (commit'leme):
 
 ```html
 <script>window.APP_CONFIG = { USE_MOCK: true, API_BASE: "/api/v1" };</script>
 ```
+
+`mock_api.js` statik `<script>` etiketiyle **yüklenmez** (GÖREV 32): config satırının altındaki küçük yükleyici betikleri dinamik `<script>` (`async = false`) ile ekleme sırasıyla yükler ve `mock_api.js`'i listeye YALNIZ `USE_MOCK: true` iken ekler. Sıra: `[mock_api.js]`, `i18n/tr.js`, `i18n/en.js`, `i18n/core.js`, `advisor.js`, `app.js` — mock, `app.js` ilk API çağrısını yapmadan hazırdır; üretimde 88 KB'lık mock hiç indirilmez. Kopya üzerinde hızlı geçiş: `sed -i '' 's/USE_MOCK: false/USE_MOCK: true/' index.html` (macOS; Linux'ta `sed -i`).
 
 Statik bir sunucuyla aç (fetch stub'ı `file://` ile de çalışır ama sunucu daha gerçekçidir):
 
@@ -41,7 +43,7 @@ Harita ekranı (GÖREV 4) ayrı bir uç kullanmaz, `GET /leaderboard` mock'undak
 
 ## Backend'e bağlama
 
-1. `index.html`'de `USE_MOCK: false` yap.
+1. `index.html`'de `USE_MOCK: false` olduğundan emin ol (varsayılan; mock dosyası o zaman hiç yüklenmez).
 2. Backend'i çalıştır — `webui/` dosyalarını FastAPI StaticFiles ile `/` altından servis eder, ekstra bir şey gerekmez.
 3. İlk açılışta sorulan API anahtarı, backend'in `.env`'indeki shared secret'tır; `localStorage`'a yazılır, 401 dönerse tekrar sorulur.
 
@@ -79,6 +81,13 @@ Harita ekranı (GÖREV 4) ayrı bir uç kullanmaz, `GET /leaderboard` mock'undak
 - Rol düzeltme: maç kartındaki "Rolleri düzenle" 10 katılımcı için rol seçici açar; "Rolleri Kaydet" yalnız **değişen** rolleri `PUT /api/v1/matches/{id}/positions` ile gönderir (`{"positions": {"<player_id>": "TOP"|null}}`) ve yanıttaki `updated` / `role_matches_replayed` bilgisini toast'ta gösterir. Ana rating etkilenmez; kaydedince maç listesi ve roster önbelleği tazelenir. Manuel girilen maçlarda roller boş geldiğinden bu panel o maçları rol evrenine sokmanın yoludur.
 - **Kaydedilmemiş rol seçimleri kaybolmaz (fix, 2026-08-19):** seçimler DOM'da değil `cp.roleDraft`'ta (maç id → `{player_id: rol}`) tutulur; panelin her yeniden çizimi (arama, durum süzgeci, sekme değişimi, idari eylem sonrası tazeleme, dil değişimi) düzenleyiciyi taslaktan geri yükler — `data-original` yine sunucudaki değerdir, yani kısmi güncelleme ölçütü bozulmaz. Sunucudaki değere geri dönen seçim taslaktan düşer; farklı olan seçim `.re-dirty` ile işaretlenir. Seçimleri atacak her yol (düzenleyiciyi kapatma, başka maçın düzenleyicisini açma, sekme değişimi, paneli kilitleme) **önce onay sorar** (ad düzenlemesindeki desen; `control.unsaved_roles_confirm` / `control.unsaved_both_confirm`), iptal edilirse hiçbir şey değişmez. Önceki davranışta seçimler sessizce sıfırlanıyordu ve kullanıcı bunu "roller kaydedilmiyor" olarak görüyordu.
 - "Dengele" butonu tam 10 seçim olmadan aktifleşmez (asıl doğrulama backend'de, `422`).
+- **Akış/durum (GÖREV 32):**
+  - *Roster önbelleği* 30 sn ömürlüdür (`ROSTER_TTL_MS`): Dengele/profil girişinde süresi geçmişse `GET /players` yeniden çekilir; ilk maçında auto-create edilen oyuncu sayfa yenilenmeden görünür. Dengele'deki **Yenile** (`#btn-roster-refresh`, `bl-` öneki) TTL'i beklemez. Seçim (`state.selected`) korunur; roster'dan düşen id seçimden çıkar.
+  - *Tarayıcı geçmişi:* her görünüm geçişi `history.pushState` ile kayıt açar (`navWrite`); kayıt görünümü kurmaya yeten serileştirilebilir bağlamı taşır (oyuncu id, maç id, geri hedefleri, SSS maddesi, geri yığını — maç nesnesi değil id'si; bellekte yoksa `GET /matches/{id}`). Telefon/tarayıcı GERİ tuşu `popstate` → `navRestore` ile önceki görünümü (profil/maç detayı/harita/SSS detayı dahil) ve kaydırma konumunu geri kurar. Aynı görünümün yeniden çizimi (dil değişimi) kayıt açmaz (`replaceState`). İlk yükleme `replaceState`'tir; sayfa yenilenirse açık görünüm geri gelir. SSS hash'i (`#faq`, `#faq/<slug>`) aynı kaydın URL'sidir.
+  - *Kontrol Paneli taslakları:* ad düzeltmeleri de `cp.nameDraft`'ta yaşar (rol taslağı `cp.roleDraft` gibi); görünümden çıkış (sol menü, GERİ tuşu) `cpConfirmLeave` onayından geçer. Dil değişimi paneli yalnız yeniden çizer — ağdan çekmez, kaydırmayı/odağı korur.
+  - *Geçmiş:* "Daha fazla yükle" (`#btn-matches-more`, `mc-more`) limiti 20 → 50 → 100 → 200 büyütür; mevcut kartlar yeniden çizilmez (yalnız eksikler sona eklenir). 200'de (contract üst sınırı) ya da sunucu limitten az döndürünce düğme gizlenir. Mock `limit`'e uyar.
+  - *Yarış koruması:* profil, maç detayı, profil grafiğinden maça atlama ve Geçmiş listesi istek sayacı taşır; bayat yanıt atılır.
+  - *Toast (mobil):* Dengele'nin yapışkan aksiyon çubuğu ekrandayken toast çubuğun üstünde durur (`--toast-lift`, `toastPlace`).
 - **Kontrol Paneli (fix-2, `cp-` öneki):** Geçmiş kartlarındaki herkese açık void düğmesi kaldırıldı; void/unvoid/replay ve oyuncu adı düzeltme sol paneldeki şifre korumalı "Kontrol Paneli" sayfasındadır. Şifre yalnız bellekte tutulur (`state.adminKey`) — localStorage/sessionStorage'a **yazılmaz**, her sayfa yenilemesinde yeniden sorulur; doğrulama yan etkisiz `GET /admin/ping` (204) iledir ve idari çağrılar `X-API-Key`'e **ek olarak** `X-Admin-Key` taşır. `503` (sunucuda `ADMIN_KEY` yok) ile `403` (şifre yanlış) ayrı mesaj gösterir; her ikisinde de panel kilitlenip giriş ekranına döner. Mock modunda geçerli şifre `mock-admin-key`'dir (sahte sabit; `window.MOCK_ADMIN_KEY_MISSING = true` ile 503 yolu denenebilir).
 - Void artık geri alınabilir: panelde void maçın satırında "Geri al" (`POST /matches/{id}/unvoid`) durur. Rulet maçında ikisi de gösterilmez (backend 409 verir), yerine kısa bir not basılır.
 - Hata yanıtlarındaki `detail` alanı kullanıcıya aynen gösterilir (backend Türkçe döner).

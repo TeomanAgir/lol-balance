@@ -96,6 +96,12 @@
               data-i18n-aria-label="balance.nem_mode_off_title">×</button>
     </div>
 
+    <!-- Roster tazeleme (GOREV 32): yeni oyuncu (ilk macinda auto-create) sayfa
+         yenilenmeden gorunsun; secim korunur. -->
+    <div class="bl-bar">
+      <button id="btn-roster-refresh" class="bl-refresh" type="button"
+              data-i18n="balance.refresh" data-i18n-title="balance.refresh_title"></button>
+    </div>
     <div id="roster" class="roster-grid" aria-live="polite"></div>
 
     <div id="suggestions" class="suggestions"></div>
@@ -329,6 +335,8 @@
   <section id="view-matches" class="view" hidden>
     <p class="view-hint" data-i18n="matches.hint"></p>
     <div id="match-list" class="match-list"></div>
+    <!-- "Daha fazla yukle" (GOREV 32): limit 20 -> 50 -> 100 -> 200 (contract ust siniri) -->
+    <button id="btn-matches-more" class="mc-more" type="button" data-i18n="matches.load_more" hidden></button>
   </section>
 
   <!-- ═══ Maç detayı (GÖREV 8) — sekme değil, Geçmiş'teki maç kartından açılan detay görünümü ═══ -->
@@ -401,14 +409,25 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" }; // USE_MOCK: false -> mock_api.js (lokal gelistirme)</script>
-<script src="mock_api.js"></script>
-<!-- i18n yükleme sırası contract geregi: tr.js, en.js, core.js, sonra app.js -->
-<script src="i18n/tr.js"></script>
-<script src="i18n/en.js"></script>
-<script src="i18n/core.js"></script>
-<!-- advisor.js app.js'ten ÖNCE gelir: Seçim ekranı window.PickAdvisor'ı kullanır -->
-<script src="advisor.js"></script>
-<script src="app.js"></script>
+<!-- USE_MOCK: true yalniz lokal gelistirme icindir (backend'siz) -> mock_api.js
+     yuklenir; uretimde (false) mock_api.js HIC indirilmez (GOREV 32). -->
+<script>window.APP_CONFIG = { USE_MOCK: false, API_BASE: "/api/v1" };</script>
+<!-- Betikler dinamik <script> ile, async=false sirasiyla yuklenir: async=false
+     dinamik betikler EKLENME SIRASIYLA calisir, bu yuzden mock (varsa) app.js
+     ilk API cagrisini yapmadan hazirdir. Sira: [mock], tr.js, en.js, core.js
+     (i18n contract geregi), advisor.js (Secim ekrani window.PickAdvisor'i
+     kullanir), app.js. -->
+<script>
+  (function () {
+    var files = ["i18n/tr.js", "i18n/en.js", "i18n/core.js", "advisor.js", "app.js"];
+    if (window.APP_CONFIG.USE_MOCK) files.unshift("mock_api.js");
+    files.forEach(function (src) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.async = false;
+      document.body.appendChild(s);
+    });
+  })();
+</script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 // mock_api.js — api_contract.md'deki örnek response'ları dönen fetch stub'ı.
-// Backend hazır olunca index.html'de USE_MOCK: false yapılır; bu dosya devre dışı kalır.
+// Backend hazır olunca index.html'de USE_MOCK: false yapılır; bu dosya o zaman HİÇ yüklenmez
+// (index.html'deki yükleyici onu yalnız USE_MOCK: true iken ekler — GÖREV 32).
 (function () {
   "use strict";
 
@@ -1363,7 +1364,12 @@
       return m ? json(m) : err(404, "Maç bulunamadı.");
     }
 
-    if (method === "GET" && path.startsWith("/matches")) return json(matches);
+    // limit (contract §3: 1..200, varsayılan 20) uygulanır — Geçmiş'teki
+    // "Daha fazla yükle" adımları (GÖREV 32) mock'ta da gerçek gibi davranır.
+    if (method === "GET" && path.startsWith("/matches")) {
+      const lim = Number(new URLSearchParams(path.split("?")[1] || "").get("limit") || 20);
+      return json(matches.slice(0, Math.max(1, Math.min(200, lim || 20))));
+    }
 
     if (method === "POST" && path === "/balance") {
       const body = JSON.parse(opts.body);
