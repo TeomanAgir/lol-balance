@@ -38,8 +38,13 @@ def reset_admin_rate_limit() -> None:
 
 
 def _client_ip(request: Optional[Request]) -> str:
-    """İstemci IP'si; ASLA header'dan (X-Forwarded-For) okunmaz — sahte IP ile
-    sayaç seyreltilmesin diye yalnız gerçek soket adresi kullanılır."""
+    """İstemci IP'si; header'dan (X-Forwarded-For) DOĞRUDAN okunmaz.
+
+    `request.client`, uygulamadaki ProxyHeadersMiddleware'den geçmiş adrestir
+    (main.create_app, GÖREV 30b): istek güvenilen bir proxy'den geldiyse
+    X-Forwarded-For'daki gerçek istemci, gelmediyse soket adresi. Header'a
+    güvenme kararı tek noktada (middleware + FORWARDED_ALLOW_IPS) verilir;
+    burada ikinci bir yorum yapılmaz."""
     if request is None or request.client is None:
         return "unknown"
     return request.client.host
