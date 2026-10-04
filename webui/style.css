@@ -215,6 +215,12 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 
 /* ── Ana yerleşim ── */
 main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
+/* GÖREV 31: main bir SORGU KAPSAYICISIDIR — iki sütunlu düzenler (.pa-grid,
+   .rlt-teams, .cp-row, .k2-duo) kırılım kararını viewport'a değil içeriğin
+   GERÇEK kullanılabilir genişliğine göre verir (panel akıştayken viewport
+   genişliği yanıltıcıdır). Ölçüldü: inline-size kapsayıcısı position:fixed
+   torunlar için içeren blok OLMAZ (Chromium 153), modal/toast etkilenmez. */
+main { container: main / inline-size; }
 /* AÇIK GÖRÜNÜM EKRANIN TAM ORTASINDA (GÖREV 24-fix2, Teoman): sol panel
    AKIŞTA olduğu için (flex sütunu, 200px) içerik alanı sağa kayıyor ve
    ortalanmış blok viewport merkezinin sağında duruyordu. Telafi, kabuğun
@@ -227,8 +233,12 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
    tamamen alır, blok 40px sağda kalırdı — ölçüldü). Boşluk öğesi bu tuzağa
    düşmez, iki auto margin dengede kalır.
    Kural YALNIZ panelin akışta olduğu genişliklerde geçerlidir — mobilde
-   (<880px) panel çekmeceye dönüp akıştan çıkar, orada telafi UYGULANMAZ. */
-@media (min-width: 880px) {
+   (<880px) panel çekmeceye dönüp akıştan çıkar, orada telafi UYGULANMAZ.
+   GÖREV 31: boşluk öğesi artık YALNIZ ≥1280px'te. 880–1279 arası "ölü
+   bant"tı (960px'te main 560px, tablet 768'de 736px alırken) — bu bantta
+   içerik kalan TÜM genişliği alır (max-width kuralları dahilinde);
+   ortalama burada panelin sağındaki alana göredir. */
+@media (min-width: 1280px) {
   .sb-app::after { content: ""; flex: 0 0 var(--sb-w); }
 }
 .view-hint { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
@@ -373,6 +383,15 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   gap: 12px;
   align-items: center;
 }
+.sug-teams > .team { min-width: 0; }
+/* GÖREV 31: dar ekranda (≤480px) iki takım ALT ALTA — mavi üstte, denge
+   yüzdesi aralarında (DOM sırası zaten mavi · orta · kırmızı). Maç kartının
+   fix-2c yığma deseniyle aynı; 320px'te ul.team 342px'e taşıyordu. Nemesis
+   kartı aynı işaretlemeyi kullandığı için kural ona da uygulanır. */
+@media (max-width: 480px) {
+  .sug-teams { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .sug-mid { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+}
 .team { list-style: none; }
 .team li {
   padding: 4px 0;
@@ -455,15 +474,27 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
   white-space: nowrap;
   margin-top: 2px;
 }
+/* GÖREV 31: çok dar ekranda (≤360px) alt satır YALNIZ "·" ayracından sonra
+   kırılır (parçalar .rs-part ile bölünmez) — skor sütunu daralır, ad sütunu
+   genişler (320px EN'de tablo 327px'e taşıyor, ad 1-2 harfe iniyordu). */
+.rating-sub .rs-part { white-space: nowrap; }
+@media (max-width: 360px) { .rating-sub { white-space: normal; } }
 /* Profili açan oyuncu adı (GÖREV 1) */
+/* GÖREV 31 — DOKUNMA HEDEFİ KALIBI: küçük metin düğmeleri (ad/link) ≥40px
+   dokunma yüksekliği alır ama GÖRSEL boyut ve satır yüksekliği değişmez:
+   dikey dolgu + aynı miktarda NEGATİF dikey margin (kenar kutusu katkısı
+   eskisiyle aynı kalır → sıralama satırı büyümez). Alt çizgi border değil
+   text-decoration'dır, yoksa dolguyla metinden uzaklaşırdı. */
 .name-link {
-  padding: 0;
+  padding: 9px;      /* yatay da: "Efe" gibi kısa adlar 23px genişlikteydi */
+  margin: -9px;
   font-weight: inherit;
   text-align: left;
-  border-bottom: 1px dotted var(--line);
-  transition: color 0.12s, border-color 0.12s;
+  text-decoration: underline dotted var(--line);
+  text-underline-offset: 3px;
+  transition: color 0.12s, text-decoration-color 0.12s;
 }
-.name-link:hover { color: var(--brass); border-bottom-color: var(--brass-dim); }
+.name-link:hover { color: var(--brass); text-decoration-color: var(--brass-dim); }
 
 /* ── Sıra değişimi göstergesi (api_contract §5 `rank_delta`) ──
    V1 "İnce Chevron" (Teoman seçimi, 2026-08-19): adın SAĞINDA çerçevesiz
@@ -693,7 +724,10 @@ main.pa-full #view-profile > .back-btn { margin: 16px 0 0 20px; }
               var(--brass) 50%, var(--brass-dim) 78%, transparent);
 }
 
-@media (max-width: 900px) {
+/* GÖREV 31: kaide sahnesinin dar düzeni main'in GERÇEK genişliğine bağlı
+   (eski eşik viewport 900px'ti; panel akıştayken 960px viewport'ta 760px
+   içerikte geniş sahne madalyonu sağ sütunun üstüne bindiriyordu). */
+@container main (max-width: 880px) {
   .k2-hero-in { padding: 22px 14px 0; }
   .k2-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; padding: 16px 0 18px; }
   .pb-plinth { grid-column: 1 / -1; order: -1; margin-bottom: 16px; }
@@ -754,8 +788,12 @@ main.pa-full #view-profile > .back-btn { margin: 16px 0 0 20px; }
   margin-bottom: 12px;
 }
 @media (max-width: 900px) {
-  .k2-duo { grid-template-columns: minmax(0, 1fr); }
   .k2-body { padding: 20px 14px 60px; }
+}
+/* GÖREV 31: iki sütun kararı main'in gerçek genişliğine göre (panel akıştayken
+   viewport 900+ olsa da içerik daha dar olabilir). */
+@container main (max-width: 759px) {
+  .k2-duo { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Rol yayları: simge ortada, dolgu yayı çevrede ──
@@ -980,7 +1018,7 @@ button.rrp-name:hover, button.rrp-name:focus-visible { color: var(--brass-hi); }
   padding: 10px 14px;
   font-size: 14px;
 }
-.syn-link { padding: 0; text-align: left; font-weight: 600; transition: color 0.12s; min-width: 0; overflow-wrap: anywhere; }
+.syn-link { padding: 11px 0; margin: -11px 0; text-align: left; font-weight: 600; transition: color 0.12s; min-width: 0; overflow-wrap: anywhere; }
 .syn-link:hover { color: var(--brass); }
 /* skor + ortak-maç metni birlikte sağa yaslanır, dar ekranda tek blok olarak sarar */
 .syn-stats { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -1397,14 +1435,18 @@ button.rrp-name:hover, button.rrp-name:focus-visible { color: var(--brass-hi); }
   font-size: 11px;
   line-height: 1.2;
   color: var(--muted);
-  padding: 5px 6px;
+  /* GÖREV 31 dokunma hedefi kalıbı: 5px → 14px dolgu, fark negatif margin
+     ile geri alınır; noktalı çizgi text-decoration (border dolguyla kayardı). */
+  padding: 14px 6px;
+  margin-block: -9px;
   background: none;
   border: 0;
-  border-bottom: 1px dotted var(--brass-dim);
+  text-decoration: underline dotted var(--brass-dim);
+  text-underline-offset: 5px;
   font-variant-numeric: tabular-nums;
 }
-.pb-go:hover { color: var(--brass-hi); border-bottom-color: var(--brass-hi); }
-.pb-big-cell .pb-go { font-size: 11.5px; margin-top: 2px; }
+.pb-go:hover { color: var(--brass-hi); text-decoration-color: var(--brass-hi); }
+.pb-big-cell .pb-go { font-size: 11.5px; margin-top: -7px; }
 
 /* Ekran okuyucu metni: açıklama + kaç kez + son maç düğmenin adına girer,
    böylece görsel tooltip'e (aria-hidden) bağımlılık kalmaz. */
@@ -1637,7 +1679,7 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   white-space: nowrap;
 }
 .nem-weekly { font-size: 13px; color: var(--muted); margin-top: 8px; }
-.nem-link { padding: 0; font-weight: 600; color: var(--text); transition: color 0.12s; }
+.nem-link { padding: 11px 0; margin: -11px 0; font-weight: 600; color: var(--text); transition: color 0.12s; }
 .nem-link:hover { color: var(--brass); }
 .btn-nemesis { display: block; width: 100%; margin-top: 12px; font-size: 15px; }
 
@@ -1694,7 +1736,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .map-entry { display: flex; justify-content: flex-end; margin: -6px 0 6px; }
 .map-link {
   padding: 6px 2px;
-  min-height: 36px;
+  min-height: 44px;
+  margin-block: -4px;  /* GÖREV 31: 36 → 44px hedef, yerleşim katkısı aynı */
   font-family: var(--display);
   font-size: 12px;
   text-transform: uppercase;
@@ -1829,7 +1872,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .rr-row:last-child { border-bottom: 0; }
 .rr-rank { color: var(--muted); font-size: 13px; }
 .rr-name {
-  padding: 0;
+  padding: 11px 0;   /* GÖREV 31 dokunma hedefi kalıbı (.name-link) */
+  margin: -11px 0;
   text-align: left;
   font-weight: 600;
   overflow: hidden;
@@ -2177,7 +2221,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   font: inherit;
   color: var(--muted);
   text-align: left;
-  padding: 0;
+  padding: 11px 0;   /* GÖREV 31 dokunma hedefi kalıbı (.name-link) */
+  margin: -11px 0;
 }
 .md-open:hover { color: var(--brass); }
 
@@ -2279,7 +2324,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
      text-decoration'dır, border DEĞİL: satır yüksekliğini 1px bile oynatmaz.
    Şampiyon alt yazısı düğmenin içindedir ama .md-champ rengini korur. */
 .md-name-btn {
-  padding: 0;
+  padding: 12px 0;   /* GÖREV 31 dokunma hedefi kalıbı (.name-link) */
+  margin: -12px 0;
   max-width: 100%;
   min-width: 0;
   justify-self: start;
@@ -2772,6 +2818,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   padding: 12px 14px;
   margin: 10px 0;
   overflow-x: auto;    /* dar ekranda blok kendi içinde kayar */
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 .fq-pre code {
   background: none;
@@ -2791,7 +2839,7 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .fq-doc blockquote p { margin: 4px 0; }
 /* Tablo sarmalayıcıda yatay kayar: 320px'te sayfa genişlemez (md-graph kuralı) */
-.fq-tablewrap { overflow-x: auto; margin: 10px 0; }
+.fq-tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; margin: 10px 0; }
 .fq-doc table { border-collapse: collapse; width: 100%; font-size: 14px; }
 .fq-doc th, .fq-doc td {
   border: 1px solid var(--line);
@@ -2925,6 +2973,9 @@ main.pa-wide { max-width: 1080px; }
   cursor: pointer;
 }
 .pa-me input { accent-color: var(--brass); width: 13px; height: 13px; cursor: pointer; }
+/* GÖREV 31: radio 13px görsel kalır; dokunma hedefi onu saran <label>'dır —
+   dolgu + negatif margin ile ≥40px yüksekliğe çıkar, satır büyümez. */
+.pa-me { padding: 14px 6px; margin: -14px -6px; }
 .pa-row.mine .pa-me { color: var(--brass); }
 .pa-refresh { width: 100%; }
 
@@ -3105,7 +3156,7 @@ main.pa-wide { max-width: 1080px; }
 
 /* Dar ekran: önce tek sütuna, sonra kart ızgarası da tek sütuna iner.
    390px'te yatay taşma yok: satır öğeleri esner, rozetler sarar. */
-@media (max-width: 879px) {
+@container main (max-width: 639px) {
   .pa-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
@@ -3356,12 +3407,16 @@ main.pa-wide { max-width: 1080px; }
 }
 
 /* ── Toast ── */
+/* GÖREV 31: masaüstünde İÇERİK alanının üst-sağı (sol panelin üstüne
+   binmez); mobilde (<880px) ALTTA, safe-area dahil — üst barı/geri düğmesini
+   örtmez. Uzun metin 2-3 satıra sarar. */
 .toast {
   position: fixed;
   top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(92vw, 480px);
+  right: 16px;
+  max-width: min(calc(100vw - var(--sb-w) - 32px), 420px);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
   background: var(--surface-2);
   border: 1px solid var(--red);
   color: var(--text);
@@ -3373,6 +3428,16 @@ main.pa-wide { max-width: 1080px; }
 }
 .toast.ok { border-color: var(--ok); }
 .toast.warn { border-color: var(--brass); }
+@media (max-width: 879px) {
+  .toast {
+    top: auto;
+    right: 12px;
+    left: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
 
 /* ── RULET (GÖREV 23) — "rlt-" öneki ──
    Eğlence modu: DENGELE'nin yanındaki vurgulu düğme, dengeleme ekranındaki
@@ -3445,7 +3510,7 @@ main.pa-wide { max-width: 1080px; }
 .rlt-note.ok { color: var(--ok); }
 .rlt-note.err { color: var(--red); }
 .rlt-teams { display: grid; gap: 14px; margin-top: 10px; }
-@media (min-width: 768px) { .rlt-teams { grid-template-columns: 1fr 1fr; } }
+@container main (min-width: 600px) { .rlt-teams { grid-template-columns: 1fr 1fr; } }
 .rlt-team {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3816,7 +3881,10 @@ main.pa-wide { max-width: 1080px; }
 @media (min-width: 768px) {
   main { padding: 24px 24px 48px; }
   .roster-grid { grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); }
-  /* Kontrol Paneli maç satırı: takım özeti tek satıra, eylem sağa yaslanır. */
+}
+/* Kontrol Paneli maç satırı: takım özeti tek satıra, eylem sağa yaslanır.
+   GÖREV 31: karar main'in gerçek genişliğine göre (container query). */
+@container main (min-width: 600px) {
   .cp-row { grid-template-columns: 1fr auto; align-items: center; }
   .cp-row-head { grid-column: 1 / -1; }
   .cp-teams { grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 8px; }
