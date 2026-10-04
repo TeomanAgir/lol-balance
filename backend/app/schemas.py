@@ -481,3 +481,156 @@ class CollectorHealthOut(BaseModel):
     outbox_pending: Optional[int]
     last_ingest_at: Optional[str]
     last_ingest_game_id: Optional[str]
+
+
+# ── GÖREV 34: META/counter verisi (api_contract §8 "Meta verisi") ─────────
+
+
+class MetaTiersOut(BaseModel):
+    """`GET /meta/tiers`: tiers belgesi + {origin, snapshot_id}."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    patch: Any = None
+    updated: Any = None
+    source: Any = None
+    # lane -> {S|A|B: [{name, win_rate, pick_rate}]}; tohum dosyada eski düz
+    # string biçimi de bulunabilir (web UI onu da okur) → eleman tipi serbest.
+    tiers: dict[str, dict[str, list[Any]]]
+    origin: Literal["snapshot", "seed"]
+    snapshot_id: Optional[int] = None
+
+
+class MetaCountersOut(BaseModel):
+    """`GET /meta/counters`: counters belgesi + {origin, snapshot_id}."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    patch: Any = None
+    updated: Any = None
+    source: Any = None
+    counters: dict[str, dict[str, list[Any]]]
+    origin: Literal["snapshot", "seed"]
+    snapshot_id: Optional[int] = None
+
+
+class MetaActiveOut(BaseModel):
+    origin: Literal["snapshot", "seed"]
+    snapshot_id: Optional[int] = None
+    patch: Optional[str] = None
+    updated: Optional[str] = None
+    source: Optional[str] = None
+    created_at: Optional[str] = None
+    trigger: Optional[str] = None
+    tiers_entries: int
+    counters_anchors: int
+    counters_rows: int
+
+
+class MetaDDragonOut(BaseModel):
+    vendored: Optional[str] = None
+    latest: Optional[str] = None
+
+
+class MetaStatusOut(BaseModel):
+    active: Optional[MetaActiveOut] = None
+    ddragon: MetaDDragonOut
+    age_days: Optional[int] = None
+    state: Literal["up_to_date", "update_available", "empty", "unknown"]
+    running: bool
+
+
+class MetaRefreshIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    dry_run: bool = False
+    force: bool = False
+    region: str = Field(default="global", min_length=1, max_length=32,
+                        pattern=r"^[A-Za-z0-9_\-]+$")
+    tier: str = Field(default="platinum_plus", min_length=1, max_length=32,
+                      pattern=r"^[A-Za-z0-9_\-]+$")
+
+
+class MetaBeforeOut(BaseModel):
+    origin: Literal["snapshot", "seed"]
+    snapshot_id: Optional[int] = None
+    patch: Optional[str] = None
+    updated: Optional[str] = None
+    tiers_entries: int
+    counters_anchors: int
+    counters_rows: int
+
+
+class MetaAfterOut(BaseModel):
+    patch: str
+    updated: str
+    source: str
+    dd_version: str
+    tiers_entries: int
+    counters_anchors: int
+    counters_rows: int
+
+
+class MetaDiffSummaryOut(BaseModel):
+    tiers_added: int
+    tiers_removed: int
+    tiers_moved: int
+    counters_added: int
+    counters_removed: int
+    counters_changed: int
+
+
+class MetaDiffOut(BaseModel):
+    # lane -> {added: [[name, tier]], removed: [[name, tier]],
+    #          moved: [[name, from, to]], counts: {S, A, B}}
+    tiers: dict[str, dict[str, Any]]
+    # lane -> {added: [name], removed: [name], changed: [name], anchors: int}
+    counters: dict[str, dict[str, Any]]
+    summary: MetaDiffSummaryOut
+
+
+class MetaGuardOut(BaseModel):
+    ok: bool
+    loss_ratio: float
+    empty_lanes: list[str]
+    reasons: list[str]
+
+
+class MetaRefreshOut(BaseModel):
+    written: bool
+    dry_run: bool
+    snapshot_id: Optional[int] = None
+    reason: Optional[Literal["already_current", "guard_rejected"]] = None
+    before: Optional[MetaBeforeOut] = None
+    after: MetaAfterOut
+    ddragon: MetaDDragonOut
+    diff: MetaDiffOut
+    guard: MetaGuardOut
+    warnings: list[str]
+    duration_ms: int
+
+
+class MetaHistoryItemOut(BaseModel):
+    id: int
+    created_at: str
+    trigger: str
+    patch: str
+    updated: Optional[str] = None
+    source: str
+    dd_version: str
+    is_active: bool
+    tiers_entries: int
+    counters_anchors: int
+    counters_rows: int
+    summary: MetaDiffSummaryOut
+    warnings_count: int
+
+
+class MetaHistoryOut(BaseModel):
+    active_id: Optional[int] = None
+    items: list[MetaHistoryItemOut]
+
+
+class MetaActivateOut(BaseModel):
+    active_id: int
+    patch: str
