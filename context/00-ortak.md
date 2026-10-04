@@ -32,7 +32,9 @@ rating (OpenSkill blend25, ana + rol evreni) → web UI (framework'süz).
   - collector: `backend/.venv/bin/python -m pytest collector`
   - rating: `backend/rating/.venv/bin/python -m pytest backend/rating`
   - webui: `backend/.venv/bin/python -m pytest webui/tests`
-- `gh` ve LoL client bu makinede YOK; collector'ın canlı doğrulaması yine Windows PC'de.
+- `gh`: `/opt/homebrew/bin/gh` (TeomanAgir hesabı, HTTPS kimlik yardımcısı; worker kullanmaz).
+  Remote `origin` HTTPS'tir (SSH anahtarı GitHub'da kayıtlı değil). LoL client bu makinede
+  YOK; collector'ın canlı doğrulaması yine Windows PC'de.
 - Yerel-only görev listesi (`new_modules.md`, `modules/`) bu makinede YOK — görev tanımı
   Teoman'dan sohbetle gelir.
 
