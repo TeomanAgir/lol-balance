@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 # Sabitlenmiş patch. Güncellerken https://ddragon.leagueoflegends.com/api/versions.json
-DDRAGON_VERSION = "16.16.1"
+DDRAGON_VERSION = "16.19.1"
 
 CDN = f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VERSION}"
 
