@@ -8,7 +8,11 @@ version = "0.1.0"
 description = "OpenSkill (Plackett-Luce) tabanli, I/O'suz rating ve 5v5 takim dengeleme kutuphanesi"
 requires-python = ">=3.11"
 dependencies = [
-    "openskill>=5.0,<7",
+    # TAM PIN (bilinçli): engine'lerin sayısal çıktısı engine_version'a
+    # dondurulmuştur (CLAUDE.md #1/#4). openskill yükseltmesi mu/sigma'yı bit
+    # düzeyinde değiştirebilir; yükseltme = bilinçli karar + altın vektör
+    # testinin (tests/test_golden_vectors.py) gerekçeli güncellemesi.
+    "openskill==6.2.0",
 ]
 
 [project.optional-dependencies]
