@@ -25,7 +25,7 @@
     profileId: null,            // açık olan oyuncu profili (GÖREV 1)
     profileFrom: "leaderboard", // profil hangi görünümden açıldı (sıralama | enler | harita | maç detayı)
     mapFrom: "highlights",      // harita hangi görünümden açıldı (enler | sıralama)
-    meta: null,                 // assets/meta/tiers.json içeriği (GÖREV 16; null = henüz çekilmedi)
+    meta: null,                 // GET /meta/tiers belgesi (GÖREV 16/34; null = henüz çekilmedi)
     metaFilter: "ALL",          // META süzgeci: "ALL" | ROLES elemanı
     faqSlug: null,              // açık olan SSS maddesinin slug'ı (SSS görevi; #faq/<slug>)
     nemesis: null,              // son GET /nemesis yanıtı (GÖREV 3)
@@ -63,7 +63,9 @@
     }
     if (res.status === 401) {
       openKeyModal();
-      throw new Error(t("common.err_unauthorized"));
+      const e = new Error(t("common.err_unauthorized"));
+      e.status = 401;
+      throw e;
     }
     if (!res.ok) {
       let detail = "";
@@ -825,31 +827,26 @@
   // rozetli öneri kartları. Analiz MOTORU ayrı modüldedir (advisor.js,
   // window.PickAdvisor): saf fonksiyon, metinsiz — rozet TANIMLAYICILARI döner,
   // görünen metni burada i18n kurar. Veri katmanı:
-  //   - tiers.json fetchMeta() ile ORTAK (META sekmesiyle aynı önbellek);
+  //   - tiers belgesi fetchMeta() ile ORTAK (META sekmesiyle aynı önbellek);
   //     yeni şema {name, win_rate, pick_rate} + eski düz-string ikisi de okunur.
-  //   - counters.json ayrı fetch (aynı desen: API değil, X-API-Key yok,
-  //     USE_MOCK yolundan geçmez, asla reject etmez).
+  //   - counters belgesi GET /meta/counters (GÖREV 34: veri backend sahipli;
+  //     api() yolundan, X-API-Key ile; aynı desen — bir kez çekilir, hata TÜRÜ
+  //     saklanır, asla reject etmez; bkz. metaFetchDoc).
   //   - champions.json tags/info: dd- katmanının zaten çektiği sözlükten okunur
   //     (paralel veri işi alanları ekler; yoksa kompozisyon sinyali atlanır).
   //   - Grup rozeti GET /matches'tan İSTEMCİDE sayılır (yeni endpoint YOK) ve
   //     öneri SIRASINI ETKİLEMEZ (Teoman kararı — yalnız bilgi rozeti).
-  // Mock modunda tiers/counters/tags-info window.MOCK_ADVISOR'dan gelir.
+  // Mock modunda tags-info window.MOCK_ADVISOR'dan gelir; tiers/counters ise
+  // mock_api.js'in tohum dosyalardan (assets/meta/*.json) kurduğu /meta/*
+  // yanıtlarından — canlıyla aynı yol.
   // Her seçim değişikliği analizi canlı tazeler; "Analizi tazele" düğmesi
   // ayrıca grup verisini (GET /matches) yeniden çeker.
-  const PA_COUNTERS_URL = "assets/meta/counters.json";
   let paCountersPromise = null;
 
   function fetchCounters() {
     if (paCountersPromise) return paCountersPromise;
-    paCountersPromise = window.fetch(PA_COUNTERS_URL)
-      .then(r => {
-        if (!r.ok) return { err: { kind: "http", status: r.status } };
-        return r.json().then(
-          d => (d && typeof d === "object" && d.counters && typeof d.counters === "object"
-            ? { data: d } : { err: { kind: "shape" } }),
-          () => ({ err: { kind: "shape" } }));
-      })
-      .catch(() => ({ err: { kind: "network" } }));
+    paCountersPromise = metaFetchDoc("/meta/counters", "counters")
+      .then(r => { if (r.err) paCountersPromise = null; return r; });
     return paCountersPromise;
   }
 
@@ -1217,15 +1214,9 @@
     await loadAssets();
     // Veri dosyaları paralel işte üretiliyor olabilir: yokluk/eski şema hata
     // DEĞİLDİR — eksik sinyal atlanır, mevcut sinyallerle devam edilir.
-    let tiers = null, counters = null;
-    if (CONFIG.USE_MOCK && window.MOCK_ADVISOR) {
-      tiers = window.MOCK_ADVISOR.tiers || null;
-      counters = window.MOCK_ADVISOR.counters || null;
-    } else {
-      const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
-      if (!mRes.err && mRes.data && mRes.data.tiers) tiers = mRes.data.tiers;
-      if (!cRes.err && cRes.data && cRes.data.counters) counters = cRes.data.counters;
-    }
+    const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
+    const tiers = !mRes.err && mRes.data && mRes.data.tiers ? mRes.data.tiers : null;
+    const counters = !cRes.err && cRes.data && cRes.data.counters ? cRes.data.counters : null;
     const grp = await paGroup();
     paData = {
       tiers, counters, group: grp.index, sample: grp.sample,
@@ -1539,15 +1530,9 @@
     const box = $("#mo-list");
     if (!box.firstChild) box.innerHTML = `<p class="mo-none">${t("common.loading")}</p>`;
     await loadAssets();
-    let tiers = null, counters = null;
-    if (CONFIG.USE_MOCK && window.MOCK_ADVISOR) {
-      tiers = window.MOCK_ADVISOR.tiers || null;
-      counters = window.MOCK_ADVISOR.counters || null;
-    } else {
-      const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
-      if (!mRes.err && mRes.data && mRes.data.tiers) tiers = mRes.data.tiers;
-      if (!cRes.err && cRes.data && cRes.data.counters) counters = cRes.data.counters;
-    }
+    const [mRes, cRes] = await Promise.all([fetchMeta(), fetchCounters()]);
+    const tiers = !mRes.err && mRes.data && mRes.data.tiers ? mRes.data.tiers : null;
+    const counters = !cRes.err && cRes.data && cRes.data.counters ? cRes.data.counters : null;
     moData = { tiers, counters, names: paNames(tiers) };
     renderMatchupShell();
   }
@@ -3175,14 +3160,14 @@
     closeRoleRank();    // 2026-08-19: profildeki rol sıralaması penceresi
   });
 
-  // ── 2f) META: şampiyon kademeleri (GÖREV 16) ──────────────────
-  // Veri API'den DEĞİL statik dosyadan gelir: assets/meta/tiers.json
-  // (api_contract §8 "Meta tier verisi"; yarı otomatik akış — deploy/fetch_meta.py
-  // üretir, Teoman onaylayıp commit'ler). Bu yüzden istek dd- varlık katmanıyla
-  // aynı desendedir: X-API-Key TAŞIMAZ, USE_MOCK yolundan geçmez, bir kez çekilip
-  // önbelleğe alınır ve ASLA reject etmez — dosyanın yokluğu bu görünümün hata
-  // durumudur, uygulamanın değil.
-  const META_URL = "assets/meta/tiers.json";
+  // ── 2f) META: şampiyon kademeleri (GÖREV 16; veri kaynağı GÖREV 34) ──
+  // Veri backend'den gelir: GET /meta/tiers (api_contract §8 "Meta tier + seçim
+  // danışmanı verisi") — etkin anlık görüntü, yoksa repodaki tohum dosya
+  // (`origin` alanı söyler). İstek api() yolundan geçer (X-API-Key; mock modunda
+  // mock_api.js tohum dosyaları okur), bir kez çekilip önbelleğe alınır ve ASLA
+  // reject etmez — 404 "veri yok" bu görünümün hata durumudur, uygulamanın değil.
+  // Kontrol Paneli › Meta güncelleme/geri alma sonrası bu önbelleği düşürür
+  // (cpInvalidateCaches), sayfa bir sonraki açılışta yeni veriyi çeker.
   const META_TIERS = ["S", "A", "B"];
   // Dosyadaki rol anahtarları küçük harftir; kanonik ROLES sırasına eşlenir.
   const META_ROLE_KEY = {
@@ -3190,19 +3175,25 @@
   };
   let metaPromise = null;
 
-  // Hata METNİ değil, hata TÜRÜ önbelleğe alınır: dil değişince mesaj yeniden
-  // üretilebilsin (metin saklansaydı eski dilde donardı).
+  // Ortak belge yükleyici (tiers + counters). api() hatası TÜRE çevrilir:
+  // status taşıyan hata http (404 = veri yok), JSON ayrıştırma hatası shape,
+  // gerisi network. Hata METNİ değil TÜRÜ saklanır: dil değişince mesaj yeniden
+  // üretilebilsin (metin saklansaydı eski dilde donardı). Statik dosya dönemine
+  // göre tek fark: hata sonucu ÖNBELLEĞE ALINMAZ (çağıranlar promise'i düşürür) —
+  // anahtar yenilendiğinde ya da sunucu ayağa kalktığında görünüm kendini
+  // toparlar, sayfa yenilemek gerekmez.
+  function metaFetchDoc(path, field) {
+    return api(path).then(
+      d => (d && typeof d === "object" && d[field] && typeof d[field] === "object"
+        ? { data: d } : { err: { kind: "shape" } }),
+      e => ({ err: e && e.status ? { kind: "http", status: e.status }
+        : e instanceof SyntaxError ? { kind: "shape" } : { kind: "network" } }));
+  }
+
   function fetchMeta() {
     if (metaPromise) return metaPromise;
-    metaPromise = window.fetch(META_URL)
-      .then(r => {
-        if (!r.ok) return { err: { kind: "http", status: r.status } };
-        return r.json().then(
-          d => (d && typeof d === "object" && d.tiers && typeof d.tiers === "object"
-            ? { data: d } : { err: { kind: "shape" } }),
-          () => ({ err: { kind: "shape" } }));
-      })
-      .catch(() => ({ err: { kind: "network" } }));
+    metaPromise = metaFetchDoc("/meta/tiers", "tiers")
+      .then(r => { if (r.err) metaPromise = null; return r; });
     return metaPromise;
   }
 
@@ -3210,7 +3201,7 @@
   const metaPlural = (n) => t("meta.n_champs" + (n === 1 ? "_one" : "_other"), { n });
 
   const metaErrText = (e) =>
-    e.kind === "http" ? t("meta.err_http", { status: e.status })
+    e.kind === "http" ? (e.status === 404 ? t("meta.err_none") : t("meta.err_http", { status: e.status }))
       : e.kind === "shape" ? t("meta.err_shape")
       : t("meta.err_network");
 
@@ -3359,8 +3350,8 @@
     renderMetaBody();
   }
 
-  // Yükleyici hiç THROW ETMEZ: veri bir uç değil statik dosyadır, hata bu
-  // görünümün içinde yazılı durur (toast'a gerek yok, sağlık ekranı deseni).
+  // Yükleyici hiç THROW ETMEZ: hata bu görünümün içinde yazılı durur (toast'a
+  // gerek yok, sağlık ekranı deseni); 404 "henüz veri yok" da aynı kutudadır.
   async function loadMeta() {
     const box = $("#meta-body");
     box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
@@ -4361,6 +4352,7 @@
   // Panelde toplanan eylemler ve yetki gereksinimleri (api_contract "Korunan
   // uçların TAM listesi", fix-3):
   //   void · unvoid · roulette/unlink · PATCH /players/{id} · admin/replay
+  //   admin/meta/status|refresh|history|activate (GÖREV 34, Meta sekmesi)
   //     → X-Admin-Key ister (api çağrısında admin: true).
   //   PUT /matches/{id}/positions (rol düzeltme)
   //     → admin anahtarı İSTEMEZ (collector backfill-positions bu ucu
@@ -4377,6 +4369,7 @@
     { id: "matches", label: "control.tab_matches" },
     { id: "players", label: "control.tab_players" },
     { id: "maint", label: "control.tab_maint" },
+    { id: "meta", label: "control.tab_meta" },
   ];
   const CP_FILTERS = ["all", "valid", "void", "roulette"];
 
@@ -4396,7 +4389,13 @@
     matches: [],
     players: [],
     busy: false,       // panel düzeyinde meşgul kilidi
+    // Meta sekmesi (GÖREV 34): status/history sunucudan (sekme her açılışta
+    // yeniden çeker); check = son refresh yanıtı (dry_run ya da guard reddi) —
+    // fark tablosu ve "Güncelle" kapısı ondan okunur. Yazma/geri alma sonrası
+    // check DÜŞER: fark, artık değişmiş etkin veriye göre bayattır.
+    meta: { status: null, history: null, check: null, err: null },
   };
+  const cpMetaFresh = () => ({ status: null, history: null, check: null, err: null });
 
   // Aramada büyük/küçük harf katlaması dile duyarlıdır (TR'de I/İ tuzağı).
   const cpNorm = (v) => String(v == null ? "" : v).toLocaleLowerCase(uiLocale());
@@ -4690,9 +4689,13 @@
     pane.setAttribute("aria-labelledby", "cp-tab-" + cp.tab);
     pane.innerHTML = cp.tab === "players" ? cpPlayersPaneHtml()
       : cp.tab === "maint" ? cpMaintPaneHtml()
-        : cpMatchesPaneHtml();
+        : cp.tab === "meta" ? cpMetaPaneHtml()
+          : cpMatchesPaneHtml();
     if (cp.tab === "matches") cpRenderList(box);
     else if (cp.tab === "players") cpRenderPlayers(box);
+    // Meta verisi yoksa (ilk açılış / sekmeye dönüş / yeniden dene) çekilir;
+    // yükleme bitince pane yeniden çizilir.
+    else if (cp.tab === "meta" && !cp.meta.status && !cp.meta.err) cpMetaLoad(box);
   }
 
   async function renderControlPanel(box) {
@@ -4742,8 +4745,10 @@
     cp.busy = on;
     const shell = box.querySelector(".cp-shell");
     if (shell) shell.classList.toggle("cp-busy", on);
+    // data-lock taşıyan düğme (Meta › Güncelle: başarılı kontrol olmadan)
+    // kilit kalkınca da KAPALI kalır — aksi hâlde her eylem sonu onu açardı.
     box.querySelectorAll(".cp-shell button, .cp-shell select")
-      .forEach(el => { el.disabled = on; });
+      .forEach(el => { el.disabled = on || el.hasAttribute("data-lock"); });
   }
 
   // Yazılmakta olan ad düzeltmesi sessizce kaybolmasın. Eylem sonrası yeniden
@@ -4804,10 +4809,16 @@
     state.badges = null;
     state.matchDetail = null;
     state.backStack = [];
+    // GÖREV 34: meta belgeleri de düşer — panelden güncelleme/geri alma META
+    // sayfasını ve danışmanı bir sonraki açılışta ANINDA etkilesin.
+    metaPromise = null;
+    paCountersPromise = null;
+    state.meta = null;
   }
 
   async function cpRefresh(box, fk) {
     await cpFetchData();
+    if (cp.tab === "meta") await cpMetaFetch();
     cpRenderPane(box);
     cpRestoreFocus(box, fk);
   }
@@ -4932,6 +4943,273 @@
     }
   }
 
+  // ── Meta sekmesi (GÖREV 34; K2 "Karşılaştırma", sınıf öneki cm-) ──
+  // Üst şerit: durum pili + özet + "Kontrol et" (dry_run, yazmaz) + "Güncelle"
+  // (yalnız başarılı kontrol sonrası açık; data-lock). Altında YÜKLÜ | KAYNAK
+  // kartları, koridor başına fark tablosu (kendi yatay kaydırma kabında),
+  // uyarılar ve anlık görüntü listesi (geri al). Tüm uçlar admin: true;
+  // eylemler cpAction kalıbından geçer (meşgul kilidi, odak iadesi, cpFail).
+  // Veri kaynağı rating'den bağımsızdır: hiçbir meta eylemi replay koşturmaz.
+  const CM_LANES = ["top", "jungle", "middle", "bottom", "utility"];
+  const CM_PILL = {
+    up_to_date: "cm-fresh", update_available: "cm-stale", empty: "cm-none", unknown: "cm-none",
+  };
+  const cmLaneName = (lane) => roleName(lane.toUpperCase());
+  const cmNum = (v) => (v == null ? "—" : esc(v));
+  const cmDate = (iso) => (iso
+    ? new Date(iso).toLocaleString(uiLocale(),
+      { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—");
+  const cmTok = (kind, text) => `<span class="cm-tok cm-${kind}">${esc(text)}</span>`;
+  const cmPlural = (base, n) => t(base + (n === 1 ? "_one" : "_other"), { n });
+
+  async function cpMetaFetch() {
+    const [status, history] = await Promise.all([
+      api("/admin/meta/status", { admin: true }),
+      api("/admin/meta/history", { admin: true }),
+    ]);
+    cp.meta.status = status;
+    cp.meta.history = history;
+    cp.meta.err = null;
+  }
+
+  // Sekme açılışındaki yükleme. Sıra sayacı: kullanıcı sekme değiştirdiyse ya
+  // da bu arada bir eylem (kendi tazelemesiyle) koştuysa bayat yanıt pane'e
+  // yazılmaz. 403/503 cpFail ile paneli kilitler; diğer hatalar pane'de
+  // yazılı durur ve "Yeniden dene" sunulur.
+  let cmLoadSeq = 0;
+  async function cpMetaLoad(box) {
+    const seq = ++cmLoadSeq;
+    try {
+      await cpMetaFetch();
+    } catch (e) {
+      if (seq !== cmLoadSeq || cp.tab !== "meta") return;
+      cp.meta.err = e.message;
+      cpFail(e);
+      if (!box.querySelector(".cp-shell")) return;
+    }
+    if (seq !== cmLoadSeq || cp.tab !== "meta") return;
+    const fk = cpFocusKey(box);
+    cpRenderPane(box);
+    cpRestoreFocus(box, fk);
+  }
+
+  function cmAgeText(st) {
+    const n = st.age_days;
+    if (n == null) return "";
+    return n === 0 ? t("control.meta_bar_age_today") : cmPlural("control.meta_bar_age", n);
+  }
+
+  function cmBarHtml(st, chk) {
+    const a = st.active;
+    const pill = `<span class="cm-pill ${CM_PILL[st.state] || "cm-none"}">${
+      t("control.meta_state_" + (CM_PILL[st.state] ? st.state : "unknown"))}</span>`;
+    const text = a
+      ? `${t("control.meta_bar_installed")} <b>${esc(a.patch)}</b> · ${t("control.meta_bar_game")} <b>${
+        cmNum(st.ddragon && st.ddragon.latest)}</b>${a.updated ? " · " + esc(cmAgeText(st)) : ""}`
+      : t("control.meta_bar_none");
+    const running = !!st.running;
+    const guardOk = !!(chk && chk.guard && chk.guard.ok);
+    const canApply = !!chk && guardOk && !running;
+    const needForce = !!chk && !!chk.guard && !guardOk && !running;
+    return `<div class="cm-bar">
+        ${pill}
+        <span class="cm-bar-text">${text}${running ? ` · <i>${t("control.meta_running")}</i>` : ""}</span>
+        <div class="cm-actions">
+          <button class="cp-btn cm-check" type="button" data-fk="meta-check"${running ? " disabled data-lock" : ""}>${
+            t(chk ? "control.meta_recheck_btn" : "control.meta_check_btn")}</button>
+          <button class="cp-btn cm-primary cm-apply" type="button" data-fk="meta-apply"${
+            canApply ? "" : " disabled data-lock"}>${t("control.meta_apply_btn")}</button>
+          ${needForce ? `<button class="cp-btn cp-danger cm-force" type="button" data-fk="meta-force">${
+            t("control.meta_force_btn")}</button>` : ""}
+        </div>
+      </div>`;
+  }
+
+  function cmCardsHtml(st, chk) {
+    const a = st.active;
+    const dd = st.ddragon || {};
+    const row = (key, val, cls = "") =>
+      `<div><span>${t(key)}</span><b${cls ? ` class="${cls}"` : ""}>${val}</b></div>`;
+    const tag = !a ? "" : a.origin === "snapshot" && a.snapshot_id != null
+      ? t("control.meta_active_tag", { id: a.snapshot_id }) : t("control.meta_active_seed");
+    const cur = `<div class="cm-card">
+        <div class="cm-card-eyebrow"><span>${t("control.meta_card_installed")}</span><span>${esc(tag)}</span></div>
+        <div class="cm-patch">${a ? esc(a.patch) : "—"}</div>
+        <div class="cm-sub">${a ? `${esc(a.updated)} · ${esc(a.source)}` : t("control.meta_no_active")}</div>
+        <div class="cm-rows">
+          ${row("control.meta_row_tiers", cmNum(a && a.tiers_entries))}
+          ${row("control.meta_row_anchors", cmNum(a && a.counters_anchors))}
+          ${row("control.meta_row_rows", cmNum(a && a.counters_rows))}
+          ${row("control.meta_row_dd_vendored", cmNum(dd.vendored))}
+        </div>
+      </div>`;
+    const af = chk && chk.after;
+    // Değişen sayı yeşil (up), değişmeyen soluk (dim) — kaynağın "ne kadar
+    // farklı" olduğu kartta da okunur.
+    const cls = (field) => (!af ? "cm-dim" : a && a[field] === af[field] ? "cm-dim" : "cm-up");
+    const src = `<div class="cm-card cm-src">
+        <div class="cm-card-eyebrow"><span>${t("control.meta_card_source")}</span><span>${
+          t(af ? "control.meta_src_checked" : "control.meta_src_unchecked")}</span></div>
+        <div class="cm-patch">${af ? esc(af.patch) : `<span class="cm-skel">—</span>`}</div>
+        <div class="cm-sub">${af ? `${esc(af.updated)} · ${esc(af.source)}` : (a ? esc(a.source) : "")}</div>
+        <div class="cm-rows">
+          ${row("control.meta_row_tiers", cmNum(af && af.tiers_entries), cls("tiers_entries"))}
+          ${row("control.meta_row_anchors", cmNum(af && af.counters_anchors), cls("counters_anchors"))}
+          ${row("control.meta_row_rows", cmNum(af && af.counters_rows), cls("counters_rows"))}
+          ${row("control.meta_row_dd_latest", cmNum(af ? af.dd_version : dd.latest),
+            af && af.dd_version === dd.vendored ? "cm-dim" : (af ? "cm-up" : "cm-dim"))}
+        </div>
+      </div>`;
+    return `<div class="cm-cmp">${cur}${src}</div>`;
+  }
+
+  const cmSumTotal = (sm) => (!sm ? 0
+    : (sm.tiers_added | 0) + (sm.tiers_removed | 0) + (sm.tiers_moved | 0)
+      + (sm.counters_added | 0) + (sm.counters_removed | 0) + (sm.counters_changed | 0));
+
+  // Fark tablosu satırı: S/A/B sayıları, tier +/−/~ jetonları, counter
+  // +/−/~ jetonları, öne çıkan adlar (eklenen/taşınan/çıkan ilk ikişer ad).
+  function cmLaneRow(lane, d) {
+    const tr = (d.tiers && d.tiers[lane]) || { added: [], removed: [], moved: [], counts: {} };
+    const co = (d.counters && d.counters[lane]) || { added: [], removed: [], changed: [] };
+    const c = tr.counts || {};
+    const toks = (p, m, v) => cmTok("p", "+" + p) + cmTok("m", "−" + m) + cmTok("v", "~" + v);
+    const names = []
+      .concat((tr.added || []).slice(0, 2).map(x => cmTok("p", "+" + x[1]) + esc(x[0])))
+      .concat((tr.moved || []).slice(0, 2).map(x => cmTok("v", x[1] + "→" + x[2]) + esc(x[0])))
+      .concat((tr.removed || []).slice(0, 2).map(x => cmTok("m", "−" + x[1]) + esc(x[0])));
+    return `<tr>
+        <td class="cm-lane">${esc(cmLaneName(lane))}</td>
+        <td class="cm-num">${cmNum(c.S)} / ${cmNum(c.A)} / ${cmNum(c.B)}</td>
+        <td>${toks((tr.added || []).length, (tr.removed || []).length, (tr.moved || []).length)}</td>
+        <td>${toks((co.added || []).length, (co.removed || []).length, (co.changed || []).length)}</td>
+        <td class="cm-names">${names.length ? names.join(" ") : "—"}</td>
+      </tr>`;
+  }
+
+  function cmDiffHtml(st, chk) {
+    const d = chk && chk.diff;
+    const sm = d && d.summary;
+    const total = cmSumTotal(sm);
+    let sumText;
+    if (!chk) sumText = t("control.meta_diff_pending");
+    else if (!total) sumText = t("control.meta_diff_none");
+    else sumText = t("control.meta_diff_sum", {
+      ta: sm.tiers_added, tr: sm.tiers_removed, tm: sm.tiers_moved,
+      ca: sm.counters_added, cr: sm.counters_removed, cc: sm.counters_changed,
+    });
+    if (chk && chk.guard) sumText += " · " + t(chk.guard.ok ? "control.meta_guard_ok" : "control.meta_guard_fail");
+    const head = ["lane", "counts", "tier", "counter", "names"]
+      .map(k => `<th>${t("control.meta_col_" + k)}</th>`).join("");
+    const body = !chk
+      ? `<tr><td colspan="5" class="cm-empty">${t("control.meta_table_unchecked")}</td></tr>`
+      : !total
+        ? `<tr><td colspan="5" class="cm-empty">${t("control.meta_table_same", { patch: chk.after ? chk.after.patch : "—" })}</td></tr>`
+        : CM_LANES.map(l => cmLaneRow(l, d)).join("");
+    const warns = [];
+    if (chk && chk.guard && !chk.guard.ok) {
+      warns.push(`<p class="cm-warn cm-guard">${esc(t("control.meta_guard_reasons",
+        { reasons: (chk.guard.reasons || []).join(" · ") || "—" }))}</p>`);
+    }
+    (chk && Array.isArray(chk.warnings) ? chk.warnings : []).forEach(w => {
+      warns.push(`<p class="cm-warn">${esc(w)}</p>`);
+    });
+    return `<div class="cm-sec">
+        <h3>${t("control.meta_diff_title")} <small>${esc(sumText)}</small></h3>
+        <div class="cm-tablewrap"><table class="cm-table">
+          <thead><tr>${head}</tr></thead><tbody>${body}</tbody>
+        </table></div>
+        ${warns.join("")}
+      </div>`;
+  }
+
+  function cmHistHtml(hist) {
+    const items = hist && Array.isArray(hist.items) ? hist.items : [];
+    const rows = items.map(it => {
+      const sm = it.summary || {};
+      const parts = [
+        cmDate(it.created_at),
+        it.trigger === "panel" ? t("control.meta_trigger_panel") : (it.trigger || "—"),
+        t("control.meta_hist_sum", { a: sm.tiers_added | 0, r: sm.tiers_removed | 0, m: sm.tiers_moved | 0 }),
+      ];
+      if (it.warnings_count) parts.push(cmPlural("control.meta_hist_warn", it.warnings_count));
+      const act = it.is_active
+        ? `<span class="cm-tag">${t("control.meta_active_badge")}</span>`
+        : `<button class="cp-btn cm-revert" type="button" data-id="${it.id}"
+              data-fk="meta-revert-${it.id}">${t("control.meta_revert_btn")}</button>`;
+      return `<li class="cm-hrow${it.is_active ? " cm-active" : ""}">
+          <span class="cm-hid">#${esc(it.id)}</span>
+          <div class="cm-hmain"><b>${esc(it.patch)}</b> · <span>${esc(parts.join(" · "))}</span></div>
+          <div class="cm-hact">${act}</div>
+        </li>`;
+    });
+    return `<div class="cm-sec">
+        <h3>${t("control.meta_hist_title")} <small>${t("control.meta_hist_note")}</small></h3>
+        <ul class="cm-hist">${rows.length ? rows.join("") : `<li class="cp-none">${t("control.meta_hist_empty")}</li>`}</ul>
+      </div>`;
+  }
+
+  function cpMetaPaneHtml() {
+    const note = `<p class="cp-sec-note">${t("control.meta_note")}</p>`;
+    if (cp.meta.err) {
+      return `${note}<p class="cp-none">${esc(t("control.meta_load_err", { msg: cp.meta.err }))}</p>
+        <button class="cp-btn cm-retry" type="button" data-fk="meta-retry">${t("control.meta_retry_btn")}</button>`;
+    }
+    if (!cp.meta.status) return `${note}<p class="cp-none">${t("common.loading")}</p>`;
+    const st = cp.meta.status;
+    const chk = cp.meta.check;
+    return note + cmBarHtml(st, chk) + cmCardsHtml(st, chk) + cmDiffHtml(st, chk) + cmHistHtml(cp.meta.history);
+  }
+
+  // "Kontrol et": dry_run — kaynağı çeker, farkı hesaplar, HİÇBİR ŞEY yazmaz.
+  function cpMetaCheck(btn, box) {
+    cpAction(btn, box, "control.meta_checking", async () => {
+      const res = await api("/admin/meta/refresh",
+        { method: "POST", admin: true, body: { dry_run: true } });
+      cp.meta.check = res;
+      toast(t("control.meta_check_done", { patch: res.after ? res.after.patch : "—" }), "ok");
+    });
+  }
+
+  // "Güncelle" / "Yine de güncelle": yazar + etkinleştirir. force yalnız guard
+  // reddinden sonra sunulur ve İKİ onay ister. already_current / guard_rejected
+  // açık mesajla gösterilir; guard yanıtı check olarak saklanır (gerekçeler
+  // fark tablosunun altında, force düğmesi şeritte belirir).
+  function cpMetaApply(btn, box, force) {
+    const chk = cp.meta.check;
+    if (!chk) return;
+    const patch = chk.after ? chk.after.patch : "—";
+    if (!confirm(t(force ? "control.meta_force_confirm" : "control.meta_apply_confirm", { patch }))) return;
+    if (force && !confirm(t("control.meta_force_confirm2"))) return;
+    cpAction(btn, box, "control.meta_writing", async () => {
+      const res = await api("/admin/meta/refresh",
+        { method: "POST", admin: true, body: { dry_run: false, force: !!force } });
+      if (res.written) {
+        cp.meta.check = null;
+        toast(t("control.meta_apply_done",
+          { patch: res.after ? res.after.patch : patch, id: res.snapshot_id }), "ok");
+      } else if (res.reason === "already_current") {
+        toast(t("control.meta_already_current", { patch }), "warn");
+      } else if (res.reason === "guard_rejected") {
+        cp.meta.check = res;
+        toast(t("control.meta_guard_toast"), "warn");
+      } else {
+        toast(t("control.meta_not_written"), "warn");
+      }
+    });
+  }
+
+  // "Geri al": eski anlık görüntüyü etkinleştirir (tek UPDATE, rating'e dokunmaz).
+  function cpMetaActivate(btn, box, id) {
+    if (!confirm(t("control.meta_revert_confirm", { id }))) return;
+    cpAction(btn, box, "control.working", async () => {
+      const res = await api(`/admin/meta/activate/${id}`, { method: "POST", admin: true });
+      cp.meta.check = null;   // fark artık başka bir etkin veriye göre
+      toast(t("control.meta_revert_done", { id: res.active_id, patch: res.patch }), "ok");
+    });
+  }
+
   // ── Olay delegasyonu ──────────────────────────────────────────
   // Dinleyiciler #control-body'ye TEK KEZ bağlanır: kutu kalıcı bir düğümdür,
   // her çizimde bağlansaydı dinleyiciler birikir ve tek tıklama birden çok
@@ -4944,6 +5222,9 @@
       const to = btn.dataset.tab;
       if (to === cp.tab || !cpConfirmLeave(box)) return;
       cp.tab = to;
+      // Meta sekmesi her açılışta durumu yeniden çeker (başka sekmedeyken
+      // güncelleme koşmuş olabilir); son kontrol sonucu (check) korunur.
+      if (to === "meta") { cp.meta.status = null; cp.meta.history = null; cp.meta.err = null; }
       cpRenderPane(box);
       const active = box.querySelector(".cp-tab.active");
       if (active) active.focus({ preventScroll: true });
@@ -4953,8 +5234,20 @@
     if (btn.classList.contains("cp-lock")) {
       if (!cpConfirmLeave(box)) return;
       state.adminKey = "";
+      cp.meta = cpMetaFresh();   // kontrol sonucu yetkili oturumla birlikte düşer
       toast(t("control.locked"), "ok");
       renderControlGate(box);
+    } else if (btn.classList.contains("cm-check")) {
+      cpMetaCheck(btn, box);
+    } else if (btn.classList.contains("cm-apply")) {
+      cpMetaApply(btn, box, false);
+    } else if (btn.classList.contains("cm-force")) {
+      cpMetaApply(btn, box, true);
+    } else if (btn.classList.contains("cm-revert")) {
+      cpMetaActivate(btn, box, Number(btn.dataset.id));
+    } else if (btn.classList.contains("cm-retry")) {
+      cp.meta.err = null;
+      cpRenderPane(box);
     } else if (btn.classList.contains("cp-void")) {
       cpVoid(btn, Number(btn.dataset.match), box);
     } else if (btn.classList.contains("cp-unvoid")) {

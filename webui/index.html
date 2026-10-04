@@ -118,9 +118,9 @@
   </section>
 
   <!-- ═══ Seçim danışmanı (GÖREV 21, tasarım S3 "Analiz Paneli") ═══ -->
-  <!-- Veri: assets/meta/tiers.json + counters.json + Data Dragon champions.json
-       (tags/info) — hepsi statik dosyadır, backend bu veriyi bilmez (api_contract
-       §8). Analiz tamamen istemcidedir: advisor.js motoru, app.js "Seçim" bloğu
+  <!-- Veri: GET /meta/tiers + /meta/counters (GÖREV 34: backend sahipli, Kontrol
+       Paneli › Meta'dan güncellenir; api_contract §8) + Data Dragon champions.json
+       (tags/info, statik). Analiz tamamen istemcidedir: advisor.js motoru, app.js "Seçim" bloğu
        çizer. Grup rozeti GET /matches'tan türetilir, öneri SIRASINI etkilemez.
        Bu görünüm görünüm-bazlı GENİŞLİK İSTİSNASI taşır: showView main'e
        .pa-wide basar (1080px), diğer görünümler 720px'te kalır. İçerik tamamen
@@ -134,7 +134,7 @@
   <!-- S3 "Seçim" ekranından AYRI, yeni bir sayfa: Teoman geri bildirimi üzerine
        çok adımlı S3 rafa kaldırıldı (kodu/davranışı DEĞİŞMEDİ), burada tek rol
        seçimi + tek rakip şampiyon ile hafif bir akış kurulur. Veri: yine
-       assets/meta/tiers.json + counters.json (api_contract §8) — app.js'in
+       GET /meta/tiers + /meta/counters (api_contract §8) — app.js'in
        Seçim ekranıyla PAYLAŞTIĞI fetchMeta()/fetchCounters() önbellekli
        yükleyicileri ve advisor.js'in tierIndex()/counterRecords() saf
        yardımcıları burada da kullanılır (veri mantığı KOPYALANMAZ). Sezgisel
@@ -286,9 +286,9 @@
   </section>
 
   <!-- ═══ META: şampiyon kademeleri (GÖREV 16) — kendi gezinme sekmesi (GÖREV 17) ═══ -->
-  <!-- Veri backend'den DEĞİL, statik dosyadan gelir: assets/meta/tiers.json
-       (api_contract §8 "Meta tier verisi"). Süzgeç düğmeleri ve sütunlar app.js'te
-       kurulur; dosya yoksa/bozuksa yalnız bu görünüm hata metni gösterir.
+  <!-- Veri backend'den gelir: GET /meta/tiers (api_contract §8; GÖREV 34 —
+       etkin anlık görüntü, yoksa repodaki tohum dosya). Süzgeç düğmeleri ve
+       sütunlar app.js'te kurulur; veri yoksa/bozuksa yalnız bu görünüm hata metni gösterir.
        Normal sekme olduğu için geri düğmesi YOKTUR (Teoman kararı: üzerine başka
        modüller bineceği için Enler'in altındaki detay girişi kaldırıldı). -->
   <section id="view-meta" class="view" hidden>
@@ -362,7 +362,9 @@
        olarak X-Admin-Key taşır (api_contract "Admin anahtarı"). İçerik tamamen
        app.js'te kurulur (loadControl → renderControlGate | renderControlPanel):
        sekmeli panel — Maçlar (tüm maçlar + arama/süzgeç, Void/Geri Al, rol
-       düzeltme, rulet bağını çözme) · Oyuncular (ad düzeltme) · Bakım (replay).
+       düzeltme, rulet bağını çözme) · Oyuncular (ad düzeltme) · Bakım (replay)
+       · Meta (GÖREV 34: tier/counter verisini kaynaktan kontrol et / güncelle /
+       geri al; K2 "Karşılaştırma", cm- öneki).
        fix-3: aria-live BURADAN KALDIRILDI — 200 satırlık liste her çizimde
        baştan okunuyordu; canlı bildirim artık sonuç sayacındadır (role=status)
        ve sonuç metinleri toast'ta duyurulur. -->
