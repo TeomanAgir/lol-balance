@@ -68,6 +68,9 @@ Faz 2 (pair synergy rating) hâlâ kapsam dışı; sinerji yalnız gösterim.
 
 ## Yerel ortam (bilinmezse zaman yakar)
 
+- **2026-10-04'ten beri iki makine var:** macOS kurulumu ve komutları `context/00-ortak.md`
+  "macOS" bölümünde (uv + Python 3.12, `backend/.venv/bin/python`). Aşağısı Windows PC'yi anlatır.
+
 - PATH'te `python`/`node` YOK: `backend\.venv\Scripts\python.exe` (backend+collector),
   `backend\rating\.venv\Scripts\python.exe` (rating). rating paketi backend venv'ine
   KOPYA kurulur (editable bozuk).

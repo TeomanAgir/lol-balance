@@ -1,6 +1,19 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-08-19 (orkestratör, gece turu)
+Son güncelleme: 2026-10-04 (orkestratör, macOS kurulumu)
+
+## 2026-10-04: geliştirme ortamı macOS'a taşındı (branch `env/mac-setup`)
+- Repo artık `/Users/shadepb/Desktop/REPO/balance` yolunda macOS'ta da çalışıyor; venv'ler
+  `uv` ile Python 3.12 (CI ile aynı). Tarif ve komutlar `00-ortak.md` "macOS" bölümünde.
+- Dört test paketi bu makinede yeşil: rating 167 · backend 473 · collector 475+4 skip ·
+  webui 118 — Windows'taki tabanla birebir aynı.
+- Tek uyarı: starlette `TestClient` httpx kullanımını deprecated ilan etti (`httpx2`
+  öneriyor) — test kırmıyor, bağımlılık işi; ayrı karar.
+- context/ bayatlıkları giderildi: 40-rating aktif engine blend20→blend25, 10-backend
+  (473 test, 28 rozet, 0006 migration, roulette/badges/health router'ları), 00-ortak
+  akış satırı blend50→blend25 ve webui 32→118.
+- Bu makinede YOK: `gh`, LoL client, `new_modules.md`/`modules/` görev listesi,
+  `backend/data/lol_balance.db` eski kopyası. E2E için DB'yi Teoman sağlar.
 
 ## 2026-08-20: aktif engine `openskill-pl-blend25-v1` (W/L %25, sigma katsayısı 3)
 - Teoman kararı: kaybetmenin bedeli artsın → W/L payı %20 → **%25** (`w=0.75`).

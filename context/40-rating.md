@@ -2,13 +2,14 @@
 
 Yazma izni: yalnız `backend/rating/`. Test: `backend\rating\.venv\Scripts\python.exe -m
 pytest backend/rating`. DEĞİŞİKLİK SONRASI backend venv'ine yeniden kur (kopya kurulum,
-bkz. 00-ortak). 156 test.
+bkz. 00-ortak). 167 test.
 
 ## Çekirdek (`rating/` paketi)
 - Engine'ler versiyon string'ine DONDURULMUŞTUR: `openskill-pl-v1`,
-  `openskill-pl-perf-v1`, `openskill-pl-blend50-v1`, aktif `openskill-pl-blend20-v1`
-  (`mu_eff = 0.2*mu + 0.8*(25 + 20*(P_avg-1))`, `score = mu_eff - 3*sigma`;
-  Teoman 2026-08-16, CHANGE_REQUESTS). Sabit/formül "tuning"i YASAK — yeni version +
+  `openskill-pl-perf-v1`, `openskill-pl-blend50-v1`, `openskill-pl-blend20-v1`, aktif
+  `openskill-pl-blend25-v1` (`mu_eff = 0.25*mu + 0.75*(25 + 20*(P_avg-1))`,
+  `score = mu_eff - 3*sigma`; Teoman 2026-08-20, CHANGE_REQUESTS). Sigma katsayısı 3
+  TARTIŞMAYA KAPALI (S=2 denemesi geri alındı, PR #75/#76). Sabit/formül "tuning"i YASAK — yeni version +
   Teoman onayı gerekir (CLAUDE.md #1, #4).
 - `balancer.py` — `ROLES` kanonik sırası, `RoleBalanceSuggestion`,
   `balance_roles(ratings_by_role, top_n)` (126 ayrım × takım başına 120 permütasyon,
