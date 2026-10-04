@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from starlette.responses import Response
 from starlette.types import Scope
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from .config import get_settings
 from .db import run_migrations
@@ -62,6 +63,20 @@ def create_app() -> FastAPI:
         yield
 
     app = FastAPI(title="lol-balance backend", lifespan=lifespan)
+
+    # İstemci IP'si (GÖREV 30b): canlıda pod nginx ingress arkasındadır; bu
+    # middleware olmadan `request.client.host` her istek için ingress IP'si
+    # olur ve admin hız sınırı (deps._client_ip, api_contract "Hız sınırı")
+    # herkes için TEK sayaca düşerdi. Header'a güvenme kararı YALNIZ burada
+    # verilir: güvenilen proxy'den gelen isteğin `client`'ı X-Forwarded-For'daki
+    # istemciyle değiştirilir; `_client_ip` header okumaz. Güvenilen liste
+    # FORWARDED_ALLOW_IPS'ten gelir (varsayılan "*" — gerekçe/uyarı config.py).
+    # Dockerfile uvicorn'u `--no-proxy-headers` ile başlatır: başlık TEK
+    # noktada işlenir (sunucu katmanı da işlerse çift uygulanırdı).
+    app.add_middleware(
+        ProxyHeadersMiddleware,
+        trusted_hosts=list(settings.forwarded_allow_ips),
+    )
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):

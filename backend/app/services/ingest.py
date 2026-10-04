@@ -277,12 +277,22 @@ def ingest_match(
                         body.source_game_id,
                         body.played_at,
                     )
-                    # Not: replay/replay_roles kendi `with conn:` bloklarını
-                    # açar; iç içe sqlite3 context manager'ı dıştaki açık
-                    # transaction'ı commit eder — yani maç + replay birlikte
-                    # kalıcı olur, replay patlarsa maç da geri alınır.
-                    rating_service.replay(conn, engine_version)
-                    role_rating_service.replay_roles(conn, engine_version)
+                    # ATOMİKLİK (api_contract §5, GÖREV 30b): iki replay de
+                    # `join_transaction=True` ile bu `with conn:` bloğunun
+                    # transaction'ına KATILIR (bkz. services/tx.py). Kendi
+                    # `with conn:` bloklarını açsalardı içteki blok dıştakini
+                    # erken commit ederdi: rol replay'i patladığında maç +
+                    # ana evren kalıcı, rol evreni eksik kalır ve aynı maç
+                    # tekrar gelince `duplicate:true` döndüğü için bu durum
+                    # kendiliğinden asla düzelmezdi. Şimdi herhangi bir
+                    # replay patlarsa maç satırı, ingest_events ve her iki
+                    # evren BİRLİKTE geri alınır; tekrar gönderim temiz yazar.
+                    rating_service.replay(
+                        conn, engine_version, join_transaction=True
+                    )
+                    role_rating_service.replay_roles(
+                        conn, engine_version, join_transaction=True
+                    )
                 else:
                     rating_service.apply_match_incremental(
                         conn, match_id, body.winner_team, engine_version

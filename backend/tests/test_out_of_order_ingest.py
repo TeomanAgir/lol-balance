@@ -109,13 +109,15 @@ def _spy_replays(monkeypatch) -> dict[str, int]:
     original = rating_service.replay
     original_roles = role_rating_service.replay_roles
 
-    def spy(conn, engine_version):
+    # **kwargs: ingest replay'leri `join_transaction=True` ile çağırır
+    # (GÖREV 30b atomiklik); spy argümanları olduğu gibi iletir.
+    def spy(conn, engine_version, **kwargs):
         calls["replay"] += 1
-        return original(conn, engine_version)
+        return original(conn, engine_version, **kwargs)
 
-    def spy_roles(conn, engine_version):
+    def spy_roles(conn, engine_version, **kwargs):
         calls["replay_roles"] += 1
-        return original_roles(conn, engine_version)
+        return original_roles(conn, engine_version, **kwargs)
 
     monkeypatch.setattr(rating_service, "replay", spy)
     monkeypatch.setattr(role_rating_service, "replay_roles", spy_roles)

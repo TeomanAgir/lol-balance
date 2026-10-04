@@ -25,4 +25,7 @@ ENV DB_PATH=/data/lol_balance.db \
 VOLUME /data
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-proxy-headers: X-Forwarded-For uygulama içindeki ProxyHeadersMiddleware'de
+# (FORWARDED_ALLOW_IPS) TEK noktada işlenir; uvicorn'un sunucu katmanı aynı
+# env'i okuyup başlığı ikinci kez uygulamasın (GÖREV 30b).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
