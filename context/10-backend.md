@@ -7,6 +7,8 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
   (+`/{id}/stats`, `/{id}/rating-history`, `/{id}/badges`), balance (`/balance`, `/balance/nemesis`),
   highlights, nemesis, admin (replay + ping; `X-Admin-Key`), roulette (GÖREV 23),
   badges (`GET /badges` katalog, GÖREV 24), health (heartbeat + collectors).
+  meta (GÖREV 34): `GET /meta/tiers|counters` (herkese açık, etkin snapshot → tohum dosya)
+  + `/admin/meta/{status,refresh,history,activate/{id}}` (`X-Admin-Key`).
 - `backend/app/services/` — iş kuralları:
   - `ingest.py` — `ingest_match`: doğrulama, oyuncu auto-create, idempotency
     (DB UNIQUE source_game_id), incremental rating; SIRA-DIŞI maçta
@@ -26,9 +28,15 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
 - `backend/migrations/` — 0001 temel, 0002 perf_score, 0003 role_rating_history,
   0004 collector_health + matches.client_id, 0005 match_participants.items_json,
   0006 roulette (sessions/assignments + matches.status 'roulette').
+  0007 meta_snapshots (GÖREV 34; tek etkin satır partial UNIQUE index).
   - `items.py` — GÖREV 14: items doğrulama/serileştirme kuralının tek tanımı.
   - `health.py` (services+routers) — GÖREV 13: heartbeat upsert + collectors listesi.
-- `backend/tests/` — 473 test. Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
+  - `meta_source.py` — GÖREV 34: OP.GG → tiers/counters belgesi dönüşümü + fark (saf, stdlib-only;
+    `deploy/fetch_meta.py` bunu çağıran ince CLI'dır, kod kopyalanmaz). `meta_store.py` —
+    okuma önceliği, status, refresh (süreç içi kilit 409, ≤10 dk ham önbellek, guard,
+    already_current, tek transaction yazma + saklama 5), history, activate. Ağ `fetch`
+    parametresiyle enjekte edilir; testler gerçek ağa çıkmaz.
+- `backend/tests/` — 561 test (2026-10-05, GÖREV 34 sonrası). Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
   "incremental yolu korunur" kanıtları, bit-bit replay eşitlikleri.
 
 ## Değişmezler (worker bunları BOZAMAZ)
