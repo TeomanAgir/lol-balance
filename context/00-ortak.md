@@ -27,6 +27,15 @@ rating (OpenSkill blend25, ana + rol evreni) → web UI (framework'süz).
   rating testleri `backend/rating/.venv/bin/python`.
 - rating paketi backend venv'ine KOPYA kurulur: `backend/rating/` değiştiyse
   `uv pip install --python backend/.venv/bin/python ./backend/rating` (editable BOZUK, aynı tuzak).
+- **macOS `.pth` TUZAĞI (2026-10-04):** bu makinede bir arka plan süreci `.venv` içindeki
+  dosyalara saniyeler içinde `hidden` bayrağı koyuyor (`ls -lO`), Python 3.12.13 ise gizli
+  `.pth` dosyalarını ATLIYOR → rating venv'indeki editable kurulum (`__editable__*.pth`)
+  görünmez olur, `No module named 'rating'` ile 9-10 collection error çıkar. `chflags
+  nohidden` birkaç saniye sonra geri geliyor. KALICI ÇÖZÜM: site-packages'a symlink —
+  `ln -sfn "$PWD/backend/rating/rating" backend/rating/.venv/lib/python3.12/site-packages/rating`
+  (uygulandı; venv yeniden kurulursa tekrar gerekir). Geçici alternatif:
+  `PYTHONPATH=backend/rating backend/rating/.venv/bin/python -m pytest backend/rating`.
+  Backend venv'i kopya kurulum kullandığı için etkilenmez.
 - Test komutları (repo kökünden):
   - backend: `backend/.venv/bin/python -m pytest backend/tests`
   - collector: `backend/.venv/bin/python -m pytest collector`
