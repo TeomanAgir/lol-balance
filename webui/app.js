@@ -80,14 +80,30 @@
   }
 
   // ── Toast + yardımcılar ───────────────────────────────────────
-  let toastTimer;
+  // GÖREV 31: toast bir canlı bölgedir — bilgi/uyarı role="status"
+  // (aria-live polite), hata role="alert" (assertive). Metin, bölge GÖRÜNÜR
+  // olduktan sonraki karede yazılır: gizliyken doldurulan bölgeyi bazı ekran
+  // okuyucular duyurmaz. Görünüm değişince (showView) kapanır.
+  let toastTimer, toastFrame;
   function toast(msg, kind = "error") {
     const el = $("#toast");
-    el.textContent = msg;
+    const isErr = kind === "error";
+    el.setAttribute("role", isErr ? "alert" : "status");
+    el.setAttribute("aria-live", isErr ? "assertive" : "polite");
     el.className = "toast " + kind;
+    el.textContent = "";
     el.hidden = false;
+    cancelAnimationFrame(toastFrame);
+    toastFrame = requestAnimationFrame(() => { el.textContent = msg; });
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 5000);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() {
+    const el = $("#toast");
+    clearTimeout(toastTimer);
+    cancelAnimationFrame(toastFrame);
+    el.hidden = true;
+    el.textContent = "";
   }
 
   // Birincil değer rating.score'dur (harman engine; harman-dışı version'da score = ordinal).
@@ -451,6 +467,7 @@
 
   function showView(name, forceReload = false) {
     currentView = name;
+    hideToast(); // GÖREV 31: önceki görünümün bildirimi yeni görünümde kalmaz
     // Açık kutular görünüm değişimini/yeniden çizimi atlatmamalı: profil yeniden
     // kurulduğunda pencerenin düğümü zaten silinir, durumu da burada sıfırlanır.
     closeRoleRank(false);
@@ -1567,7 +1584,13 @@
     const body = $("#board-body");
     body.innerHTML = rows.map((p, i) => {
       const sub = ratingSub(p.rating);
-      const subHtml = sub ? `<span class="rating-sub">` + sub + `</span>` : "";
+      // GÖREV 31: parçalar (.rs-part) bölünmez; dar ekranda satır yalnız "·"
+      // ayracından SONRA kırılır (ayraç önceki parçayla birlikte kalır).
+      const parts = sub ? sub.split(" · ") : [];
+      const subHtml = sub
+        ? `<span class="rating-sub">` + parts.map((x, k) =>
+            `<span class="rs-part">${x}${k < parts.length - 1 ? " ·" : ""}</span>`).join(" ") + `</span>`
+        : "";
       return `<tr>
          <td class="rank">${i + 1}</td>
          <td class="player"><span class="pname"><button type="button" class="name-link" data-player="${p.id}">${esc(p.display_name)}</button>${rankDeltaHtml(p.rank_delta)}</span></td>
@@ -2116,10 +2139,13 @@
       return `<circle class="ph-dot ${q.p.win ? "win" : "loss"}${last ? " last" : ""}"
           cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${last ? 4.6 : 3.4}"/>`;
     }).join("");
-    // Dokunma hedefi noktadan büyüktür (r=10 viewBox birimi ≈ 18px @320px ekran)
-    // ve saydamdır; en sona çizilir ki tıklama hep hedefe gitsin.
+    // Dokunma hedefi noktadan büyüktür ve saydamdır; en sona çizilir ki tıklama
+    // hep hedefe gitsin. GÖREV 31: viewBox genişliği 640'a çıkınca r=10 ekranda
+    // yarıya inmişti (~7px çap @320px). r=22 viewBox birimi: grafik 224px
+    // (@320px ekran) → ~15px çap, 594px (@1440px) → ~41px çap. Dar ekranda
+    // açığı aşağıdaki "en yakın nokta" yedeği kapatır (renderHistory: 20px).
     const hits = xy.map((q, i) =>
-      `<circle class="ph-hit" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="10"
+      `<circle class="ph-hit" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="22"
          tabindex="0" role="button" data-i="${i}"
          aria-label="${esc(t("profile.hist_point_aria", {
            date: fmtDate(q.p.played_at),
@@ -2207,6 +2233,24 @@
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); histActivate(i, node); }
       });
     });
+    // GÖREV 31 — dar ekran dokunma yedeği: hedef dairesi ekranda küçük kalır
+    // (büyütülse komşu noktaları örterdi). Dairenin DIŞINA düşen dokunuş, ekranda
+    // 20px içindeki EN YAKIN noktaya gider → her nokta ~40px'lik hedefe sahip,
+    // yakın noktalar birbirini yutmaz. Olay işaretlenir ki popup'ı "dışarı
+    // tıklama" dinleyicisi aynı tıkta kapatmasın.
+    const svg = sec.querySelector(".ph-svg");
+    if (svg) svg.addEventListener("click", (e) => {
+      if (e.target.closest(".ph-hit")) return;
+      let best = null, bestD = 20;
+      sec.querySelectorAll(".ph-hit").forEach(node => {
+        const r = node.getBoundingClientRect();
+        const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+        if (d <= bestD) { bestD = d; best = node; }
+      });
+      if (!best) return;
+      e.phHit = true;
+      histActivate(Number(best.dataset.i), best);
+    });
   }
 
   // Teoman'ın tarifi: noktaya İLK tık popup'ı açar, AYNI noktaya (ya da popup'a)
@@ -2278,6 +2322,7 @@
   // ortak keydown dinleyicisinde).
   document.addEventListener("click", (e) => {
     if (state.histOpen == null) return;
+    if (e.phHit) return; // GÖREV 31: en-yakın-nokta yedeği bu tıkı zaten işledi
     if (e.target.closest && e.target.closest(".ph-pop, .ph-hit")) return;
     closeHistPopup(false);
   });

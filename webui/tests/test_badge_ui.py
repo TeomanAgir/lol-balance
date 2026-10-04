@@ -783,17 +783,19 @@ def test_open_view_is_centered_on_the_viewport():
     bir BOSLUK OGESI (.sb-app::after) eklemek — main'e tek taraflı margin
     DEGIL (flex'te tek auto-margin tum bosluk alanini yutar, gerekce
     style.css'te). Kural TUM gorunumler icin gecerlidir (gorunume ozel
-    degildir) ve YALNIZ panelin akista oldugu genislikte (>=880px) uygulanir
+    degildir) ve YALNIZ genis ekranda (GOREV 31: >=1280px; once >=880px) uygulanir
     — mobilde panel cekmeceye donup akistan cikar, orada telafi YOKTUR."""
     css = css_text()
-    m = re.search(r"@media \(min-width: 880px\) \{\s*\.sb-app::after \{ content: \"\"; flex: 0 0 var\(--sb-w\); \}\s*\}", css)
+    # [GOREV 31] Bosluk ogesi yalniz >=1280px'te: 880-1279 "olu bant"ta icerik
+    # kalan tum genisligi alir (960px'te main 560px'e sikisiyordu).
+    m = re.search(r"@media \(min-width: 1280px\) \{\s*\.sb-app::after \{ content: \"\"; flex: 0 0 var\(--sb-w\); \}\s*\}", css)
     assert m, "viewport merkezleme telafisi yok (.sb-app::after boşluk ögesi, flex: 0 0 var(--sb-w))"
     # Telafi gorunume ozel bir kural DEGIL (main'in kendisinde tanimli degil).
     assert "#view-profile { margin-right" not in css
     assert "main { margin-right" not in css
     # Kural yalniz >=880px media sorgusunda var; disinda (mobil) tekrar etmiyor.
     assert css.count(".sb-app::after") == 1, (
-        ".sb-app::after tam olarak bir kez, yalniz min-width:880px icinde tanimli olmali"
+        ".sb-app::after tam olarak bir kez, yalniz min-width:1280px icinde tanimli olmali"
     )
 
 
