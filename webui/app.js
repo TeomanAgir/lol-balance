@@ -128,6 +128,70 @@
   window.addEventListener("scroll", toastReplace, { passive: true });
   window.addEventListener("resize", toastReplace);
 
+  // ── Ortak görünüm durumu: yükleniyor / boş / hata (GÖREV 33) ──
+  // Tüm görünümler veri bekleme, boş sonuç ve yükleme hatasını TEK kalıpla
+  // gösterir: container'ın içeriği tek bir `.vs-box` ile değiştirilir. Sınıflar
+  // "vs-" öneklidir (eski global boş-durum sınıfı iki kez çakışma yaşattı).
+  //   kind: VS_LOADING | VS_EMPTY | VS_ERROR (anahtarlar: loading / empty / error)
+  //   opts.text   — ana satır (varsayılan: common.loading / common.empty_default /
+  //                 common.error_title); görünüme özgü boş metni burada verilir
+  //   opts.detail — ikinci satır (ör. hata iletisi, SSS dosya ayrıntısı); düz metin
+  //   opts.hint   — üçüncü satır (ne yapmalı)
+  //   opts.retry  — yalnız "error": verilirse "Tekrar dene" düğmesi bunu çağırır
+  // Hata bloğu çizilen yerde toast ATILMAZ (çift bildirim olmasın): yükleyici
+  // bloğu çizip normal döner; toast yalnız bloğu olmayan eylemler içindir.
+  //
+  // Flaş önleme — seçim: GECİKMELİ GÖSTERİM. Yükleniyor kutusu hemen DOM'a
+  // girer (role=status + aria-busy) ama VS_DELAY_MS dolana kadar görünmez
+  // (`.vs-wait`). İstek bundan kısa sürerse yükleyici kutuyu zaten silmiştir ve
+  // kullanıcı metni hiç görmez. "En az 300 ms kalsın" yerine bu seçildi: hızlı
+  // yanıtı yapay olarak bekletmez. Zamanlayıcı yalnız kutu hâlâ DOM'daysa iş
+  // görür (isConnected) — çizim kutuyu sildiyse sessizce boşa düşer; CSS
+  // animasyonu yerine JS seçildi çünkü azaltılmış harekette global
+  // `animation: none` kutuyu sonsuza dek gizli bırakırdı.
+  const VS_DELAY_MS = 150;
+  const VS_DEFAULT = { loading: "common.loading", empty: "common.empty_default", error: "common.error_title" };
+  // Tür adları sabitten gelir: çağrılarda çıplak tür dizesi yazılmaz, böylece
+  // eski global boş-durum sınıfı için tutulan grep bekçisi (README) anlamlı kalır.
+  const [VS_LOADING, VS_EMPTY, VS_ERROR] = Object.keys(VS_DEFAULT);
+  function viewState(container, kind, opts = {}) {
+    if (!container) return null;
+    const box = document.createElement("div");
+    box.className = "vs-box vs-" + kind;
+    if (kind === VS_LOADING) {
+      box.setAttribute("role", "status");
+      box.setAttribute("aria-busy", "true");
+      box.classList.add("vs-wait");
+      setTimeout(() => { if (box.isConnected) box.classList.remove("vs-wait"); }, VS_DELAY_MS);
+    } else if (kind === VS_ERROR) {
+      box.setAttribute("role", "alert");
+    }
+    const line = (cls, text) => {
+      const p = document.createElement("p");
+      p.className = cls;
+      p.textContent = text;
+      box.appendChild(p);
+    };
+    line("vs-text", opts.text || t(VS_DEFAULT[kind] || VS_DEFAULT[VS_EMPTY]));
+    if (opts.detail) line("vs-detail", opts.detail);
+    if (opts.hint) line("vs-hint", opts.hint);
+    if (kind === VS_ERROR && typeof opts.retry === "function") {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "vs-retry";
+      btn.textContent = t("common.retry");
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        // Yükleyiciler kendi hata bloğunu çizer; yine de fırlatırsa (bloğu
+        // olmayan yol) kaybolmasın diye toast'a düşer.
+        Promise.resolve().then(opts.retry).catch(e => toast(e.message));
+      });
+      box.appendChild(btn);
+    }
+    container.replaceChildren(box);
+    return box;
+  }
+
   // Birincil değer rating.score'dur (harman engine; harman-dışı version'da score = ordinal).
   const fmtRating = (x) => x.toFixed(1);
   // İkincil bilgi: W/L çekirdeği (ordinal) + kariyer performans çarpanı.
@@ -654,10 +718,28 @@
   }
 
   // ── 1) Dengeleme ──────────────────────────────────────────────
+  // GÖREV 33: roster yükleniyor/boş/hata ortak viewState kalıbıyla #roster'da
+  // gösterilir. Kartlar zaten ekrandaysa (TTL tazelemesi, "Yenile") yükleniyor
+  // kutusu çizilmez — kartlar yerinde kalır. "Yenile" (force) başarısız olursa
+  // kartlar SİLİNMEZ ve hata fırlatılır: o bir eylemdir, toast'ı düğme gösterir.
+  // Sayfa/görünüm yüklemesinde ise hata bloğu çizilir, toast atılmaz.
+  let blSeq = 0;
   async function loadBalance(force) {
-    await fetchRoster(force);
+    const my = ++blSeq;
     const grid = $("#roster");
+    const hasCards = !!grid.querySelector(".player-card");
+    if (!hasCards) viewState(grid, VS_LOADING);
+    try {
+      await fetchRoster(force);
+    } catch (e) {
+      if (my !== blSeq) return;
+      if (force && hasCards) throw e;
+      viewState(grid, VS_ERROR, { detail: e.message, retry: () => loadBalance(true) });
+      return;
+    }
+    if (my !== blSeq) return;
     grid.innerHTML = "";
+    if (!state.roster.length) viewState(grid, VS_EMPTY, { text: t("balance.roster_empty") });
     // Nemesis modunda çiftin iki üyesi kartta işaretlenir (ikisi de seçilmek zorunda).
     const nemIds = new Set(state.nemesisMode ? state.nemesisMode.players.map(x => x.player_id) : []);
     for (const p of state.roster) {
@@ -1384,7 +1466,7 @@
   async function loadPick() {
     ensurePickState();
     const box = $("#pick-body");
-    if (!box.firstChild) box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    if (!box.firstChild) viewState(box, VS_LOADING);
     await loadAssets();
     // Veri dosyaları paralel işte üretiliyor olabilir: yokluk/eski şema hata
     // DEĞİLDİR — eksik sinyal atlanır, mevcut sinyallerle devam edilir.
@@ -1708,7 +1790,7 @@
   async function loadMatchup() {
     ensureMatchupState();
     const box = $("#mo-list");
-    if (!box.firstChild) box.innerHTML = `<p class="mo-none">${t("common.loading")}</p>`;
+    if (!box.firstChild) viewState(box, VS_LOADING);
     await loadAssets();
     let tiers = null, counters = null;
     if (CONFIG.USE_MOCK && window.MOCK_ADVISOR) {
@@ -1750,9 +1832,32 @@
     return rdSpan("rd-flat", "&mdash;", t("leaderboard.rank_same"));
   }
 
+  // GÖREV 33: durum kutusu tablonun ÜSTÜNDEKİ #board-state'tedir (tbody'ye div
+  // giremez); kutu görünürken tablo gizlenir — başlık satırı boşta asılı kalmaz.
+  let lbSeq = 0;
   async function loadLeaderboard() {
-    const rows = await api("/leaderboard"); // backend score'a göre sıralı döner
+    const my = ++lbSeq;
+    const stateBox = $("#board-state");
+    const table = $("#view-leaderboard table.board");
     const body = $("#board-body");
+    const showState = (kind, opts) => {
+      table.hidden = true;
+      body.innerHTML = "";
+      viewState(stateBox, kind, opts);
+    };
+    if (!body.firstChild) showState(VS_LOADING);
+    let rows;
+    try {
+      rows = await api("/leaderboard"); // backend score'a göre sıralı döner
+    } catch (e) {
+      if (my !== lbSeq) return;
+      showState(VS_ERROR, { detail: e.message, retry: loadLeaderboard });
+      return;
+    }
+    if (my !== lbSeq) return;
+    if (!rows.length) { showState(VS_EMPTY, { text: t("leaderboard.empty_msg") }); return; }
+    stateBox.replaceChildren();
+    table.hidden = false;
     body.innerHTML = rows.map((p, i) => {
       const sub = ratingSub(p.rating);
       // GÖREV 31: parçalar (.rs-part) bölünmez; dar ekranda satır yalnız "·"
@@ -2196,10 +2301,10 @@
     $("#btn-profile-back").textContent = backLabel(state.profileFrom);
     const box = $("#profile-body");
     if (state.profileId == null) {
-      box.innerHTML = `<p class='empty'>${t("profile.no_player")}</p>`;
+      viewState(box, VS_EMPTY, { text: t("profile.no_player") });
       return;
     }
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    viewState(box, VS_LOADING);
     try {
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
       if (my !== profileSeq) return;
@@ -2230,8 +2335,8 @@
       bindRoleRankButtons(box); // rol simgesi → o roldeki sıralama penceresi
     } catch (e) {
       if (my !== profileSeq) return;   // bayat isteğin hatası yeni profili ezmez
-      box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
-      throw e; // toast'ı showView gösterir
+      // GÖREV 33: hata bloğu çizilir, toast ATILMAZ (çift bildirim yok).
+      viewState(box, VS_ERROR, { detail: e.message, retry: loadProfile });
     }
   }
 
@@ -3193,20 +3298,23 @@
       </section>`;
   }
 
+  let hlSeq = 0;
   async function loadHighlights() {
+    const my = ++hlSeq;
     const box = $("#highlights-body");
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    viewState(box, VS_LOADING);
     try {
       // /nemesis ayrı bir uçtur: düşerse Enler ekranının kalanı çalışmaya devam etsin.
       const [h, n] = await Promise.all([
         api("/highlights/weekly"),
         api("/nemesis").catch(() => null),
       ]);
+      if (my !== hlSeq) return;
       state.nemesis = n;
       const roles = h.best_by_role || {};
       // Hiç valid maç yoksa contract üç alanı da null döner → tek satır boş durum.
       if (!h.best_player && !h.rising_star && !ROLES.some(r => roles[r])) {
-        box.innerHTML = `<p class='empty'>${t("highlights.empty")}</p>`;
+        viewState(box, VS_EMPTY, { text: t("highlights.empty_msg") });
         return;
       }
       const w = h.window || {};
@@ -3240,8 +3348,9 @@
       // "Haritada gör →" (GÖREV 4): rol enlerini harita görünümünde açar.
       box.querySelector("#btn-map-from-hl").addEventListener("click", openMap);
     } catch (e) {
-      box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
-      throw e; // toast'ı showView gösterir
+      if (my !== hlSeq) return;
+      // GÖREV 33: hata bloğu çizilir, toast ATILMAZ.
+      viewState(box, VS_ERROR, { detail: e.message, retry: loadHighlights });
     }
   }
 
@@ -3265,8 +3374,9 @@
     const [x, y] = RIFT_SPOTS[role];
     const pos = `left:${x}%;top:${y}%`;
     if (!top) {
-      // Sınıf adı "rb-none": global ".empty" (ortalı boş-durum paragrafı, padding 40px)
-      // baloncuğun kutusunu bozuyordu — enler ekranındaki ".hl-none" ile aynı desen.
+      // Sınıf adı "rb-none": eski global boş-durum sınıfı (ortalı paragraf, padding
+      // 40px; GÖREV 33'te kaldırıldı) baloncuğun kutusunu bozuyordu — enler
+      // ekranındaki ".hl-none" ile aynı desen.
       return `<button type="button" class="rift-bub rb-none" style="${pos}" data-role="${role}"
                 aria-label="${t("map.bubble_none_aria", { role: roleName(role) })}">
           <span class="rb-role">${roleAbbr(role)}</span>
@@ -3298,16 +3408,23 @@
   $("#btn-map-back").addEventListener("click", () => showView(state.mapFrom));
   $("#btn-map-from-board").addEventListener("click", openMap);
 
+  let mapSeq = 0;
   async function loadMap() {
     // Geçmişten geri kurulumda (GÖREV 32) openMap atlanır → etiket burada da yazılır.
     $("#btn-map-back").textContent = backLabel(state.mapFrom);
+    // GÖREV 33: eski özel ".rift-err" yerine ortak viewState; kutu baloncuk
+    // katmanının içinde ortalanır (.rift-bubbles > .vs-box kuralı).
+    const my = ++mapSeq;
     const box = $("#rift-bubbles");
+    if (!box.querySelector(".rift-bub")) viewState(box, VS_LOADING);
     try {
       state.board = await api("/leaderboard");
     } catch (e) {
-      box.innerHTML = `<p class="rift-err">${esc(e.message)}</p>`;
-      throw e; // toast'ı showView gösterir
+      if (my !== mapSeq) return;
+      viewState(box, VS_ERROR, { detail: e.message, retry: loadMap });
+      return;
     }
+    if (my !== mapSeq) return;
     box.innerHTML = ROLES.map(r => riftBubble(r, roleRanking(state.board, r)[0])).join("");
     box.querySelectorAll(".rift-bub").forEach(btn =>
       btn.addEventListener("click", () => openRoleModal(btn.dataset.role, btn)));
@@ -3526,10 +3643,9 @@
     // Hiçbir kademede ad yoksa (boş ya da tanınmayan rol anahtarlı dosya) sütun
     // iskeleti yerine tek satır boş durum yazılır.
     const total = lists.reduce((n, l) => n + l.length, 0);
-    box.innerHTML = total
-      ? `<div class="mt-cols">${cols}</div>` +
-        (state.metaFilter === "ALL" ? `<p class="mt-note">${t("meta.all_note")}</p>` : "")
-      : `<p class='empty'>${t("meta.empty")}</p>`;
+    if (!total) { viewState(box, VS_EMPTY, { text: t("meta.empty_msg") }); return; }
+    box.innerHTML = `<div class="mt-cols">${cols}</div>` +
+      (state.metaFilter === "ALL" ? `<p class="mt-note">${t("meta.all_note")}</p>` : "");
     ddBindImages(box);
   }
 
@@ -3549,20 +3665,25 @@
   }
 
   // Yükleyici hiç THROW ETMEZ: veri bir uç değil statik dosyadır, hata bu
-  // görünümün içinde yazılı durur (toast'a gerek yok, sağlık ekranı deseni).
+  // görünümün içinde yazılı durur (toast'a gerek yok). GÖREV 33: eski özel
+  // ".mt-error" kutusu ortak viewState hata bloğuna devredildi; başlık/ayrıntı/
+  // ipucu üçlüsü opts.text/detail/hint ile korunur. fetchMeta hatayı önbelleğe
+  // aldığı için "Tekrar dene" önce önbelleği düşürür.
+  let metaSeq = 0;
   async function loadMeta() {
+    const my = ++metaSeq;
     const box = $("#meta-body");
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    viewState(box, VS_LOADING);
     $("#meta-filters").hidden = true;
     $("#meta-patch").textContent = "";
     const [res] = await Promise.all([fetchMeta(), loadAssets()]);
+    if (my !== metaSeq) return;
     if (res.err) {
       state.meta = null;
-      box.innerHTML = `<div class="mt-error">
-          <p class="mt-err-title">${t("meta.error_title")}</p>
-          <p class="mt-err-detail">${esc(metaErrText(res.err))}</p>
-          <p class="mt-err-hint">${t("meta.error_hint")}</p>
-        </div>`;
+      viewState(box, VS_ERROR, {
+        text: t("meta.error_title"), detail: metaErrText(res.err), hint: t("meta.error_hint"),
+        retry: () => { metaPromise = null; return loadMeta(); },
+      });
       return;
     }
     state.meta = res.data;
@@ -3640,11 +3761,12 @@
       : e.kind === "shape" ? t("faq.err_shape")
       : t("faq.err_network");
 
-  const faqErrorHtml = (title, e) =>
-    `<div class="fq-error">
-       <p class="fq-err-title">${title}</p>
-       <p class="fq-err-detail">${esc(faqErrText(e))}</p>
-     </div>`;
+  // GÖREV 33: eski özel "faqErrorHtml" kutusu ortak viewState'e devredildi;
+  // başlık opts.text, dosya/HTTP ayrıntısı opts.detail ile korunur. fetchFaq
+  // ve fetchFaqDoc hatayı önbelleğe aldığı için "Tekrar dene" (retry) önce
+  // ilgili önbelleği düşürür (çağıran verir).
+  const faqError = (box, title, e, retry) =>
+    viewState(box, VS_ERROR, { text: title, detail: faqErrText(e), retry });
 
   // Manifest'teki {tr, en} nesnesinden aktif dilin metni; yoksa diğer dile
   // düşülür (ddText deseni), o da yoksa boş döner.
@@ -3778,16 +3900,18 @@
 
   // ── SSS: liste + detay görünümleri ────────────────────────────
   // Yükleyiciler hiç THROW ETMEZ (META deseni): hata görünümün içinde yazılı durur.
+  const faqRetry = (loader) => () => { faqPromise = null; return loader(); };
   async function loadFaq() {
     const box = $("#faq-list");
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    viewState(box, VS_LOADING);
     const res = await fetchFaq();
+    if (currentView !== "faq") return;
     if (res.err) {
-      box.innerHTML = faqErrorHtml(t("faq.error_title"), res.err);
+      faqError(box, t("faq.error_title"), res.err, faqRetry(loadFaq));
       return;
     }
     if (!res.items.length) {
-      box.innerHTML = `<p class='empty'>${t("faq.empty")}</p>`;
+      viewState(box, VS_EMPTY, { text: t("faq.empty_msg") });
       return;
     }
     // Kartlar GitHub issue listesi hissinde: başlık + tek cümlelik özet.
@@ -3812,22 +3936,27 @@
   async function loadFaqDetail() {
     $("#btn-faqdetail-back").textContent = t("common.back_faq");
     const box = $("#faqdetail-body");
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    const slug = state.faqSlug;
+    viewState(box, VS_LOADING);
     const res = await fetchFaq();
+    if (currentView !== "faqdetail" || state.faqSlug !== slug) return;
     if (res.err) {
-      box.innerHTML = faqErrorHtml(t("faq.error_title"), res.err);
+      faqError(box, t("faq.error_title"), res.err, faqRetry(loadFaqDetail));
       return;
     }
     const item = res.items.find(x => x.slug === state.faqSlug);
     if (!item) {
       // Bayat/bozuk deep-link: madde yok — kısa mesaj, liste geri düğmesi duruyor.
-      box.innerHTML = `<p class='empty'>${t("faq.not_found")}</p>`;
+      viewState(box, VS_EMPTY, { text: t("faq.not_found") });
       return;
     }
     const path = faqFilePath(item);
     const doc = path ? await fetchFaqDoc(path) : { err: { kind: "shape" } };
+    if (currentView !== "faqdetail" || state.faqSlug !== slug) return;
     if (doc.err) {
-      box.innerHTML = faqErrorHtml(t("faq.item_error"), doc.err);
+      faqError(box, t("faq.item_error"), doc.err, path
+        ? () => { faqDocCache.delete(path); return loadFaqDetail(); }
+        : undefined);
       return;
     }
     box.innerHTML = `<article class="fq-doc">${mdToHtml(doc.text)}</article>`;
@@ -3899,18 +4028,33 @@
     btn.textContent = t("matches.load_more");
   }
 
+  // GÖREV 33: üç istek (roster, varlık sözlükleri, maç listesi) birbirini
+  // beklemez — Promise.all ile PARALEL koşar; sonuç şekli aynıdır. Yükleniyor/
+  // boş/hata ortak viewState kalıbıyla #match-list'te gösterilir; hata bloğu
+  // varken toast atılmaz. Kartlar zaten ekrandaysa yükleniyor kutusu çizilmez.
   async function loadMatches() {
     const my = ++mcSeq;
     $("#btn-matches-more").hidden = true;
-    await fetchRoster();
-    // Sözlükler bir kez yüklenir ve reject etmez; yoksa portreler yer tutucu
-    // moduna düşer (maç listesi varlık yokluğunda BLOKE OLMAZ).
-    await loadAssets();
-    const list = await api(`/matches?limit=${state.matchesLimit}`);
+    const box = $("#match-list");
+    if (!box.querySelector(".match-card")) viewState(box, VS_LOADING);
+    let list;
+    try {
+      // loadAssets reject etmez; varlık yoksa portreler yer tutucu moduna düşer
+      // (maç listesi varlık yokluğunda BLOKE OLMAZ).
+      [, , list] = await Promise.all([
+        fetchRoster(),
+        loadAssets(),
+        api(`/matches?limit=${state.matchesLimit}`),
+      ]);
+    } catch (e) {
+      if (my !== mcSeq) return;
+      viewState(box, VS_ERROR, { detail: e.message, retry: loadMatches });
+      return;
+    }
     if (my !== mcSeq) return;
     state.matches = list;   // GÖREV 10: profil grafiğinden detaya atlarken önbellek
-    const box = $("#match-list");
-    box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
+    if (list.length) box.innerHTML = "";
+    else viewState(box, VS_EMPTY, { text: t("matches.empty_msg") });
     for (const m of list) box.appendChild(mcCard(m));
     // Portrelerin 404/geçici hata yolu (tek retry → yer tutucu) build satırlarıyla
     // aynı yardımcıdan gelir; tüm kartlar eklendikten sonra bir kez bağlanır.
@@ -3948,7 +4092,8 @@
       while (frag.firstChild) box.appendChild(frag.firstChild);
     } else {
       const y = window.scrollY;
-      box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
+      if (list.length) box.innerHTML = "";
+      else viewState(box, VS_EMPTY, { text: t("matches.empty_msg") });
       for (const m of list) box.appendChild(mcCard(m));
       ddBindImages(box);
       window.scrollTo({ top: y });
@@ -4231,9 +4376,10 @@
       ddIconHtml(itemIconSrc(id), itemPh(id), "item"));
   }
 
-  // Sınıf adı "mb-empty"dir, "empty" DEĞİL: global `.empty` (ortalı boş-durum
-  // paragrafı, padding: 40px 0) slotu 26x26 yerine 26x82 çiziyor, satırı
-  // şişiriyordu. Bu tuzağa dördüncü düşüş (.hl-none / .rb-none / .mc-none).
+  // Sınıf adı "mb-empty"dir (önekli): eski global boş-durum sınıfı (ortalı
+  // paragraf, padding: 40px 0; GÖREV 33'te kaldırıldı) slotu 26x26 yerine 26x82
+  // çiziyor, satırı şişiriyordu. Bu tuzağa dördüncü düşüş (.hl-none / .rb-none /
+  // .mc-none) — kalıcı çözüm ortak "vs-" önekli viewState kutusu oldu.
   const mbEmptySlot = () => `<span class="mb-slot mb-empty" aria-hidden="true"></span>`;
 
   function mbChampHtml(champ) {
@@ -4439,20 +4585,21 @@
     closeBuildTip();   // yeniden çizim açık tooltip'in düğümünü siler
     if (!m && state.matchDetailId != null) {
       const id = state.matchDetailId;
-      box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+      viewState(box, VS_LOADING);
       try {
         m = await api(`/matches/${id}`);
       } catch (e) {
         if (my !== mdSeq) return;
-        box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
-        throw e; // toast'ı showView gösterir
+        // GÖREV 33: hata bloğu çizilir, toast ATILMAZ.
+        viewState(box, VS_ERROR, { detail: e.message, retry: loadMatchDetail });
+        return;
       }
       if (my !== mdSeq || state.matchDetailId !== id) return;
       state.matchDetail = m;
       mdCache.set(m.id, m);
     }
     if (!m) {
-      box.innerHTML = `<p class='empty'>${t("matchdetail.no_match")}</p>`;
+      viewState(box, VS_EMPTY, { text: t("matchdetail.no_match") });
       return;
     }
     // Varlık sözlükleri bir kez yüklenir; yoksa yer tutucu modunda çizilir (GÖREV 14).
@@ -4556,11 +4703,13 @@
       </article>`;
   }
 
+  let chSeq = 0;
   async function loadHealth() {
     const box = $("#health-body");
     const btn = $("#btn-health-refresh");
     const count = $("#health-count");
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    const my = ++chSeq;
+    viewState(box, VS_LOADING);
     count.textContent = "";
     btn.disabled = true;
     btn.textContent = t("health.refreshing");
@@ -4568,25 +4717,27 @@
     try {
       list = await api("/health/collectors");
     } catch (e) {
+      if (my !== chSeq) return;
       // Bu görünümün TEK içeriği cihaz listesidir: uç düşerse ekran boş kalmaz,
-      // ne olduğu ve ne yapılacağı yazılı durur (toast'ı showView ayrıca atar).
-      box.innerHTML = `<div class="ch-error">
-          <p class="ch-err-title">${t("health.error_title")}</p>
-          <p class="ch-err-detail">${esc(e.message)}</p>
-          <p class="ch-err-hint">${t("health.error_hint")}</p>
-        </div>`;
-      throw e;
+      // ne olduğu ve ne yapılacağı yazılı durur. GÖREV 33: eski özel
+      // ".ch-error" kutusu ortak viewState'e devredildi; toast ATILMAZ
+      // (Yenile düğmesi dahil — blok zaten görünür).
+      viewState(box, VS_ERROR, {
+        text: t("health.error_title"), detail: e.message, hint: t("health.error_hint"),
+        retry: loadHealth,
+      });
+      return;
     } finally {
-      btn.disabled = false;
-      btn.textContent = t("health.refresh");
+      if (my === chSeq) {
+        btn.disabled = false;
+        btn.textContent = t("health.refresh");
+      }
     }
+    if (my !== chSeq) return;
     // Sıralamayı backend verir (contract §6: last_seen azalan) — UI yeniden SIRALAMAZ.
     const devices = Array.isArray(list) ? list : [];
     if (!devices.length) {
-      box.innerHTML = `<div class="ch-empty">
-          <p class="ch-empty-title">${t("health.empty")}</p>
-          <p class="ch-empty-note">${t("health.empty_note")}</p>
-        </div>`;
+      viewState(box, VS_EMPTY, { text: t("health.empty_title"), detail: t("health.empty_note") });
       return;
     }
     count.textContent = chPlural("health.devices", devices.length);
@@ -4958,14 +5109,15 @@
   }
 
   async function renderControlPanel(box) {
-    box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+    viewState(box, VS_LOADING);
     try {
       await cpFetchData();
     } catch (e) {
-      // Yetki hatasında cpFail giriş ekranını çizer; ağ/HTTP hatasında oturum
-      // hâlâ geçerlidir → ekran boş kalmasın, sebep yazılı dursun.
-      box.innerHTML = `<p class='cp-none'>${esc(e.message)}</p>`;
-      cpFail(e);
+      // Yetki hatasında cpFail giriş ekranını çizer (+ toast: kilit eylemdir,
+      // bloğu yoktur); ağ/HTTP hatasında oturum hâlâ geçerlidir → ekran boş
+      // kalmasın, sebep ortak hata bloğunda yazılı dursun (GÖREV 33: toast YOK).
+      if (e.status === 403 || e.status === 503) { cpFail(e); return; }
+      viewState(box, VS_ERROR, { detail: e.message, retry: () => renderControlPanel(box) });
       return;
     }
     box.innerHTML = cpShellHtml();

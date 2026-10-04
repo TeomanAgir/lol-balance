@@ -52,7 +52,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
    display-font etiketler, aktif öğede 3px pirinç SOL şerit (tabbar'daki
    border-top'un doksan derece dönmüş hali). Masaüstünde (≥880px) panel HEP
    AÇIK sabit sütundur; mobilde soldan kayan çekmece + scrim (app.js sürer).
-   Sınıflar sb- öneklidir (global ad alanı dersi: .empty çakışması). */
+   Sınıflar sb- öneklidir (global ad alanı dersi: eski global boş-durum sınıfı çakışması). */
 .sb-app { display: flex; min-height: 100dvh; }
 .sb-content { flex: 1 1 auto; min-width: 0; }
 
@@ -1586,8 +1586,8 @@ button.hl-card:hover { border-color: var(--brass-dim); }
 .hl-card.hero .hl-name { font-size: 28px; color: var(--brass); }
 .hl-card.hero .hl-value { font-size: 32px; color: var(--brass); }
 /* Yıldız rukisi delta'sının rengi .delta.up/.down'dan gelir (yeşil/kırmızı). */
-/* Veri yok işaretçisi ".hl-none"dır; global ".empty" (ortalı boş durum paragrafı)
-   bilinçli olarak kullanılmaz — kart yerleşimini bozuyor. */
+/* Veri yok işaretçisi ".hl-none"dır; eski global boş-durum paragraf sınıfı (GÖREV 33'te
+   kaldırıldı) kart yerleşimini bozuyordu — önekli sınıf bilinçlidir. */
 .hl-card.hl-none .hl-name { color: var(--muted); }
 
 /* Dar ekranda 2 sütun, 560px'ten sonra 5 rolün tamamı tek sıra (auto-fit 4+1
@@ -1850,11 +1850,20 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   font-variant-numeric: tabular-nums;
 }
 /* Rolde hiç oynayan yok: soluk "—" (tıklanabilir kalır, pop-up kısa mesaj yazar).
-   Sınıf ".empty" DEĞİL: o global sınıf ortalı boş-durum paragrafı içindir (padding 40px). */
+   Sınıf önekli (rb-): eski global boş-durum paragraf sınıfı (padding 40px; GÖREV 33'te
+   kaldırıldı) baloncuğu bozuyordu. */
 .rift-bub.rb-none { opacity: 0.62; border-color: var(--line); border-style: dashed; }
 .rift-bub.rb-none .rb-name { font-size: 15px; color: var(--muted); }
 .rift-note { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; }
-.rift-err { color: var(--muted); font-size: 14px; text-align: center; padding-top: 40%; }
+/* GÖREV 33: eski ".rift-err" yerine ortak viewState kutusu; baloncuk katmanı
+   mutlak konumlu olduğu için kutu katmanın ortasına oturtulur. */
+.rift-bubbles > .vs-box {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, 86%);
+}
 
 /* Rol sıralaması pop-up'ı */
 .modal-list {
@@ -2008,16 +2017,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .mt-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 4px 0; }
 .mt-note { margin-top: 14px; font-size: 12px; line-height: 1.4; color: var(--muted); }
 
-/* Hata kutusu: sağlık ekranındaki desenin aynısı (başlık · ayrıntı · ne yapmalı). */
-.mt-error {
-  background: var(--surface);
-  border: 1px solid rgba(217, 82, 74, 0.5);
-  border-radius: 10px;
-  padding: 16px;
-}
-.mt-err-title { font-weight: 600; color: var(--red); margin-bottom: 6px; }
-.mt-err-detail, .mt-err-hint { color: var(--muted); font-size: 13px; }
-.mt-err-hint { margin-top: 6px; }
 
 @media (max-width: 360px) {
   .mt-filters { gap: 4px; }
@@ -2118,8 +2117,9 @@ button.hl-role:hover { border-color: var(--brass-dim); }
    büyütmemek için 19px'te kalır. Takım rengi çerçevesi YOK: satırın sol
    kenarındaki mavi/kırmızı şerit tarafı zaten söylüyor.
    champion null → kutu yer kaplar ama görünmez, adlar hizada kalır.
-   Boş kutunun sınıfı "mc-none"dur, "empty" DEĞİL: global `.empty` kuralı
-   (padding: 40px 0) satırı 88px'e şişiriyordu — bu tuzağa üçüncü düşüş. */
+   Boş kutunun sınıfı "mc-none"dur (önekli): eski global boş-durum kuralı
+   (padding: 40px 0; GÖREV 33'te kaldırıldı) satırı 88px'e şişiriyordu — bu
+   tuzağa üçüncü düşüş. */
 .mc-champ { flex: 0 0 auto; align-self: center; width: 19px; height: 19px; }
 .mc-champ.mc-none { visibility: hidden; }
 
@@ -2230,7 +2230,43 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 /* Kaydedilmemiş seçim: kutu vurgulanır — kullanıcı neyin sunucuda, neyin
    yalnız ekranda olduğunu görsün (seçimler yeniden çizimde korunuyor). */
 .re-row select.re-dirty { border-color: var(--brass); }
-.empty { color: var(--muted); text-align: center; padding: 40px 0; }
+/* ── Ortak görünüm durumu (GÖREV 33) — "vs-" öneki viewState()'e aittir ──
+   Yükleniyor / boş / hata TÜM görünümlerde aynı kutudur; görünüme özgü hata
+   kutuları (.mt-error, .fq-error, .ch-error, .rift-err) ve eski global
+   boş-durum sınıfı bunun lehine kaldırıldı. Sade: ikon/spinner yok. */
+.vs-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.vs-box.vs-loading { background: none; border-color: transparent; }
+/* Gecikmeli gösterim: VS_DELAY_MS dolana kadar yer tutar ama görünmez
+   (kısa isteklerde metin "flaş" yapmaz). */
+.vs-box.vs-wait { visibility: hidden; }
+.vs-box.vs-error { border-color: rgba(217, 82, 74, 0.5); }
+.vs-text { margin: 0; }
+.vs-error .vs-text { color: var(--red); font-weight: 600; }
+.vs-detail, .vs-hint { margin: 6px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.vs-retry {
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--brass-dim);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.vs-retry:hover { border-color: var(--brass); color: var(--brass); }
+.vs-retry:disabled { opacity: 0.6; cursor: default; }
+/* Grid kapsayıcılar (roster, SSS listesi, maç listesi) içinde tam satır kaplar. */
+.roster-grid > .vs-box, .fq-list > .vs-box, .match-list > .vs-box { grid-column: 1 / -1; }
 
 /* ── Maç detayı (GÖREV 8) — "md-" öneki bu görünüme aittir ──
    Kart tıklanabilir; klavye girişi başlıktaki .md-open düğmesidir. */
@@ -2544,7 +2580,7 @@ button.hl-role:hover { border-color: var(--brass-dim); }
    padding/border sıfırlanır ve box-sizing: border-box ile kenarlık ölçünün İÇİNE
    alınır (boş slotun 1px kesik çizgisi kareyi büyütmez), align-self: flex-start
    ile de saran flex satırında dikey esneme (stretch) kapatılır. Bu üç satır
-   savunmadır: dışarıdan eşleşen bir kural (bkz. aşağıdaki .empty dersi) slotu
+   savunmadır: dışarıdan eşleşen bir kural (bkz. aşağıdaki boş-durum dersi) slotu
    artık şişiremez, satır yüksekliği içerikten bağımsız kalır. */
 .mb-slot {
   position: relative;
@@ -2559,8 +2595,8 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 }
 .mb-champ { width: var(--mb-champ); height: var(--mb-champ); }
 /* Boş slot: envanterde o yer boş (items = [] ya da 7'den az eşya).
-   Sınıf ".mb-empty"dir, ".empty" DEĞİL: global `.empty` (ortalı boş-durum
-   paragrafı) `padding: 40px 0` ile slotu 26x26 yerine 26x82 çiziyor, eksik
+   Sınıf "mb-empty"dir (önekli): eski global boş-durum paragraf sınıfı
+   (GÖREV 33'te kaldırıldı) `padding: 40px 0` ile slotu 26x26 yerine 26x82 çiziyor, eksik
    eşyalı satırları 78px'ten 127px'e şişiriyordu. Bu tuzağa dördüncü düşüş
    (önceki kurbanlar: .hl-none, .rb-none, .mc-none). */
 .mb-slot.mb-empty {
@@ -2708,17 +2744,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
   color: var(--muted);
 }
 
-.ch-empty, .ch-error {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px;
-}
-.ch-error { border-color: rgba(217, 82, 74, 0.5); }
-.ch-empty-title, .ch-err-title { font-weight: 600; margin-bottom: 6px; }
-.ch-err-title { color: var(--red); }
-.ch-empty-note, .ch-err-detail, .ch-err-hint { color: var(--muted); font-size: 13px; }
-.ch-err-hint { margin-top: 6px; }
 
 /* ── Modal ── */
 .modal-backdrop {
@@ -2781,16 +2806,6 @@ button.hl-role:hover { border-color: var(--brass-dim); }
 .fq-card:hover .fq-card-title { color: var(--brass); }
 .fq-card-sum { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
 
-/* Hata kutusu META/health hata desenidir (mt-error) */
-.fq-error {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 18px;
-  text-align: center;
-}
-.fq-err-title { font-weight: 600; }
-.fq-err-detail { color: var(--muted); font-size: 14px; margin-top: 6px; }
 
 /* Madde gövdesi: mdToHtml çıktısı yalnız bu kapsayıcıda yaşar; element
    seçicileri .fq-doc altına kilitli, global sızıntı yok. */
