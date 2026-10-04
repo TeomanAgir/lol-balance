@@ -336,6 +336,200 @@
     return null;
   };
 
+  // ── Meta tier + counter verisi (GÖREV 34, api_contract §8) ──
+  // Canlıda veri DB'deki etkin anlık görüntüden, yoksa repodaki tohum dosyadan
+  // gelir. Mock aynı iki katmanı taklit eder: tohum = assets/meta/tiers.json +
+  // counters.json (window.fetch ile bir kez okunur; file:// gibi okunamayan
+  // ortamda MOCK_ADVISOR'daki küçük sahte belgeye düşer), anlık görüntüler ise
+  // sayfa belleğinde yaşar (yenilemede sıfırlanır). Kaynağın "yeni patch" hâli
+  // tohumdan DETERMİNİSTİK türetilir (metaSourceDocs) — refresh her seferinde
+  // aynı farkı üretir, panel akışı (kontrol → güncelle → zaten güncel) denenebilir.
+  // Senaryo bayrakları (konsoldan değiştirilebilir):
+  //   MOCK_META_EMPTY       → etkin görüntü yoksa tohum da YOK sayılır (404 / "empty")
+  //   MOCK_META_SOURCE_DOWN → refresh 502 (kaynak düştü; hiçbir şey yazılmaz)
+  //   MOCK_META_RUNNING     → refresh 409 (başka güncelleme koşuyor) + status.running
+  //   MOCK_META_GUARD_FAIL  → kaynakta Orta koridor boş gelir → guard_rejected (force aşar)
+  window.MOCK_META_EMPTY = false;
+  window.MOCK_META_SOURCE_DOWN = false;
+  window.MOCK_META_RUNNING = false;
+  window.MOCK_META_GUARD_FAIL = false;
+  const META_LANES = ["top", "jungle", "middle", "bottom", "utility"];
+  const META_TIERS = ["S", "A", "B"];
+  const MOCK_DD_VENDORED = "16.16.1";   // webui/assets/ddragon/manifest.json ile aynı sabit
+  const MOCK_DD_LATEST = "16.19.1";     // "Data Dragon'daki en yeni" taklidi
+  const META_KEEP = 5;
+  const metaDb = { seed: null, snapshots: [], activeId: null, nextId: 1 };
+
+  function metaSeed() {
+    if (metaDb.seed) return metaDb.seed;
+    const grab = (name) => window.fetch("assets/meta/" + name)
+      .then(r => (r.ok ? r.json() : null)).catch(() => null);
+    metaDb.seed = Promise.all([grab("tiers.json"), grab("counters.json")]).then(([tiers, counters]) => {
+      const fb = window.MOCK_ADVISOR || {};
+      const head = { patch: "16.16", updated: "2026-08-17", source: "op.gg (global, platinum_plus)" };
+      if (!tiers || typeof tiers !== "object" || !tiers.tiers)
+        tiers = Object.assign({}, head, { tiers: fb.tiers || {} });
+      if (!counters || typeof counters !== "object" || !counters.counters)
+        counters = Object.assign({}, head, { counters: fb.counters || {} });
+      return { tiers, counters };
+    });
+    return metaDb.seed;
+  }
+
+  const metaActive = () => metaDb.snapshots.find(sn => sn.id === metaDb.activeId) || null;
+
+  // Okuma önceliği (contract): etkin anlık görüntü → tohum → yok (null).
+  async function metaDocs() {
+    const a = metaActive();
+    if (a) return { tiers: a.tiers, counters: a.counters, origin: "snapshot", snapshot_id: a.id };
+    if (window.MOCK_META_EMPTY) return null;
+    const seed = await metaSeed();
+    return { tiers: seed.tiers, counters: seed.counters, origin: "seed", snapshot_id: null };
+  }
+
+  const tierNameOf = (x) => (typeof x === "string" ? x : x && typeof x.name === "string" ? x.name : "");
+  const laneCell = (doc, lane) => (doc.tiers && doc.tiers[lane]) || {};
+  const laneList = (doc, lane, tier) => (Array.isArray(laneCell(doc, lane)[tier]) ? laneCell(doc, lane)[tier] : []);
+  const laneCounters = (doc, lane) => (doc.counters && doc.counters[lane]) || {};
+  const tiersEntries = (doc) => META_LANES.reduce((n, l) =>
+    n + META_TIERS.reduce((m, tr) => m + laneList(doc, l, tr).length, 0), 0);
+  const countersAnchors = (doc) => META_LANES.reduce((n, l) => n + Object.keys(laneCounters(doc, l)).length, 0);
+  const countersRows = (doc) => META_LANES.reduce((n, l) =>
+    n + Object.values(laneCounters(doc, l)).reduce((m, arr) => m + (Array.isArray(arr) ? arr.length : 0), 0), 0);
+  const majorMinor = (v) => String(v).split(".").slice(0, 2).join(".");
+  const ageDays = (updated) => {
+    const ts = Date.parse(updated);
+    return Number.isNaN(ts) ? null : Math.max(0, Math.round((Date.now() - ts) / 86400000));
+  };
+  const metaStats = (d) => ({
+    tiers_entries: tiersEntries(d.tiers),
+    counters_anchors: countersAnchors(d.counters),
+    counters_rows: countersRows(d.counters),
+  });
+
+  async function metaStatus() {
+    const d = await metaDocs();
+    const a = metaActive();
+    const active = d ? Object.assign({
+      origin: d.origin, snapshot_id: d.snapshot_id,
+      patch: d.tiers.patch, updated: d.tiers.updated, source: d.tiers.source,
+      created_at: a ? a.created_at : null, trigger: a ? a.trigger : null,
+    }, metaStats(d)) : null;
+    const age = active ? ageDays(active.updated) : null;
+    const state = !active ? "empty"
+      : (majorMinor(MOCK_DD_LATEST) !== active.patch || (age != null && age > 14))
+        ? "update_available" : "up_to_date";
+    return {
+      active, ddragon: { vendored: MOCK_DD_VENDORED, latest: MOCK_DD_LATEST },
+      age_days: age, state, running: !!window.MOCK_META_RUNNING,
+    };
+  }
+
+  // Kaynağın yeni-patch hâli: her koridorda ilk S ile ilk A yer değiştirir
+  // (2 taşınma), son B düşer (1 çıkan), bir yeni ad A'ya girer (eklenen; tohumda
+  // zaten varsa taşınma sayılır). Orman'daki ad UYDURMADIR ve bilerek
+  // champions.json'da yoktur → uyarıyla elenir (contract'taki "yeni şampiyon
+  // vendored DD'de yok" yolu). Counter'da ilk anahtar düşer, yeni ad anahtar
+  // olur, her beşinci satırın winrate'i oynar (changed).
+  const META_NEW_NAME = { top: "Ambessa", jungle: "Zaahen", middle: "Mel", bottom: "Smolder", utility: "Rell" };
+  function metaSourceDocs(seed) {
+    const patch = majorMinor(MOCK_DD_LATEST);
+    const today = new Date().toISOString().slice(0, 10);
+    const tiers = { patch, updated: today, source: seed.tiers.source, tiers: {} };
+    const counters = { patch, updated: today, source: seed.counters.source, counters: {} };
+    const warnings = [];
+    META_LANES.forEach(l => {
+      const S = [...laneList(seed.tiers, l, "S")];
+      const A = [...laneList(seed.tiers, l, "A")];
+      const B = [...laneList(seed.tiers, l, "B")];
+      if (S.length && A.length) { const s0 = S.shift(); const a0 = A.shift(); S.unshift(a0); A.unshift(s0); }
+      if (B.length) B.pop();
+      const add = META_NEW_NAME[l];
+      if (l === "jungle") {
+        warnings.push(`'${add}' champions.json'da yok (Data Dragon ${MOCK_DD_VENDORED} vendored); kayıt atlandı, görünmesi için redeploy gerekir.`);
+      } else {
+        A.push({ name: add, win_rate: 0.5213, pick_rate: 0.0311 });
+      }
+      const out = {};
+      Object.keys(laneCounters(seed.counters, l)).forEach((k, i) => {
+        if (i === 0) return;
+        out[k] = laneCounters(seed.counters, l)[k].map((r, j) => (j % 5 === 0
+          ? Object.assign({}, r, { win_rate_against: +(r.win_rate_against + 0.011).toFixed(4) }) : r));
+      });
+      if (l !== "jungle") out[add] = [{ champion: "Garen", games: 120, win_rate_against: 0.5104 }];
+      if (window.MOCK_META_GUARD_FAIL && l === "middle") { S.length = 0; A.length = 0; B.length = 0; Object.keys(out).forEach(k => delete out[k]); }
+      tiers.tiers[l] = { S, A, B };
+      counters.counters[l] = out;
+    });
+    return { tiers, counters, warnings };
+  }
+
+  // Fark (contract refresh.diff): şampiyon → tier haritaları karşılaştırılır;
+  // listeler ad alfabetik (deterministik).
+  function tierMap(doc, lane) {
+    const m = {};
+    META_TIERS.forEach(tr => laneList(doc, lane, tr).forEach(x => {
+      const n = tierNameOf(x);
+      if (n && !m[n]) m[n] = tr;
+    }));
+    return m;
+  }
+  function metaDiff(before, after) {
+    const summary = { tiers_added: 0, tiers_removed: 0, tiers_moved: 0,
+      counters_added: 0, counters_removed: 0, counters_changed: 0 };
+    const diff = { tiers: {}, counters: {}, summary };
+    META_LANES.forEach(l => {
+      const b = before ? tierMap(before.tiers, l) : {};
+      const a = tierMap(after.tiers, l);
+      const added = [], removed = [], moved = [];
+      Object.keys(a).sort().forEach(n => {
+        if (!(n in b)) added.push([n, a[n]]);
+        else if (b[n] !== a[n]) moved.push([n, b[n], a[n]]);
+      });
+      Object.keys(b).sort().forEach(n => { if (!(n in a)) removed.push([n, b[n]]); });
+      const counts = { S: 0, A: 0, B: 0 };
+      Object.values(a).forEach(tr => { counts[tr] += 1; });
+      diff.tiers[l] = { added, removed, moved, counts };
+      summary.tiers_added += added.length; summary.tiers_removed += removed.length; summary.tiers_moved += moved.length;
+      const bc = before ? laneCounters(before.counters, l) : {};
+      const ac = laneCounters(after.counters, l);
+      const cAdded = Object.keys(ac).filter(k => !(k in bc)).sort();
+      const cRemoved = Object.keys(bc).filter(k => !(k in ac)).sort();
+      const cChanged = Object.keys(ac).filter(k => k in bc && JSON.stringify(ac[k]) !== JSON.stringify(bc[k])).sort();
+      diff.counters[l] = { added: cAdded, removed: cRemoved, changed: cChanged, anchors: Object.keys(ac).length };
+      summary.counters_added += cAdded.length; summary.counters_removed += cRemoved.length; summary.counters_changed += cChanged.length;
+    });
+    return diff;
+  }
+
+  // Güvenlik eşiği (contract): boş koridor, counter'sız koridor, yarıdan fazla kayıp.
+  function metaGuard(before, after) {
+    const reasons = [], empty_lanes = [];
+    META_LANES.forEach(l => {
+      const total = META_TIERS.reduce((m, tr) => m + laneList(after.tiers, l, tr).length, 0);
+      if (!total) { empty_lanes.push(l); reasons.push(`${l}: tier listesi boş`); }
+      if (!Object.keys(laneCounters(after.counters, l)).length) {
+        if (!empty_lanes.includes(l)) empty_lanes.push(l);
+        reasons.push(`${l}: counter anahtarı yok`);
+      }
+    });
+    const bt = before ? tiersEntries(before.tiers) : 0, at = tiersEntries(after.tiers);
+    const ba = before ? countersAnchors(before.counters) : 0, aa = countersAnchors(after.counters);
+    if (before && at < bt * 0.5) reasons.push(`tier kaydı yarıdan fazla azaldı (${bt} → ${at})`);
+    if (before && aa < ba * 0.5) reasons.push(`counter anahtarı yarıdan fazla azaldı (${ba} → ${aa})`);
+    return { ok: !reasons.length, loss_ratio: bt ? +(1 - Math.min(1, at / bt)).toFixed(4) : 0, empty_lanes, reasons };
+  }
+
+  function metaHistoryItem(sn) {
+    return {
+      id: sn.id, created_at: sn.created_at, trigger: sn.trigger, patch: sn.patch,
+      updated: sn.updated, source: sn.source, dd_version: sn.dd_version,
+      is_active: sn.id === metaDb.activeId,
+      tiers_entries: sn.stats.tiers_entries, counters_anchors: sn.stats.counters_anchors,
+      counters_rows: sn.stats.counters_rows, summary: sn.summary, warnings_count: sn.warnings_count,
+    };
+  }
+
   // Takıma rol atar: açgözlü (en yüksek rol skoru önce), eşitlikte ilk bulunan kalır.
   // Gerçek atama backend'de (126 ayrım × 120 atama); burada sadece şekil doğru olsun diye.
   // fixed = {player_id, position} verilirse o oyuncu o role sabitlenir (nemesis maçı).
@@ -1615,16 +1809,99 @@
       return json({ match_id: match.id, duplicate: false }, 201);
     }
 
+    // ── Meta verisi (GÖREV 34, api_contract §8) ──
+    // Herkese açık okuma: etkin görüntü, yoksa tohum; ikisi de yoksa 404.
+    if (method === "GET" && (path === "/meta/tiers" || path === "/meta/counters")) {
+      const d = await metaDocs();
+      if (!d) return err(404, "Meta verisi yok.");
+      const doc = path === "/meta/tiers" ? d.tiers : d.counters;
+      return json(Object.assign({}, doc, { origin: d.origin, snapshot_id: d.snapshot_id }));
+    }
+
+    if (method === "GET" && path === "/admin/meta/status") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      return json(await metaStatus());
+    }
+
+    if (method === "GET" && path === "/admin/meta/history") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      return json({ active_id: metaDb.activeId, items: metaDb.snapshots.map(metaHistoryItem) });
+    }
+
+    if (method === "POST" && path === "/admin/meta/refresh") {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      if (window.MOCK_META_RUNNING) return err(409, "Meta güncellemesi zaten koşuyor.");
+      if (window.MOCK_META_SOURCE_DOWN) return err(502, "Kaynak alınamadı: OP.GG zaman aşımı (30 sn).");
+      let body = {};
+      try { body = opts.body ? JSON.parse(opts.body) : {}; } catch { body = {}; }
+      const dryRun = !!body.dry_run, force = !!body.force;
+      const t0 = Date.now();
+      const seed = await metaSeed();
+      const cur = await metaDocs();
+      const src = metaSourceDocs(seed);
+      const before = cur ? Object.assign({
+        origin: cur.origin, snapshot_id: cur.snapshot_id, patch: cur.tiers.patch, updated: cur.tiers.updated,
+      }, metaStats(cur)) : null;
+      const after = Object.assign({
+        patch: src.tiers.patch, updated: src.tiers.updated, source: src.tiers.source, dd_version: MOCK_DD_LATEST,
+      }, metaStats(src));
+      const diff = metaDiff(cur, src);
+      const guard = metaGuard(cur, src);
+      const base = {
+        dry_run: dryRun, before, after,
+        ddragon: { vendored: MOCK_DD_VENDORED, latest: MOCK_DD_LATEST },
+        diff, guard, warnings: src.warnings, duration_ms: Date.now() - t0 + 250,
+      };
+      const skip = (reason) => json(Object.assign({ written: false, snapshot_id: null, reason }, base));
+      if (dryRun) return skip(null);
+      if (!force && cur && cur.tiers.patch === src.tiers.patch) {
+        const age = ageDays(cur.tiers.updated);
+        if (age != null && age <= 7) return skip("already_current");
+      }
+      if (!guard.ok && !force) return skip("guard_rejected");
+      const sn = {
+        id: metaDb.nextId++, created_at: new Date().toISOString(), trigger: "panel",
+        patch: src.tiers.patch, updated: src.tiers.updated, source: src.tiers.source, dd_version: MOCK_DD_LATEST,
+        tiers: src.tiers, counters: src.counters, stats: metaStats(src),
+        summary: diff.summary, warnings_count: src.warnings.length,
+      };
+      metaDb.snapshots.unshift(sn);
+      metaDb.activeId = sn.id;
+      // Saklama: en fazla META_KEEP satır; etkin olmayan EN ESKİ silinir, etkin asla.
+      while (metaDb.snapshots.length > META_KEEP) {
+        let idx = -1;
+        for (let i = metaDb.snapshots.length - 1; i >= 0; i--) {
+          if (metaDb.snapshots[i].id !== metaDb.activeId) { idx = i; break; }
+        }
+        if (idx < 0) break;
+        metaDb.snapshots.splice(idx, 1);
+      }
+      return json(Object.assign({ written: true, snapshot_id: sn.id, reason: null }, base));
+    }
+
+    const activateMatch = path.match(/^\/admin\/meta\/activate\/(\d+)$/);
+    if (method === "POST" && activateMatch) {
+      const denied = adminGuard(opts);
+      if (denied) return denied;
+      const sn = metaDb.snapshots.find(x => x.id === Number(activateMatch[1]));
+      if (!sn) return err(404, "Anlık görüntü bulunamadı.");
+      metaDb.activeId = sn.id;   // zaten etkinse 200 (idempotent)
+      return json({ active_id: sn.id, patch: sn.patch });
+    }
+
     return err(404, "Böyle bir endpoint yok: " + path);
   };
 
   // ── Seçim danışmanı mock verisi (GÖREV 21) ──
-  // Canlıda bu veriler STATİK DOSYALARDAN gelir (assets/meta/tiers.json +
-  // counters.json + champions.json tags/info — api_contract §8); mock modunda
-  // dosyalar olmayabilir diye makul sahteleri buradan verilir (app.js USE_MOCK
-  // iken doğrudan window.MOCK_ADVISOR okur, fetch yolu hiç koşmaz).
+  // GÖREV 34'ten beri tiers/counters mock'ta da API yolundan gelir (/meta/*,
+  // yukarıdaki metaSeed tohum dosyaları okur); buradaki tiers/counters yalnız
+  // tohum dosya OKUNAMAZSA (file:// gibi) yedek belgedir. champ_info ise hâlâ
+  // doğrudan okunur (app.js paChampInfo: champions.json tags/info taklidi).
   // tiers YENİ şemadadır ({name, win_rate, pick_rate}); MIDDLE B kademesi eski
-  // düz-string biçimi taşır → geriye uyum yolu mock'ta da görünür/denenebilir.
+  // düz-string biçimi taşır → geriye uyum yolu yedek belgede de denenebilir.
   // Adlar bilerek maç geçmişindeki CHAMPS havuzuyla kesişir: grup rozeti
   // ("Teoman: 3W-1L") önerilerde gerçekten belirir.
   window.MOCK_ADVISOR = {

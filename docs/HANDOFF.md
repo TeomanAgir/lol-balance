@@ -86,4 +86,5 @@ Faz 2 (pair synergy rating) hâlâ kapsam dışı; sinerji yalnız gösterim.
 - GÖREV IMPOSSIBLE (mobil app/hesap/lobi) uzak vizyon — savunulan kararların
   revizyonunu gerektirir, başlamadı.
 - Data Dragon patch güncellemesi: `fetch_ddragon.py` DDRAGON_VERSION + redeploy;
-  META verisi: `fetch_meta.py` → fark → `--write` → commit (onaysız yazmaz).
+  META verisi (GÖREV 34): Kontrol Paneli → Meta → Kontrol et → Güncelle (DB'de
+  `meta_snapshots`, geri alınabilir); `fetch_meta.py --write` yalnız repodaki tohum dosyaları yazar.

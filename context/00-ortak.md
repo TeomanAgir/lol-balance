@@ -72,9 +72,9 @@ rating (OpenSkill blend25, ana + rol evreni) → web UI (framework'süz).
 - Kod yorumları/log'lar mevcut dosyanın diline uyar (çoğunlukla TR yorum, EN log).
 - Deterministiklik esastır: eşitlik kırılımları contract'ta tanımlanır; testler
   bit-bit eşitlik kanıtlayabilmelidir (replay == incremental gibi).
-- Test tabanları (2026-08-20, blend25 sonrası): rating 167 · backend 473 · collector 479 (475+4 skip)
-  · webui 118 (`pytest webui/tests`, backend venv'iyle). macOS'ta 2026-10-04'te
-  aynı sayılar doğrulandı (167 / 473 / 475+4 skip / 118).
+- Test tabanları (2026-10-05, GÖREV 34 sonrası, macOS): rating 179 · backend 561 · collector 479
+  (475+4 skip) · webui 126 (`pytest webui/tests`, backend venv'iyle). (Önceki taban 2026-08-20:
+  167 / 473 / 475+4 / 118; GÖREV 30-33 ile rating 179 / backend 480 / webui 118 olmuştu.)
   Worker, taban sayıyı DÜŞÜRMEDEN teslim eder ve önce/sonra sayısını raporlar.
   **Sayım tuzağı:** pytest çıktısını `tail`/`head` ile boruya sokma — renkli ilerleme
   noktaları kesilince özet satırı yanlış okunur (bir test worker'ı böylece 406'yı 361

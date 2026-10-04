@@ -3871,6 +3871,197 @@ main.pa-wide { max-width: 1080px; }
   min-height: 40px;
 }
 
+/* ── Kontrol Paneli › Meta sekmesi (GÖREV 34, K2 "Karşılaştırma") ──
+   Sınıflar cm- öneklidir (konseptteki mc- yerine; global ad alanı). Yerleşim:
+   durum şeridi → YÜKLÜ | KAYNAK kartları → koridor başına fark tablosu (kendi
+   yatay kaydırma kabında; 360px'te sayfa taşmaz) → uyarılar → anlık görüntüler.
+   Uyarı sarısı yalnız burada kullanılır; :root paletine eklenmedi. */
+.cp-pane { --cm-warn: #d9a03a; }
+.cm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.cm-pill {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.cm-pill.cm-stale {
+  color: var(--cm-warn);
+  border-color: color-mix(in srgb, var(--cm-warn) 50%, transparent);
+  background: color-mix(in srgb, var(--cm-warn) 10%, transparent);
+}
+.cm-pill.cm-fresh {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.cm-bar-text { color: var(--muted); font-size: 13px; flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.cm-bar-text b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.cm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cp-btn.cm-primary {
+  color: var(--bg);
+  background: var(--brass);
+  border-color: var(--brass);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cp-btn.cm-primary:hover:not(:disabled) { background: #d9b26a; color: var(--bg); }
+
+.cm-cmp { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.cm-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.cm-card.cm-src { border-color: color-mix(in srgb, var(--brass) 40%, var(--line)); }
+.cm-card-eyebrow {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cm-card.cm-src .cm-card-eyebrow { color: var(--brass); }
+.cm-patch {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.cm-sub { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.cm-rows { margin-top: 12px; display: grid; gap: 4px; font-size: 13px; }
+.cm-rows div { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.cm-rows span { color: var(--muted); }
+.cm-rows b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.cm-rows b.cm-up { color: var(--ok); }
+.cm-rows b.cm-dim { color: var(--muted); }
+.cm-skel { color: var(--muted); font-style: italic; }
+
+.cm-sec { margin-top: 18px; }
+.cm-sec h3 {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.cm-sec h3 small {
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cm-tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.cm-table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 13px; }
+.cm-table th, .cm-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.cm-table th {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  background: var(--surface);
+}
+.cm-table tbody tr:last-child td { border-bottom: 0; }
+.cm-table td.cm-num { font-variant-numeric: tabular-nums; text-align: right; }
+.cm-table td.cm-lane { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: 0.03em; }
+.cm-table td.cm-names { white-space: normal; min-width: 240px; color: var(--muted); overflow-wrap: anywhere; }
+.cm-table td.cm-empty { white-space: normal; padding: 16px; color: var(--muted); overflow-wrap: anywhere; }
+.cm-tok {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-right: 4px;
+}
+.cm-tok.cm-p { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.cm-tok.cm-m { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.cm-tok.cm-v { color: var(--brass); background: color-mix(in srgb, var(--brass) 12%, transparent); }
+/* Uyarı/gerekçe metni sunucudan gelir ve kırılmaz dizge (dosya yolu, URL)
+   taşıyabilir: overflow-wrap: anywhere + min-width: 0 olmadan 360px'te belge
+   yatay taşıyordu (orkestratör bulgusu, canlı backend). */
+.cm-warn {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--cm-warn);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cm-warn::before {
+  content: "!";
+  font-family: var(--display);
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+.cm-warn.cm-guard { color: var(--red); }
+
+.cm-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cm-hrow {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.cm-hrow.cm-active { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.cm-hid { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--brass); }
+.cm-hmain { min-width: 0; overflow-wrap: anywhere; }
+.cm-hmain b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.cm-hmain span { color: var(--muted); }
+.cm-hact { grid-column: 2; }
+.cm-hact .cp-btn { min-height: 34px; padding: 5px 10px; font-size: 12px; }
+.cm-tag { font-family: var(--display); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ok); }
+/* Geniş main: kartlar yan yana, geçmiş satırında eylem üçüncü sütun. */
+@container main (min-width: 600px) {
+  .cm-cmp { grid-template-columns: 1fr 1fr; }
+  .cm-hrow { grid-template-columns: 52px 1fr auto; }
+  .cm-hact { grid-column: auto; }
+}
+
 /* Çok dar ekran: vitrin madalyonu ve çarpan madeni küçülür (konseptin
    clamp() değerleri zaten ölçekliyor; buradaki tek ek kart genişliğidir). */
 @media (max-width: 420px) {

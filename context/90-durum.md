@@ -1,6 +1,31 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-10-04 (orkestratör, macOS kurulumu)
+Son güncelleme: 2026-10-05 (orkestratör, GÖREV 34)
+
+## 2026-10-05: GÖREV 34 — META/counter verisi backend sahipli, Kontrol Paneli'nden tek tık (branch `feat/g34-meta-admin`)
+- Teoman isteği: şampiyon meta + eşleşme (counter) verisi 7 haftadır 16.16'da kalmıştı; admin
+  panelinden tek tıkla kontrol + çekme + güncelleme. Karar günlüğü: CHANGE_REQUESTS 2026-10-05.
+- Veri artık DB'de: `meta_snapshots` (migration 0007, tek etkin satır partial UNIQUE); repodaki
+  `webui/assets/meta/*.json` TOHUM/yedek (snapshot yoksa okunur). Dönüşüm kodu
+  `backend/app/services/meta_source.py` (tek sahip); `deploy/fetch_meta.py` ince CLI, yalnız tohum yazar.
+- Uçlar: `GET /meta/tiers|counters` (X-API-Key) + `/admin/meta/{status,refresh,history,activate/{id}}`
+  (X-Admin-Key). Sağlamlık: süreç içi kilit 409, 30 sn zaman aşımı + 502'de sıfır yazma, guard
+  (boş koridor / >%50 kayıp → yazılmaz, `force` aşar), already_current (aynı patch + ≤7 gün),
+  ≤10 dk ham önbellek (Kontrol et → Güncelle kaynağa bir kez gider), saklama 5 + etkin silinmez.
+- Web UI: META sayfası + Eşleşme Optimizasyonu API'den okur; Kontrol Paneli 4. sekme "Meta"
+  (K2 "Karşılaştırma" — 3 artifact'tan Teoman seçti): Kontrol et (dry_run) → fark tablosu →
+  Güncelle; anlık görüntü listesi + Geri al; `cm-` öneki.
+- Orkestratör doğrulaması: gerçek OP.GG'ye karşı E2E (scratch DB, uvicorn 8123): tohum okuma →
+  status (DD 16.19.1, update_available) → dry_run (16.19, guard ok, 837 ms) → yazma (önbellekten
+  56 ms, #1) → already_current → force (#2) → activate(#1) → 404/422 yolları; rating tabloları
+  boş kaldı. Orman koridorunda −31 kayıt KAYNAĞIN kendisinden (OP.GG orman S/A/B'de 25 şampiyon
+  tutuyor), dönüşüm hatası değil. Playwright (gerçek backend): META 16.19, panel akışı; 360px'te
+  `cm-warn` uzun yol taşması bulundu → düzeltildi (overflow-wrap) + backend warning'den mutlak yol
+  kaldırıldı.
+- CANLIYA ALIRKEN: (1) PR merge → deploy; (2) pod'un OP.GG + Data Dragon egress'i (NetworkPolicy
+  varsa) doğrulanır; (3) Kontrol Paneli → Meta → Kontrol et → Güncelle (ilk snapshot). Vendored
+  Data Dragon 16.16.1 eski: yeni şampiyonlar uyarıyla elenir → `deploy/fetch_ddragon.py`
+  DDRAGON_VERSION yükselt + redeploy ayrı iş.
 
 ## 2026-10-04: geliştirme ortamı macOS'a taşındı (branch `env/mac-setup`)
 - Repo artık `/Users/shadepb/Desktop/REPO/balance` yolunda macOS'ta da çalışıyor; venv'ler
@@ -171,7 +196,8 @@ profilde favori eşya; varlıklar gitignore'lu, dd-/mb-/fi- blokları) ·
   Release'e ekler; arkadaşlara releases/latest linki gönderilir (GÖREV 13+14+16
   tek dağıtımda; sonraki sürümlerde pencere kendisi haber verir).
 - Data Dragon patch güncellemesi: `deploy/fetch_ddragon.py` DDRAGON_VERSION +
-  redeploy; META verisi: `deploy/fetch_meta.py` → fark → `--write` → commit.
+  redeploy; META verisi: GÖREV 34'ten beri Kontrol Paneli → Meta (tohum dosya için
+  `deploy/fetch_meta.py --write` hâlâ çalışır, isteğe bağlı).
 - new_modules.md'de bekleyen: GÖREV X (sinerji seçiminde perf katkısı — tartışma
   aşamasında; eski "GÖREV 17 sinerji" maddesinin yeni adı).
 Ayrıntı ve kararlar: `docs/CHANGE_REQUESTS.md`.

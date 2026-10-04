@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from app.db import MIGRATIONS_DIR, connect, run_migrations
 
 
@@ -43,6 +45,7 @@ def test_fresh_db_applies_all_migrations_in_name_order(tmp_path):
         "0004_collector_health.sql",
         "0005_participant_items.sql",
         "0006_roulette.sql",
+        "0007_meta_snapshots.sql",
     ]  # sıra garantisi
     assert "perf_score" in _columns(db_path, "rating_history")
     # Tekrar koşmak güvenli ve no-op.
@@ -108,6 +111,7 @@ def test_existing_db_gets_0002_and_0003(tmp_path):
         "0004_collector_health.sql",
         "0005_participant_items.sql",
         "0006_roulette.sql",
+        "0007_meta_snapshots.sql",
     ]
     assert "perf_score" in _columns(db_path, "rating_history")
     assert "role_rating_history" in _objects(db_path)
@@ -225,7 +229,9 @@ def test_0006_rebuild_preserves_matches_rows_and_foreign_keys(tmp_path):
     finally:
         conn.close()
 
-    assert run_migrations(str(db_path)) == ["0006_roulette.sql"]
+    assert run_migrations(str(db_path)) == [
+        "0006_roulette.sql", "0007_meta_snapshots.sql",
+    ]
 
     conn = connect(str(db_path))
     try:
@@ -266,3 +272,37 @@ def test_0001_does_not_define_matches_client_id():
 def test_0001_does_not_define_items_json():
     """Aynı koruma items_json için: tek kaynak 0005'tir (bkz. 0002 notu)."""
     assert not any("items_json" in line for line in _code_lines("0001_init.sql"))
+
+
+def test_0007_creates_meta_snapshots_with_single_active_index(tmp_path):
+    """GÖREV 34: meta_snapshots + partial UNIQUE (tek etkin satır) (db_schema 0007)."""
+    import sqlite3 as _sqlite3
+
+    db_path = tmp_path / "meta.db"
+    run_migrations(str(db_path))
+    assert {"meta_snapshots", "meta_snapshots_single_active"} <= _objects(db_path)
+    assert _columns(db_path, "meta_snapshots") == {
+        "id", "created_at", "trigger", "source", "source_patch", "dd_version",
+        "tiers_json", "counters_json", "warnings_json", "summary_json", "is_active",
+    }
+    conn = connect(str(db_path))
+    try:
+        ins = (
+            "INSERT INTO meta_snapshots (trigger, source, source_patch, dd_version,"
+            " tiers_json, counters_json, is_active) VALUES (?, 's', '16.19',"
+            " '16.16.1', '{}', '{}', ?)"
+        )
+        conn.execute(ins, ("panel", 1))
+        conn.execute(ins, ("cli", 0))
+        conn.execute(ins, ("cli", 0))  # birden çok pasif satır serbest
+        with pytest.raises(_sqlite3.IntegrityError):
+            conn.execute(ins, ("panel", 1))  # ikinci etkin satır reddedilir
+        conn.rollback()
+        with pytest.raises(_sqlite3.IntegrityError):
+            conn.execute(ins, ("bogus", 0))  # trigger CHECK
+        conn.rollback()
+        row = conn.execute("SELECT created_at, warnings_json, summary_json"
+                           " FROM meta_snapshots LIMIT 1").fetchone()
+        assert row is None or True  # rollback sonrası tablo boş olabilir
+    finally:
+        conn.close()

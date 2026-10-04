@@ -13,7 +13,8 @@ YAZILMAZ) ve `GET /admin/ping` ile doğrular.
 **Korunan uçların TAM listesi (fix-3, Teoman 2026-08-19):**
 `POST /matches/{id}/void` · `POST /matches/{id}/unvoid` ·
 `POST /matches/{id}/roulette/unlink` · `POST /players` · `PATCH /players/{id}` ·
-`POST /admin/replay` · `GET /admin/ping`.
+`POST /admin/replay` · `GET /admin/ping` · `GET /admin/meta/status` · `POST /admin/meta/refresh` ·
+`GET /admin/meta/history` · `POST /admin/meta/activate/{id}` (son dördü GÖREV 34, bkz. §8 "Meta verisi").
 
 **Bilinçli olarak AÇIK kalanlar** (yalnız `X-API-Key`) ve gerekçeleri:
 - `PUT /matches/{id}/positions` ve `PUT /matches/{id}/items` — **collector bağımlılığı**:
@@ -729,6 +730,11 @@ POST /admin/replay                 → HER İKİ evreni yeniden kurar: ana ratin
                                      role_matches_replayed, engine_version}
 GET  /admin/ping                   → 204; `X-Admin-Key` doğrulama ucu (fix-2 — Kontrol
                                      Paneli giriş şifresini bununla sınar; yan etkisiz)
+GET  /admin/meta/status            → META/counter verisinin durumu (GÖREV 34; bkz. §8)
+POST /admin/meta/refresh           → kaynaktan çek + doğrula + fark + (dry_run değilse) yaz
+GET  /admin/meta/history           → son anlık görüntüler
+POST /admin/meta/activate/{id}     → eski anlık görüntüye geri dön
+                                     (dördü de `X-Admin-Key` ister; rating'e DOKUNMAZ)
 GET  /leaderboard                  → score'a göre sıralı oyuncu listesi
                                      (harman olmayan version'da score = ordinal;
                                       role_ratings alanı burada da döner, bkz. §2;
@@ -818,27 +824,125 @@ tarayıcı DIŞARI istek atmaz, repo'ya görsel commit'lenmez. Yerleşim (`webui
   etiketleri resmî oyun simgeleriyle gösterilir)
 İndirme betiği `deploy/fetch_ddragon.py`'dir; Dockerfile imaj kurulumunda koşturur.
 
-**Meta tier verisi (META sayfası — Teoman kararı, yarı otomatik):** Onaylı veri repo'da
-`webui/assets/meta/tiers.json` dosyasıdır (gitignore'lu DEĞİL, commit'lenir; statik servis
-otomatik). Şema: `{patch, updated, source, tiers: {top|jungle|middle|bottom|utility:
-{S|A|B: [DD görünen adları]}}}`. Güncelleme akışı: `deploy/fetch_meta.py` topluluk
-kaynağından çeker → bizim şemaya çevirir + adları champions.json'a karşı doğrular →
-mevcut dosyayla FARKI gösterir → yalnız açık onayla (`--write`) dosyaya yazar → Teoman
-commit/PR'lar. Otomatik cron YOK; patch başına elle koşulur. Backend bu veriyi bilmez. Yerel
-geliştirmede varlıklar yoksa web UI YER TUTUCU gösterir (kırık görsel değil) — betik elle de
-koşulabilir. Kaldırılmış/bilinmeyen eşya id'si de yer tutucuya düşer. Deploy modeli: lokalde tek uvicorn prosesi; VPS'e taşıma = aynı Docker container'ı (backend + webui birlikte) çalıştırmak, ekstra web server gerekmez (istenirse önüne reverse proxy konulabilir, kapsam dışı).
+**Meta tier + seçim danışmanı verisi (META sayfası ve Eşleşme Optimizasyonu) — GÖREV 34
+(Teoman, 2026-10-05): backend sahipli, Kontrol Paneli'nden tek tıkla güncellenir.**
+Tarihçe: 2026-08-15/17'de bu veri yalnız repodaki iki statik dosyaydı ve `deploy/fetch_meta.py`
+→ fark → `--write` → commit akışıyla elle tazeleniyordu; backend bu veriyi bilmezdi. Canlıda
+webui dosyaları imajın içinde olduğu için panelden güncelleme dosyaya yazarak YAPILAMAZ;
+veri artık DB'de yaşar (`meta_snapshots`, db_schema migration 0007) ve backend servis eder.
 
-**Seçim danışmanı verisi (GÖREV 21 — Teoman kararı, aynı yarı otomatik akış):**
-`deploy/fetch_meta.py` AYNI tek OP.GG isteğinden iki dosya üretir/tazeler (fark göster +
-`--write` onayı + Teoman commit'i akışı değişmez; cron YOK; backend bu veriyi bilmez):
-- `webui/assets/meta/tiers.json` şeması GENİŞLER: tier listeleri `[ad]` yerine
-  `[{name, win_rate, pick_rate}]` taşır (oranlar 0-1, 4 ondalık). Geriye uyum: web UI
-  eski düz-string biçimini de okuyabilir (dosya tazelenene dek).
-- `webui/assets/meta/counters.json` (YENİ): `{patch, updated, source, counters:
-  {top|jungle|middle|bottom|utility: {"<DD adı>": [{champion, games,
-  win_rate_against}]}}}`. `win_rate_against` = listelenen `champion`'ın anahtar
-  şampiyona KARŞI winrate'i (0-1; yüksekse iyi counter). Kayıt sayısı kaynak kadardır
-  (şampiyon/rol başına 1-3); adlar champions.json'a karşı doğrulanır, eşleşmeyen atılır.
-- Analiz tamamen İSTEMCİ tarafındadır: bu iki dosya + Data Dragon `champions.json`
-  (sınıf/hasar sezgiselleri için `tags` + `info` alanları eklenir) + `GET /matches`'tan
-  istemcide türetilen grup rozeti. YENİ BACKEND ENDPOINT'İ YOKTUR.
+*Belge şemaları (DEĞİŞMEDİ; dosya ve API aynı şekli taşır):*
+- **tiers belgesi:** `{patch, updated, source, tiers: {top|jungle|middle|bottom|utility:
+  {S|A|B: [{name, win_rate, pick_rate}]}}}` — adlar Data Dragon görünen adlarıdır, oranlar 0-1
+  ve 4 ondalık; tier içi sıra kaynağın `rank`'i (eşitlikte ad alfabetik → deterministik).
+  Kaynak tier eşlemesi: OP(0)/1 → S, 2 → A, 3 → B; 4-5 (C/D) alınmaz. Web UI eski düz-string
+  biçimini (`[ad]`) de okumaya devam eder.
+- **counters belgesi:** `{patch, updated, source, counters: {top|…|utility: {"<DD adı>":
+  [{champion, games, win_rate_against}]}}}`. `win_rate_against` = listelenen `champion`'ın
+  anahtar şampiyona KARŞI winrate'i (0-1; yüksekse iyi counter), kaynaktaki `(play-win)/play`.
+  S/A/B şartı aranmaz; `is_rip` ve ad doğrulamasından elenenler girmez.
+- Her iki belgede de adlar `webui/assets/ddragon/champions.json`'a karşı doğrulanır;
+  eşleşmeyen kayıt belgeye GİRMEZ, uyarı olarak listelenir (yeni şampiyon vendored Data Dragon'da
+  yoksa böyle görünür; çözümü `fetch_ddragon.py` sürümü + redeploy'dur, bu akışın işi değildir).
+
+*Kaynak (tek istek, değişmedi):* OP.GG açık şampiyon tier ucu
+(`https://lol-api-champion.op.gg/api/{region}/champions/ranked?tier={tier}`, varsayılan
+`global` / `platinum_plus`), id→ad eşlemesi için Data Dragon `champion.json` (vendored
+`manifest.json` sürümü; yoksa en yeni). Dönüşüm/fark kodunun TEK sahibi backend'dir
+(`backend/app/services/meta_source.py`, saf fonksiyonlar); `deploy/fetch_meta.py` o modülü
+çağıran ince CLI'dır ve yalnız repo dosyalarını (tohum) yazar.
+
+*Veri kaynağı önceliği (okuma):* etkin `meta_snapshots` satırı varsa o; yoksa repodaki
+**tohum** dosyalar `webui/assets/meta/tiers.json` + `counters.json` (commit'lenir, ilk kurulum ve
+yedek). İkisi de yoksa 404. Tohum dosyalar statik olarak da servis edilmeye devam eder (mock
+geliştirme); web UI artık API'yi kullanır.
+
+```
+GET  /meta/tiers                   → tiers belgesi + {origin: "snapshot"|"seed", snapshot_id|null}
+GET  /meta/counters                → counters belgesi + aynı iki alan
+                                     (yalnız X-API-Key; Cache-Control: no-cache; 404 = veri yok)
+
+GET  /admin/meta/status            → {
+                                       active: {origin, snapshot_id|null, patch, updated, source,
+                                                created_at|null, trigger|null,
+                                                tiers_entries, counters_anchors, counters_rows} | null,
+                                       ddragon: {vendored: "16.16.1"|null, latest: "16.19.1"|null},
+                                       age_days: int|null,          // active.updated'dan bugüne
+                                       state: "up_to_date" | "update_available" | "empty" | "unknown",
+                                       running: bool                // şu an bir refresh koşuyor mu
+                                     }
+                                     Hafif uçtur: OP.GG'ye GİTMEZ; yalnız Data Dragon versions.json
+                                     (küçük, 5 sn zaman aşımı; erişilemezse latest=null, state
+                                     "unknown"). update_available = Data Dragon latest'in
+                                     major.minor'u active.patch'ten farklı VEYA age_days > 14.
+
+POST /admin/meta/refresh           → gövde {dry_run: bool=false, force: bool=false,
+                                            region: str="global", tier: str="platinum_plus"}
+                                     Tek tık akışı: kaynak + Data Dragon çek → iki belgeye çevir →
+                                     ad doğrula → etkin veriyle fark → güvenlik eşiği →
+                                     (dry_run değilse ve eşik geçildiyse) yeni anlık görüntü yaz
+                                     ve TEK transaction'da etkinleştir. Yanıt:
+                                     {
+                                       written: bool, dry_run: bool, snapshot_id: int|null,
+                                       reason: null | "already_current" | "guard_rejected",
+                                       before: {origin, snapshot_id|null, patch, updated,
+                                                tiers_entries, counters_anchors, counters_rows} | null,
+                                       after:  {patch, updated, source, dd_version,
+                                                tiers_entries, counters_anchors, counters_rows},
+                                       ddragon: {vendored, latest},
+                                       diff: {
+                                         tiers:    {lane: {added: [[name, tier]], removed: [[name, tier]],
+                                                           moved: [[name, from, to]], counts: {S, A, B}}},
+                                         counters: {lane: {added: [name], removed: [name],
+                                                           changed: [name], anchors: int}},
+                                         summary:  {tiers_added, tiers_removed, tiers_moved,
+                                                    counters_added, counters_removed, counters_changed}
+                                       },
+                                       guard: {ok: bool, loss_ratio: float, empty_lanes: [lane],
+                                               reasons: [str]},
+                                       warnings: [str], duration_ms: int
+                                     }
+                                     Kurallar:
+                                     - already_current: dry_run=false, force=false, kaynak patch ==
+                                       etkin patch VE age_days <= 7 → hiçbir şey yazılmaz
+                                       (kaynağa gereksiz yük bindirilmez). dry_run her zaman tam
+                                       hesaplar, asla yazmaz.
+                                     - Güvenlik eşiği (guard): herhangi bir koridorun S+A+B toplamı
+                                       0 ise, herhangi bir koridorda counter anahtarı 0 ise, ya da yeni
+                                       tiers_entries < etkin*0.5 veya yeni counters_anchors <
+                                       etkin*0.5 ise `ok=false` → yazılmaz, reason guard_rejected.
+                                       force=true eşiği aşar (dry_run'da yine yazmaz).
+                                       loss_ratio = 1 - min(1, yeni_tiers_entries / etkin_tiers_entries)
+                                       (etkin yoksa 0).
+                                     - Eşzamanlılık: süreç içi kilit; ikinci istek 409
+                                       (detail: "Meta güncellemesi zaten koşuyor.").
+                                     - Kaynak hataları 502 (zaman aşımı 30 sn; boş `data`, HTTP
+                                       hatası, bozuk JSON, Data Dragon alınamadı — Türkçe detail
+                                       neyin düştüğünü söyler). 502'de DB'ye hiçbir şey yazılmaz.
+                                     - Ham kaynak yanıtı süreç belleğinde ≤10 dk önbelleğe
+                                       alınabilir (aynı region/tier): panelin "Kontrol et" (dry_run)
+                                       → "Güncelle" ikilisi kaynağa iki kez gitmez. Anlam değişmez.
+                                     - Saklama: yazımdan sonra etkin olmayan en eski satırlar silinir,
+                                       en fazla 5 anlık görüntü kalır (etkin olan asla silinmez).
+                                     - trigger = "panel". `updated` = sunucu UTC tarihi (YYYY-MM-DD);
+                                       `created_at` ISO-8601 UTC.
+                                     - Rating/replay/ingest ile HİÇBİR ilişkisi yoktur.
+
+GET  /admin/meta/history           → {active_id: int|null, items: [{id, created_at, trigger, patch,
+                                        updated, source, dd_version, is_active,
+                                        tiers_entries, counters_anchors, counters_rows,
+                                        summary: {…refresh.diff.summary}, warnings_count}]}
+                                     id azalan (en yeni önce), en fazla 5.
+
+POST /admin/meta/activate/{id}     → {active_id, patch}; eski anlık görüntü etkin olur (tek
+                                     transaction, tek etkin satır DB'de partial UNIQUE index ile
+                                     garanti). 404 = id yok. Zaten etkinse 200 (idempotent).
+```
+
+*Web UI:* META sayfası ve Eşleşme Optimizasyonu (advisor.js veri yükleyicileri) belgeleri
+`GET /meta/tiers` + `GET /meta/counters`'tan alır (`X-API-Key` ile, `api()` yolundan; mock modunda
+`mock_api.js` tohum dosyaları okur). Kontrol Paneli'ne dördüncü sekme **"Meta"** gelir (K2
+"Karşılaştırma" konsepti, CHANGE_REQUESTS 2026-10-05): üst şerit durum + "Kontrol et" (dry_run) +
+"Güncelle"; yüklü | kaynak kartları; koridor başına fark tablosu; anlık görüntü listesi + geri al.
+Refresh/activate sonrası istemci meta önbellekleri düşürülür. Analiz (danışman) tamamen istemci
+tarafında kalır; `champions.json` tags/info kullanımı değişmez.

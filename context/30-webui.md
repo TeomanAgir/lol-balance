@@ -22,6 +22,14 @@ Yazma izni: yalnız `webui/`. React/bundler/build zinciri ÖNERME (CLAUDE.md kar
 - `i18n/` — tr+en sözlükleri; `I18n.t()` + `data-i18n` kalıbı; dil düğmesi sağ üst,
   seçim localStorage'da; YENİ her metin iki sözlüğe de girer (CI'da pytest bütünlük testi).
 - `mock_api.js` — backend'siz geliştirme; api_contract şekilleriyle senkron tutulur.
+  GÖREV 34 senaryo bayrakları: `MOCK_META_EMPTY` / `MOCK_META_SOURCE_DOWN` /
+  `MOCK_META_RUNNING` / `MOCK_META_GUARD_FAIL`.
+- META + Eşleşme Optimizasyonu verisi (GÖREV 34): statik dosya DEĞİL, `api("/meta/tiers")` +
+  `api("/meta/counters")` (`metaFetchDoc`, hata türü http/shape/network, 404 = yüklü veri yok).
+  Kontrol Paneli 4. sekme "Meta" (`cm-` öneki, K2 Karşılaştırma): `cpMetaPaneHtml`,
+  `cpMetaCheck` (dry_run) / `cpMetaApply(force)` / `cpMetaActivate`; refresh/activate sonrası
+  `cpInvalidateCaches` meta önbelleklerini düşürür. Uyarı/gerekçe satırları `overflow-wrap:
+  anywhere` taşır (360px taşma dersi, orkestratör doğrulaması 2026-10-05).
 - Data Dragon varlık katmanı (GÖREV 14): `assets/ddragon/` (gitignore'lu, build-time
   vendoring) — `dd-` yardımcıları (tek yükleme, img hatasında 600ms tek retry,
   yer tutucu fallback; lazy-loading BİLEREK yok), BUILD sekmesi `mb-`, favori
