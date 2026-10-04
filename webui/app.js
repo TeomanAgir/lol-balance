@@ -32,6 +32,8 @@
     nemesisMode: null,          // açık nemesis modu: {source, role, players:[{player_id, display_name}]}
     matches: [],                // son GET /matches yanıtı (GÖREV 10: grafikten detaya atlarken önbellek)
     matchDetail: null,          // açık maç detayı: GET /matches listesinden gelen maç nesnesi (GÖREV 8)
+    matchDetailId: null,        // açık maç detayının id'si (GÖREV 32: nesne yoksa GET /matches/{id} ile çekilir)
+    matchesLimit: 20,           // Geçmiş'te çekilen maç sayısı (GÖREV 32: 20 → 50 → 100 → 200)
     matchStat: "gold",          // maç detayında seçili stat (MD_STATS anahtarı)
     matchFrom: "matches",       // maç detayı hangi görünümden açıldı (geçmiş | profil, GÖREV 10)
     ratingHistory: null,        // GET /players/{id}/rating-history yanıtı (GÖREV 10; null = çekilemedi)
@@ -97,6 +99,7 @@
     toastFrame = requestAnimationFrame(() => { el.textContent = msg; });
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, 5000);
+    toastPlace();
   }
   function hideToast() {
     const el = $("#toast");
@@ -105,6 +108,25 @@
     el.hidden = true;
     el.textContent = "";
   }
+  // GÖREV 32: mobilde (<880px) toast altta durur ve Dengele'nin yapışkan
+  // aksiyon çubuğunun (sayaç + RULET/Dengele) üstüne biniyordu. Çubuk ekranda
+  // görünürken toast, çubuğun üst kenarının 8px üstüne kaldırılır (CSS
+  // --toast-lift; masaüstü kuralı onu kullanmaz). Çubuk sticky olduğu için
+  // konumu kaydırmayla değişir → toast açıkken scroll/resize'da yeniden ölçülür.
+  function toastPlace() {
+    const el = $("#toast");
+    const bar = document.querySelector("#view-balance .action-bar");
+    let lift = 0;
+    if (!el.hidden && bar && bar.getClientRects().length) {
+      const r = bar.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < window.innerHeight) lift = window.innerHeight - r.top + 8;
+    }
+    if (lift > 0) el.style.setProperty("--toast-lift", Math.round(lift) + "px");
+    else el.style.removeProperty("--toast-lift");
+  }
+  const toastReplace = () => { if (!$("#toast").hidden) toastPlace(); };
+  window.addEventListener("scroll", toastReplace, { passive: true });
+  window.addEventListener("resize", toastReplace);
 
   // Birincil değer rating.score'dur (harman engine; harman-dışı version'da score = ordinal).
   const fmtRating = (x) => x.toFixed(1);
@@ -465,7 +487,118 @@
   }
   let currentView = "balance";
 
-  function showView(name, forceReload = false) {
+  // ── Tarayıcı geçmişi (GÖREV 32) ───────────────────────────────
+  // Her görünüm geçişi history'ye bir kayıt yazar: tarayıcının/telefonun GERİ
+  // tuşu siteden çıkmak yerine önceki görünüme döner. Kayıt, o görünümü
+  // yeniden kurmaya yeten SERİLEŞTİRİLEBİLİR bağlamdır (hangi oyuncu / hangi
+  // maç / harita-profil-maç geri hedefleri / SSS maddesi / geri yığını). Maç
+  // nesnesi kayda girmez (büyük) — yalnız id'si; nesne bellekteki önbellekten
+  // (mdCache) gelir, yoksa (sayfa yenilendi, önbellek düştü) GET /matches/{id}
+  // ile çekilir. Aynı görünümün yeniden çizimi (dil değişimi vb.) yeni kayıt
+  // AÇMAZ: anahtar (görünüm + oyuncu/maç/madde) aynıysa replaceState.
+  // SSS'nin kalıcı adresi (#faq, #faq/<slug>) aynı yazımla URL'ye girer.
+  const mdCache = new Map();   // maç id → maç nesnesi (geçmiş kaydından geri kurulum için)
+  const NAV_MARK = "lb32";     // bu uygulamanın yazdığı kayıt işareti
+  try { if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch { /* kısıtlı ortam */ }
+
+  const navFrameOut = (f) => f.view === "matchdetail"
+    ? { view: f.view, from: f.from, matchId: f.match ? f.match.id : (f.matchId ?? null), stat: f.stat }
+    : { view: f.view, from: f.from, playerId: f.playerId, range: f.range };
+  const navFrameIn = (f) => f.view === "matchdetail"
+    ? { view: f.view, from: f.from, matchId: f.matchId,
+        match: f.matchId != null ? (mdCache.get(f.matchId) || null) : null, stat: f.stat }
+    : { view: f.view, from: f.from, playerId: f.playerId, range: f.range };
+
+  function navSnapshot(name) {
+    return {
+      mark: NAV_MARK, view: name,
+      profileId: state.profileId, profileFrom: state.profileFrom, range: state.historyRange,
+      matchId: state.matchDetail ? state.matchDetail.id : state.matchDetailId,
+      matchStat: state.matchStat, matchFrom: state.matchFrom,
+      mapFrom: state.mapFrom, faqSlug: state.faqSlug,
+      back: state.backStack.map(navFrameOut),
+      y: 0,
+    };
+  }
+  const navKey = (s) => [s.view,
+    s.view === "profile" ? s.profileId : "",
+    s.view === "matchdetail" ? s.matchId : "",
+    s.view === "faqdetail" ? s.faqSlug : ""].join("|");
+  const navOurs = (s) => !!(s && s.mark === NAV_MARK);
+
+  // SSS görünümleri adresi yazar, diğerleri yalnız FAQ hash'ini temizler
+  // (uygulamanın başka hash'i yok, başka hash'e dokunulmaz).
+  function navUrlFor(name) {
+    if (name === "faq") return "#faq";
+    if (name === "faqdetail" && state.faqSlug) return "#faq/" + state.faqSlug;
+    if (FAQ_HASH_RE.test(location.hash)) return location.pathname + location.search;
+    return location.href;
+  }
+
+  // mode: "push" (kullanıcı geçişi) | "replace" (ilk yükleme, dış hash) | "none" (popstate geri kurulumu)
+  function navWrite(name, mode) {
+    if (mode === "none") return;
+    const snap = navSnapshot(name);
+    const url = navUrlFor(name);
+    const cur = history.state;
+    try {
+      if (mode === "push" && !(navOurs(cur) && navKey(cur) === navKey(snap))) {
+        // Terk edilen kaydın kaydırma konumu saklanır: geri gelince oraya dönülür.
+        if (navOurs(cur)) history.replaceState(Object.assign({}, cur, { y: window.scrollY }), "");
+        history.pushState(snap, "", url);
+      } else {
+        history.replaceState(snap, "", url);
+      }
+    } catch { /* file:// vb. kısıtlı ortam: gezinme yine çalışır, yalnız geçmiş yazılmaz */ }
+  }
+
+  // Geçmiş kaydından görünümü geri kurar (popstate ve sayfa yenileme).
+  function navRestore(s, nav) {
+    if (s.profileId !== state.profileId) {
+      state.ratingHistory = null;
+      state.badges = null;
+    }
+    state.profileId = s.profileId ?? null;
+    state.profileFrom = s.profileFrom || "leaderboard";
+    state.historyRange = s.range || "all";
+    state.matchDetailId = s.matchId ?? null;
+    state.matchDetail = s.matchId != null ? (mdCache.get(s.matchId) || null) : null;
+    state.matchStat = s.matchStat || "gold";
+    state.matchFrom = s.matchFrom || "matches";
+    state.mapFrom = s.mapFrom || "highlights";
+    state.faqSlug = s.faqSlug ?? null;
+    state.backStack = Array.isArray(s.back) ? s.back.map(navFrameIn) : [];
+    const view = Object.prototype.hasOwnProperty.call(loaders, s.view) ? s.view : "balance";
+    return showView(view, false, { nav, y: s.y || 0 });
+  }
+
+  window.addEventListener("popstate", (e) => {
+    const s = e.state;
+    sbCloseNav();
+    if (!navOurs(s)) {
+      // Bizim yazmadığımız kayıt: elle yazılan adres (#faq/...) ya da eski
+      // oturum. SSS hash'iyse o görünüm açılır (kayıt yerinde güncellenir);
+      // değilse dokunulmaz.
+      faqRouteFromHash("replace");
+      return;
+    }
+    // Kontrol Paneli'nden çıkış kaydedilmemiş taslakları atar → önce onay.
+    // İptalde tarayıcı zaten geri gitmiştir: panel kaydı yeniden eklenir,
+    // kullanıcı panelde kalır.
+    if (currentView === "control" && s.view !== "control" && !cpConfirmLeaveView()) {
+      try { history.pushState(navSnapshot("control"), "", navUrlFor("control")); } catch { /* yok */ }
+      return;
+    }
+    navRestore(s, "none");
+  });
+
+  // opts.nav: geçmiş yazımı (bkz. navWrite; varsayılan "push").
+  // opts.y: yükleme bitince dönülecek kaydırma konumu (geçmişten geri kurulum).
+  // Dönüş: geçiş yapıldıysa true (Kontrol Paneli onayı iptal edilirse false).
+  function showView(name, forceReload = false, opts = {}) {
+    // Kontrol Paneli'nden ayrılırken kaydedilmemiş ad/rol taslakları sessizce
+    // kaybolmasın (GÖREV 32) — panelin sekme/kilit deseninin aynısı.
+    if (currentView === "control" && name !== "control" && !cpConfirmLeaveView()) return false;
     currentView = name;
     hideToast(); // GÖREV 31: önceki görünümün bildirimi yeni görünümde kalmaz
     // Açık kutular görünüm değişimini/yeniden çizimi atlatmamalı: profil yeniden
@@ -480,22 +613,43 @@
     // kenardan kenara, içerik 1240px'e kadar. Kısıt YALNIZ bu görünümde kalkar
     // (global main kuralı ve diğer görünümler etkilenmez).
     $("#main").classList.toggle("pa-full", name === "profile");
-    syncFaqHash(name);
+    navWrite(name, opts.nav || "push");
     const tab = tabOf(name);
     document.querySelectorAll(".view").forEach(v => { v.hidden = v.id !== "view-" + name; });
     document.querySelectorAll(".sb-item").forEach(tb => tb.classList.toggle("active", tb.dataset.view === tab));
     window.scrollTo({ top: 0 });
-    loaders[name](forceReload).catch(e => toast(e.message));
+    const y = opts.y || 0;
+    loaders[name](forceReload)
+      .then(() => { if (y && currentView === name) window.scrollTo({ top: y }); })
+      .catch(e => toast(e.message));
+    return true;
   }
   // Sekmeye basmak zinciri TERK ETMEKTİR: birikmiş geri kareleri düşer
   // (yeni zincir sıfırdan kurulur, bayat kare geri düğmesine karışmaz).
   // Mobil çekmece seçimden sonra kapanır (masaüstünde sbCloseNav no-op).
+  // Kontrol Paneli onayı iptal edilirse zincir de korunur (geçiş olmadı).
   document.querySelectorAll(".sb-item").forEach(tb =>
-    tb.addEventListener("click", () => { clearBack(); showView(tb.dataset.view); sbCloseNav(true); }));
+    tb.addEventListener("click", () => {
+      if (currentView === "control" && tb.dataset.view !== "control" && !cpConfirmLeaveView()) return;
+      clearBack();
+      showView(tb.dataset.view);
+      sbCloseNav(true);
+    }));
 
+  // Roster önbelleği KISA ömürlüdür (GÖREV 32): ilk maçında auto-create edilen
+  // oyuncu sayfa yenilenmeden Dengele'de görünsün, kart skorları/maç sayıları
+  // bayatlamasın. TTL içinde istek gitmez (aynı ekranda art arda çizimler
+  // bedava kalır); force (Dengele'deki "Yenile") TTL'i atlar. Roster'dan düşen
+  // id seçimden de çıkar — seçili kalanlar korunur.
+  const ROSTER_TTL_MS = 30000;
+  let rosterAt = 0;
   async function fetchRoster(force = false) {
-    if (state.roster.length && !force) return state.roster;
-    state.roster = await api("/players");
+    if (state.roster.length && !force && Date.now() - rosterAt < ROSTER_TTL_MS) return state.roster;
+    const list = await api("/players");
+    state.roster = list;
+    rosterAt = Date.now();
+    const ids = new Set(list.map(p => p.id));
+    for (const id of [...state.selected]) if (!ids.has(id)) state.selected.delete(id);
     return state.roster;
   }
 
@@ -548,6 +702,23 @@
       }).catch(() => { /* eski backend / ağ hatası: bölüm çizilmez */ });
     }
   }
+
+  // Dengele'deki "Yenile" (GÖREV 32): roster'ı TTL'i beklemeden tazeler.
+  // Seçim korunur (fetchRoster yalnız roster'dan düşen id'leri çıkarır).
+  $("#btn-roster-refresh").addEventListener("click", async () => {
+    const btn = $("#btn-roster-refresh");
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = t("balance.refreshing");
+    try {
+      await loadBalance(true);
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t("balance.refresh");
+    }
+  });
 
   function updatePickCounter() {
     const n = state.selected.size;
@@ -1642,7 +1813,8 @@
       state.ratingHistory = null;
       state.badges = null;
     } else {
-      state.matchDetail = f.match;
+      state.matchDetail = f.match || null;
+      state.matchDetailId = f.match ? f.match.id : (f.matchId ?? null);
       state.matchStat = f.stat;
       state.matchFrom = f.from;
     }
@@ -2012,7 +2184,12 @@
     return head + `<div class="k2-body">${ratingSec}${synSec}${badgeSec}${otherSec}</div>`;
   }
 
+  // Yarış koruması (GÖREV 32): hızlı A → B geçişinde geç gelen A yanıtı B'nin
+  // üstüne yazmasın. Her çağrı sayaç alır; await sonrası sayaç değiştiyse
+  // yanıt BAYATTIR ve atılır (hata da gösterilmez — artık başka profil açık).
+  let profileSeq = 0;
   async function loadProfile() {
+    const my = ++profileSeq;
     // Geri düğmesi metni burada yazılır (maç detayındaki desenin aynısı): profil
     // hem openProfile'dan hem geri zincirinden (restoreFrame) açılıyor, dil de
     // değişebiliyor — tek yer yazarsa etiket her yolda doğru kalır.
@@ -2025,6 +2202,7 @@
     box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
     try {
       await fetchRoster(); // rol şeridi + puan için; önbellekliyse istek gitmez
+      if (my !== profileSeq) return;
       // rating-history ve badges ayrı uçlardır (GÖREV 10, 11+12): düşerlerse
       // profilin kalanı çalışsın — /nemesis'teki desenin aynısı, o bölüm çizilmez.
       // loadAssets (GÖREV 14) reject etmez: varlık yoksa favori eşya kartı yer
@@ -2039,6 +2217,7 @@
         fetchBadgeCatalog(),
         loadAssets(),
       ]);
+      if (my !== profileSeq) return;   // bayat yanıt: başka profil istendi
       state.ratingHistory = h;
       state.badges = b;
       box.innerHTML = profileHtml(s);
@@ -2050,6 +2229,7 @@
         btn.addEventListener("click", () => openProfile(Number(btn.dataset.player))));
       bindRoleRankButtons(box); // rol simgesi → o roldeki sıralama penceresi
     } catch (e) {
+      if (my !== profileSeq) return;   // bayat isteğin hatası yeni profili ezmez
       box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
       throw e; // toast'ı showView gösterir
     }
@@ -2307,14 +2487,21 @@
 
   // Maça atlama: maç Geçmiş ekranından zaten yüklüyse önbellekten, değilse
   // GET /matches/{id} ile çekilir (contract §3, GÖREV 10 notu).
+  // GÖREV 32: art arda iki noktaya basılırsa YALNIZ son istek açılır; yanıt
+  // gelene kadar profilden çıkıldıysa (ya da başka profil açıldıysa) atılır.
+  let mdOpenSeq = 0;
   async function openMatchFromHistory(matchId) {
     closeHistPopup(false);
-    const cached = state.matches.find(m => m.id === matchId);
+    const my = ++mdOpenSeq;
+    const pid = state.profileId;
+    const cached = state.matches.find(m => m.id === matchId) || mdCache.get(matchId);
     if (cached) { openMatchDetail(cached, "profile"); return; }
     try {
-      openMatchDetail(await api(`/matches/${matchId}`), "profile");
+      const m = await api(`/matches/${matchId}`);
+      if (my !== mdOpenSeq || currentView !== "profile" || state.profileId !== pid) return;
+      openMatchDetail(m, "profile");
     } catch (e) {
-      toast(e.message);
+      if (my === mdOpenSeq) toast(e.message);
     }
   }
 
@@ -3112,6 +3299,8 @@
   $("#btn-map-from-board").addEventListener("click", openMap);
 
   async function loadMap() {
+    // Geçmişten geri kurulumda (GÖREV 32) openMap atlanır → etiket burada da yazılır.
+    $("#btn-map-back").textContent = backLabel(state.mapFrom);
     const box = $("#rift-bubbles");
     try {
       state.board = await api("/leaderboard");
@@ -3645,41 +3834,28 @@
   }
 
   // ── SSS: kalıcı adres (#faq, #faq/<slug>) ─────────────────────
-  const fqSetUrl = (u) => {
-    try { history.replaceState(null, "", u); } catch { /* file:// vb. kısıtlı ortam */ }
-  };
-  // showView her geçişte çağırır: SSS görünümleri adresi yazar, diğerleri
-  // yalnız FAQ hash'ini temizler (uygulamanın başka hash'i yok, ona dokunulmaz).
-  function syncFaqHash(name) {
-    const h = name === "faq" ? "#faq"
-      : name === "faqdetail" && state.faqSlug ? "#faq/" + state.faqSlug
-      : null;
-    if (h) {
-      if (location.hash !== h) fqSetUrl(h);
-    } else if (FAQ_HASH_RE.test(location.hash)) {
-      fqSetUrl(location.pathname + location.search);
-    }
-  }
+  // GÖREV 32: adres yazımı artık genel geçmiş katmanındadır (navWrite/navUrlFor):
+  // her görünüm geçişi kendi kaydını push'lar, SSS hash'i o kaydın URL'sidir.
   // Adresteki FAQ hash'ini görünüme çevirir; FAQ hash'i değilse false döner
-  // (başlangıçta varsayılan görünüme düşülür).
-  function faqRouteFromHash() {
+  // (başlangıçta varsayılan görünüme düşülür). Tarayıcı bu adres için kaydı
+  // ZATEN açmıştır (elle yazılan adres / ilk yükleme) → kayıt yerinde
+  // güncellenir ("replace"), ikinci bir kayıt eklenmez.
+  function faqRouteFromHash(nav = "replace") {
     const m = FAQ_HASH_RE.exec(location.hash);
     if (!m) return false;
-    if (m[1]) state.faqSlug = m[1];
-    clearBack();
-    showView(m[1] ? "faqdetail" : "faq");
-    return true;
-  }
-  // Yalnız DIŞ hash değişimi (adres çubuğuna yazma, tarayıcı geri'si): kendi
-  // yazdığımız replaceState bu olayı tetiklemez. Zaten açık görünümse dokunulmaz.
-  window.addEventListener("hashchange", () => {
-    const m = FAQ_HASH_RE.exec(location.hash);
-    if (!m) return;
     const already = m[1]
       ? currentView === "faqdetail" && state.faqSlug === m[1]
       : currentView === "faq";
-    if (!already) faqRouteFromHash();
-  });
+    if (already) return true;
+    if (m[1]) state.faqSlug = m[1];
+    clearBack();
+    showView(m[1] ? "faqdetail" : "faq", false, { nav });
+    return true;
+  }
+  // Yalnız DIŞ hash değişimi (adres çubuğuna yazma): kendi yazdığımız
+  // push/replaceState bu olayı tetiklemez; geçmişte gezinirken popstate zaten
+  // görünümü kurmuştur → "already" kontrolü ikinci çizimi önler.
+  window.addEventListener("hashchange", () => { faqRouteFromHash("replace"); });
 
   // ── 3) Maç geçmişi ────────────────────────────────────────────
   // Kart satırındaki şampiyon portresi (GÖREV 14 uzantısı): kartlar arasında
@@ -3710,86 +3886,143 @@
       ? `${stats.kills}/${stats.deaths}/${stats.assists}`
       : null;
 
+  // "Daha fazla yükle" (GÖREV 32): limit adım adım büyür; 200 contract'ın üst
+  // sınırıdır (api_contract §3) — ötesi sayfalama, ayrı karar. Sunucu istenen
+  // limitten AZ döndürdüyse çekilecek başka maç yoktur → düğme gizlenir.
+  const MC_STEPS = [20, 50, 100, 200];
+  let mcSeq = 0;   // yarış koruması: yalnız SON istenen liste çizilir
+  function mcSyncMore(n) {
+    const btn = $("#btn-matches-more");
+    const i = MC_STEPS.indexOf(state.matchesLimit);
+    btn.hidden = !(n >= state.matchesLimit && i >= 0 && i < MC_STEPS.length - 1);
+    btn.disabled = false;
+    btn.textContent = t("matches.load_more");
+  }
+
   async function loadMatches() {
+    const my = ++mcSeq;
+    $("#btn-matches-more").hidden = true;
     await fetchRoster();
     // Sözlükler bir kez yüklenir ve reject etmez; yoksa portreler yer tutucu
     // moduna düşer (maç listesi varlık yokluğunda BLOKE OLMAZ).
     await loadAssets();
-    const list = await api("/matches?limit=20");
+    const list = await api(`/matches?limit=${state.matchesLimit}`);
+    if (my !== mcSeq) return;
     state.matches = list;   // GÖREV 10: profil grafiğinden detaya atlarken önbellek
     const box = $("#match-list");
     box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
-
-    for (const m of list) {
-      const voided = m.status === "void";
-      const teamCol = (team) => {
-        const members = m.participants.filter(p => p.team === team)
-          .sort((a, b) => roleOrder(a.position) - roleOrder(b.position));
-        const won = m.winner_team === team;
-        return `<ul class="team ${team === 100 ? "blue" : "red"} ${won ? "won" : ""}">` +
-          members.map(p => {
-            const rc = p.rating_change; // nullable: void maç / rating satırı yok → delta gösterme
-            // GÖREV 18: delta = EFEKTİF score farkı (api_contract §3) — W/L çekirdek
-            // mu farkı değil. Eski cache'li yanıtta score alanları yoksa mu farkına
-            // düşülür (hata fırlatılmaz); renk sınıfları (up/down) aynı kalır.
-            const rcDelta = rc
-              ? (rc.score_after != null && rc.score_before != null
-                  ? rc.score_after - rc.score_before
-                  : rc.mu_after - rc.mu_before)
-              : null;
-            const deltaHtml = rc
-              ? `<span class="delta ${rcDelta >= 0 ? "up" : "down"}">${fmtDelta(rcDelta)}</span>`
-              : `<span class="delta none">—</span>`;
-            // GÖREV 19: ham K/D/A adla delta ARASINDA ayrı (soluk) bir sütundur —
-            // .p-who'nun içine girmez ki adın ellipsis'i KDA'yı kırpmasın; null'da
-            // span hiç basılmaz (yer tutucu yok, satır eski haliyle çizilir).
-            const kda = kdaText(p.stats);
-            const kdaHtml = kda ? `<span class="mc-kda">${kda}</span>` : "";
-            return `<li>${mcRoleHtml(p.position)}` +
-                   mcChampHtml(p.champion) +
-                   `<span class="p-who">${esc(p.display_name)}</span>${kdaHtml}${deltaHtml}</li>`;
-          }).join("") + "</ul>";
-      };
-      // GÖREV 23: status üç değerlidir (valid | void | roulette). Rulet maçı
-      // geçmişte RULET rozetiyle + kazanan etiketiyle görünür.
-      // fix-2: HERKESE AÇIK void düğmesi bu karttan KALDIRILDI (yanlışlıkla
-      // void'lanan maç olayı) — void/unvoid yalnız şifre korumalı Kontrol
-      // Paneli'ndedir.
-      // fix-3: ROL DÜZENLEYİCİ de karttan kaldırıldı. Uç (PUT /positions)
-      // contract gereği admin anahtarı İSTEMEZ (collector backfill'i onu
-      // arkadaşların PC'sinden çağırıyor), ama "yanlış tıklayan arkadaş"
-      // riski arayüzü panele taşıyarak kapatılır (api_contract "Admin
-      // anahtarı" → bilinçli olarak açık kalanlar).
-      const isRoulette = m.status === "roulette";
-      const winTag = `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
-      const headBadge = voided
-        ? `<span class="void-badge">${t("matches.void_badge")}</span>`
-        : isRoulette
-          ? `<span class="mh-badges"><span class="rlt-badge">${t("roulette.badge")}</span>${winTag}</span>`
-          : winTag;
-      const card = document.createElement("article");
-      card.className = "match-card" + (voided ? " voided" : "");
-      card.innerHTML =
-        `<header class="match-head">
-           <button class="md-open" type="button" title="${t("matches.open_detail")}">${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</button>
-           ${headBadge}
-         </header>
-         <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>`;
-
-      // Karta tıklama maç detayını açar (GÖREV 8). Düğme içindeki tıklamalar
-      // detayı AÇMAZ. Klavye erişimi başlıktaki .md-open düğmesindedir
-      // (kartın kendisi odaklanabilir bir öğe değildir).
-      card.addEventListener("click", (e) => {
-        if (e.target.closest("button, select, label")) return;
-        openMatchDetail(m);
-      });
-      card.querySelector(".md-open").addEventListener("click", () => openMatchDetail(m));
-
-      box.appendChild(card);
-    }
+    for (const m of list) box.appendChild(mcCard(m));
     // Portrelerin 404/geçici hata yolu (tek retry → yer tutucu) build satırlarıyla
     // aynı yardımcıdan gelir; tüm kartlar eklendikten sonra bir kez bağlanır.
     ddBindImages(box);
+    mcSyncMore(list.length);
+  }
+
+  // Mevcut kartlar yeniden ÇİZİLMEZ: yeni liste eskisinin devamıysa (en yeni
+  // başta, aynı sıra) yalnız eksik kartlar sona eklenir. Arada yeni maç
+  // geldiyse sıra kayar → liste baştan çizilir ama kaydırma konumu korunur.
+  async function loadMoreMatches() {
+    const btn = $("#btn-matches-more");
+    const next = MC_STEPS[MC_STEPS.indexOf(state.matchesLimit) + 1];
+    if (!next || btn.disabled) return;
+    const my = ++mcSeq;
+    btn.disabled = true;
+    btn.textContent = t("matches.loading_more");
+    let list;
+    try {
+      list = await api(`/matches?limit=${next}`);
+    } catch (e) {
+      if (my === mcSeq) { btn.disabled = false; btn.textContent = t("matches.load_more"); toast(e.message); }
+      return;
+    }
+    if (my !== mcSeq) return;
+    state.matchesLimit = next;
+    const prev = state.matches;
+    const box = $("#match-list");
+    const isTail = prev.length > 0 && prev.length <= list.length &&
+      prev.every((m, i) => list[i].id === m.id);
+    if (isTail) {
+      const frag = document.createElement("div");
+      for (const m of list.slice(prev.length)) frag.appendChild(mcCard(m));
+      ddBindImages(frag);
+      while (frag.firstChild) box.appendChild(frag.firstChild);
+    } else {
+      const y = window.scrollY;
+      box.innerHTML = list.length ? "" : `<p class='empty'>${t("matches.empty")}</p>`;
+      for (const m of list) box.appendChild(mcCard(m));
+      ddBindImages(box);
+      window.scrollTo({ top: y });
+    }
+    state.matches = list;
+    mcSyncMore(list.length);
+  }
+  $("#btn-matches-more").addEventListener("click", loadMoreMatches);
+
+  function mcCard(m) {
+    const voided = m.status === "void";
+    const teamCol = (team) => {
+      const members = m.participants.filter(p => p.team === team)
+        .sort((a, b) => roleOrder(a.position) - roleOrder(b.position));
+      const won = m.winner_team === team;
+      return `<ul class="team ${team === 100 ? "blue" : "red"} ${won ? "won" : ""}">` +
+        members.map(p => {
+          const rc = p.rating_change; // nullable: void maç / rating satırı yok → delta gösterme
+          // GÖREV 18: delta = EFEKTİF score farkı (api_contract §3) — W/L çekirdek
+          // mu farkı değil. Eski cache'li yanıtta score alanları yoksa mu farkına
+          // düşülür (hata fırlatılmaz); renk sınıfları (up/down) aynı kalır.
+          const rcDelta = rc
+            ? (rc.score_after != null && rc.score_before != null
+                ? rc.score_after - rc.score_before
+                : rc.mu_after - rc.mu_before)
+            : null;
+          const deltaHtml = rc
+            ? `<span class="delta ${rcDelta >= 0 ? "up" : "down"}">${fmtDelta(rcDelta)}</span>`
+            : `<span class="delta none">—</span>`;
+          // GÖREV 19: ham K/D/A adla delta ARASINDA ayrı (soluk) bir sütundur —
+          // .p-who'nun içine girmez ki adın ellipsis'i KDA'yı kırpmasın; null'da
+          // span hiç basılmaz (yer tutucu yok, satır eski haliyle çizilir).
+          const kda = kdaText(p.stats);
+          const kdaHtml = kda ? `<span class="mc-kda">${kda}</span>` : "";
+          return `<li>${mcRoleHtml(p.position)}` +
+                 mcChampHtml(p.champion) +
+                 `<span class="p-who">${esc(p.display_name)}</span>${kdaHtml}${deltaHtml}</li>`;
+        }).join("") + "</ul>";
+    };
+    // GÖREV 23: status üç değerlidir (valid | void | roulette). Rulet maçı
+    // geçmişte RULET rozetiyle + kazanan etiketiyle görünür.
+    // fix-2: HERKESE AÇIK void düğmesi bu karttan KALDIRILDI (yanlışlıkla
+    // void'lanan maç olayı) — void/unvoid yalnız şifre korumalı Kontrol
+    // Paneli'ndedir.
+    // fix-3: ROL DÜZENLEYİCİ de karttan kaldırıldı. Uç (PUT /positions)
+    // contract gereği admin anahtarı İSTEMEZ (collector backfill'i onu
+    // arkadaşların PC'sinden çağırıyor), ama "yanlış tıklayan arkadaş"
+    // riski arayüzü panele taşıyarak kapatılır (api_contract "Admin
+    // anahtarı" → bilinçli olarak açık kalanlar).
+    const isRoulette = m.status === "roulette";
+    const winTag = `<span class="win-tag ${m.winner_team === 100 ? "blue" : "red"}">${m.winner_team === 100 ? t("matches.win_blue") : t("matches.win_red")}</span>`;
+    const headBadge = voided
+      ? `<span class="void-badge">${t("matches.void_badge")}</span>`
+      : isRoulette
+        ? `<span class="mh-badges"><span class="rlt-badge">${t("roulette.badge")}</span>${winTag}</span>`
+        : winTag;
+    const card = document.createElement("article");
+    card.className = "match-card" + (voided ? " voided" : "");
+    card.innerHTML =
+      `<header class="match-head">
+         <button class="md-open" type="button" title="${t("matches.open_detail")}">${fmtDate(m.played_at)} · ${fmtDuration(m.duration_s)}</button>
+         ${headBadge}
+       </header>
+       <div class="match-teams">${teamCol(100)}${teamCol(200)}</div>`;
+
+    // Karta tıklama maç detayını açar (GÖREV 8). Düğme içindeki tıklamalar
+    // detayı AÇMAZ. Klavye erişimi başlıktaki .md-open düğmesindedir
+    // (kartın kendisi odaklanabilir bir öğe değildir).
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("button, select, label")) return;
+      openMatchDetail(m);
+    });
+    card.querySelector(".md-open").addEventListener("click", () => openMatchDetail(m));
+    return card;
   }
 
   // ── 3b) Maç detayı (GÖREV 8) ──────────────────────────────────
@@ -4181,6 +4414,8 @@
     if (from === "profile") pushBack(profileFrame());
     else clearBack();   // Geçmiş kartı: yeni zincirin başı
     state.matchDetail = m;
+    state.matchDetailId = m ? m.id : null;
+    if (m) mdCache.set(m.id, m);   // geçmiş kaydından geri kurulum için (GÖREV 32)
     state.matchFrom = from === "profile" ? "profile" : "matches";
     showView("matchdetail");
   }
@@ -4191,18 +4426,38 @@
   });
 
   // Geri düğmesi metni burada yazılır → dil değişiminde de kendiliğinden tazelenir.
+  // GÖREV 32: maç nesnesi bellekte yoksa (tarayıcı geçmişinden / yenilemeden
+  // dönüş, idari eylem önbelleği düşürdü) id'den GET /matches/{id} ile çekilir.
+  // Yarış koruması profildekinin aynısı: yalnız SON çağrı çizer.
+  let mdSeq = 0;
   async function loadMatchDetail() {
+    const my = ++mdSeq;
     $("#btn-matchdetail-back").textContent =
       t(state.matchFrom === "profile" ? "common.back_profile" : "common.back_matches");
     const box = $("#matchdetail-body");
-    const m = state.matchDetail;
+    let m = state.matchDetail;
     closeBuildTip();   // yeniden çizim açık tooltip'in düğümünü siler
+    if (!m && state.matchDetailId != null) {
+      const id = state.matchDetailId;
+      box.innerHTML = `<p class='empty'>${t("common.loading")}</p>`;
+      try {
+        m = await api(`/matches/${id}`);
+      } catch (e) {
+        if (my !== mdSeq) return;
+        box.innerHTML = `<p class='empty'>${esc(e.message)}</p>`;
+        throw e; // toast'ı showView gösterir
+      }
+      if (my !== mdSeq || state.matchDetailId !== id) return;
+      state.matchDetail = m;
+      mdCache.set(m.id, m);
+    }
     if (!m) {
       box.innerHTML = `<p class='empty'>${t("matchdetail.no_match")}</p>`;
       return;
     }
     // Varlık sözlükleri bir kez yüklenir; yoksa yer tutucu modunda çizilir (GÖREV 14).
     await loadAssets();
+    if (my !== mdSeq) return;
     box.innerHTML = matchDetailHtml(m);
     ddBindImages(box);
     bindBuildTips(box);
@@ -4393,6 +4648,10 @@
     // sekme, idari eylem sonrası tazeleme, dil değişimi) düzenleyiciyi baştan
     // basar ve seçimler sessizce sıfırlanırdı (fix: "roller kaydedilmiyor").
     roleDraft: {},
+    // Kaydedilmemiş ad düzeltmeleri: oyuncu id → kutudaki metin (GÖREV 32).
+    // Rol taslağıyla aynı gerekçe: dil değişimi / yeniden çizim / görünümden
+    // çıkış kutuları baştan basıyordu ve yazılan ad sessizce kayboluyordu.
+    nameDraft: {},
     matches: [],
     players: [],
     busy: false,       // panel düzeyinde meşgul kilidi
@@ -4641,9 +4900,12 @@
 
   function cpPlayerRow(p) {
     const name = esc(p.display_name);
+    // Görünen değer taslaktan gelir; data-original yine SUNUCUDAKİ addır.
+    const draft = Object.prototype.hasOwnProperty.call(cp.nameDraft, p.id)
+      ? esc(cp.nameDraft[p.id]) : name;
     return `<li class="cp-prow" data-player="${p.id}">
         <span class="cp-pid">#${p.id}</span>
-        <input class="cp-pname" type="text" maxlength="64" value="${name}"
+        <input class="cp-pname" type="text" maxlength="64" value="${draft}"
                data-player="${p.id}" data-original="${name}" data-fk="name-${p.id}"
                aria-label="${esc(t("control.name_aria", { name: p.display_name }))}">
         <button class="cp-btn cp-psave" type="button" data-player="${p.id}"
@@ -4749,9 +5011,16 @@
   // Yazılmakta olan ad düzeltmesi sessizce kaybolmasın. Eylem sonrası yeniden
   // çizim zaten YALNIZ aktif bölümü tazeler (başka sekmedeki kutular hiç
   // yeniden çizilmez); geriye kalan risk bölümü terk etmektir → onay sorulur.
+  // GÖREV 32: asıl ölçüt cp.nameDraft'tır (Oyuncular bölümü o an çizili
+  // olmasa da yanıtlanır; taslak sunucudaki ada karşı ölçülür). box verilirse
+  // çizili kutular da yoklanır (taslağa henüz yazılmamış girdi için emniyet).
   function cpHasUnsavedNames(box) {
-    return [...box.querySelectorAll(".cp-pname")]
-      .some(i => i.value.trim() !== (i.dataset.original || ""));
+    const inDraft = Object.keys(cp.nameDraft).some(pid => {
+      const p = cp.players.find(x => String(x.id) === String(pid));
+      return !p || String(cp.nameDraft[pid]).trim() !== p.display_name;
+    });
+    return inDraft || (!!box && [...box.querySelectorAll(".cp-pname")]
+      .some(i => i.value.trim() !== (i.dataset.original || "")));
   }
 
   // Rol taslağı: bir katılımcının SUNUCUDAKİ rolü ("" = rolsüz). Taslak DOM'a
@@ -4789,7 +5058,17 @@
       : roles ? "control.unsaved_roles_confirm" : "control.unsaved_confirm";
     if (!confirm(t(key))) return false;
     cp.roleDraft = {};
+    cp.nameDraft = {};
+    // Atılan adlar kutularda da geri alınır: aynı çıkışın ikinci kapısı
+    // (sol menü + showView) DOM'dan bir daha "kaydedilmemiş" okuyup İKİNCİ
+    // kez sormasın.
+    if (box) box.querySelectorAll(".cp-pname").forEach(i => { i.value = i.dataset.original || ""; });
     return true;
+  }
+  // Görünümden çıkış (sol menü, tarayıcı geri tuşu — GÖREV 32): panel
+  // kilitliyse taslak yoktur, sorulmaz.
+  function cpConfirmLeaveView() {
+    return !state.adminKey || cpConfirmLeave($("#control-body"));
   }
 
   // ── Eylemler ──────────────────────────────────────────────────
@@ -4799,6 +5078,7 @@
   // kullanıcı bayat delta'ları görüyordu (fix-3 inceleme bulgusu).
   function cpInvalidateCaches() {
     state.roster = [];
+    mdCache.clear();   // geçmişten dönülen maç detayı taze çekilsin (GÖREV 32)
     state.matches = [];
     state.ratingHistory = null;
     state.badges = null;
@@ -4915,6 +5195,7 @@
         { method: "PATCH", body: { display_name: name }, admin: true });
       input.dataset.original = res.display_name;
       input.value = res.display_name;
+      delete cp.nameDraft[pid];         // taslak sunucuya geçti
       const p = cp.players.find(x => String(x.id) === String(pid));
       if (p) p.display_name = res.display_name;
       cp.matches.forEach(m => (m.participants || []).forEach(pt => {
@@ -4985,6 +5266,12 @@
     if (!el.classList) return;
     if (el.classList.contains("cp-search")) { cp.q = el.value; cpRenderList(box); }
     else if (el.classList.contains("cp-psearch")) { cp.pq = el.value; cpRenderPlayers(box); }
+    else if (el.classList.contains("cp-pname")) {
+      // Ad taslağı ANINDA cp'ye yazılır; sunucudaki ada dönen metin düşer.
+      const pid = el.dataset.player;
+      if (el.value.trim() === (el.dataset.original || "")) delete cp.nameDraft[pid];
+      else cp.nameDraft[pid] = el.value;
+    }
   });
 
   $("#control-body").addEventListener("change", (e) => {
@@ -5051,12 +5338,38 @@
   window.I18n.subscribe(() => {
     $("#btn-profile-back").textContent = backLabel(state.profileFrom);
     $("#btn-map-back").textContent = backLabel(state.mapFrom);
+    if (currentView === "control") { cpRelocalize(); return; }
     showView(currentView);
   });
+
+  // Kontrol Paneli'nde dil değişimi (GÖREV 32): YALNIZ yeniden çizilir —
+  // 200 maç ağdan yeniden çekilmez, sayfa başa kaydırılmaz, taslaklar
+  // (cp.roleDraft / cp.nameDraft) çizimle geri gelir, odak ve iç liste
+  // kaydırması korunur. Veri hiç yüklenmediyse (yükleniyor/hata) normal yol.
+  function cpRelocalize() {
+    const box = $("#control-body");
+    if (!state.adminKey) { renderControlGate(box); return; }
+    if (!box.querySelector(".cp-shell")) { renderControlPanel(box).catch(cpFail); return; }
+    const fk = cpFocusKey(box);
+    const y = window.scrollY;
+    const sc = box.querySelector(".cp-scroll");
+    const scTop = sc ? sc.scrollTop : 0;
+    box.innerHTML = cpShellHtml();
+    cpRenderPane(box);
+    const sc2 = box.querySelector(".cp-scroll");
+    if (sc2) sc2.scrollTop = scTop;
+    window.scrollTo({ top: y });
+    cpRestoreFocus(box, fk);
+  }
 
   // ── Başlangıç ─────────────────────────────────────────────────
   if (!state.apiKey) openKeyModal();
   // Deep-link: adres #faq ya da #faq/<slug> ise doğrudan o SSS görünümü açılır
-  // (paylaşılan link ilk açılışta da çalışır); değilse varsayılan görünüm.
-  if (!faqRouteFromHash()) showView("balance");
+  // (paylaşılan link ilk açılışta da çalışır). Değilse ve sayfa YENİLENDİYSE
+  // geçmiş kaydı hâlâ bizimdir → aynı görünüm geri kurulur (GÖREV 32); yoksa
+  // varsayılan görünüm. Üçünde de ilk kayıt replaceState ile yazılır.
+  if (!faqRouteFromHash("replace")) {
+    if (navOurs(history.state)) navRestore(history.state, "replace");
+    else showView("balance", false, { nav: "replace" });
+  }
 })();
