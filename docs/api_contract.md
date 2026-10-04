@@ -194,12 +194,14 @@ GET /players/{id}/badges[?include_locked=false]
   "badges": [
     {"key": "mvp", "count": 7, "last_match_id": 42,
      "best_match_id": 37, "best_value": 1.62,
-     "tier": "gold", "rate": 0.32, "next_tier_rate": null,
-     "progress": null},
+     "tier": "gold", "rate": 0.32, "next_tier_count": 9,
+     "progress": null,
+     "stellar_quest": {"target": 3, "best": 2, "met": false}},
     {"key": "veteran_20", "count": 1, "last_match_id": 40,
      "best_match_id": null, "best_value": null,
-     "tier": null, "rate": null, "next_tier_rate": null,
-     "progress": {"current": 22, "target": 20}}
+     "tier": null, "rate": null, "next_tier_count": null,
+     "progress": {"current": 22, "target": 20},
+     "stellar_quest": null}
   ]
 }
 ```
@@ -226,8 +228,9 @@ determinizm: `POST /admin/replay` sonrası yanıt bit-bit aynı kalmalıdır —
   değeri olan sınıflarda (`record`, `role`, `personal`): rekor rozetlerinde o maçtaki
   metrik değeri, `role_duel`'de perf oranı, kişisel rekorlarda yeni rekor değeri.
   Eşitlikte replay sırasında İLK gelen maç. Diğer sınıflarda ikisi de `null`.
-- `tier` / `rate` / `next_tier_rate`: yalnız KADEMELİ rozetlerde (aşağıya bkz.), diğerlerinde
-  `null`.
+- `tier` / `rate` / `next_tier_count` / `stellar_quest`: yalnız KADEMELİ rozetlerde (aşağıya
+  bkz.), diğerlerinde `null`. (`next_tier_rate` alanı GÖREV 24 kademe revizyonunda
+  kaldırıldı — örnek 2026-10-04'te buna göre düzeltildi, CHANGE_REQUESTS.)
 - `progress`: `{"current": int, "target": int}` — yalnız ilerlemesi tanımlı sınıflarda,
   diğerlerinde `null`. Kilometre (`veteran_*`) → valid maç sayısı / eşik; `versatile` →
   oynanan farklı rol / 5; ilişkisel (`nemesis_6`, `duo_6`) → en yüksek rakip/arkadaş
