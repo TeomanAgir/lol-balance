@@ -5,7 +5,8 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
 ## Dizin
 - `backend/app/routers/` — ingest, matches (GET /{id} tekil, PUT positions, void), players
   (+`/{id}/stats`, `/{id}/rating-history`, `/{id}/badges`), balance (`/balance`, `/balance/nemesis`),
-  highlights, nemesis, admin (replay).
+  highlights, nemesis, admin (replay + ping; `X-Admin-Key`), roulette (GÖREV 23),
+  badges (`GET /badges` katalog, GÖREV 24), health (heartbeat + collectors).
 - `backend/app/services/` — iş kuralları:
   - `ingest.py` — `ingest_match`: doğrulama, oyuncu auto-create, idempotency
     (DB UNIQUE source_game_id), incremental rating; SIRA-DIŞI maçta
@@ -14,16 +15,20 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
     `effective_score` (blend dallanmasının TEK noktası), `is_out_of_order`, `STAT_FIELDS`,
     `replay_order_by` (replay sort-key'inin tek doğruluk noktası; rating_history de kullanır).
   - `rating_history.py` — GÖREV 10: tarihsel efektif score serisi (kümülatif P_avg).
-  - `badges.py` — GÖREV 11+12: 13 rozetlik salt-okur katalog (DB'ye yazılmaz).
+  - `badges.py` — GÖREV 24: 28 rozetlik salt-okur katalog (DB'ye yazılmaz; ID sırası
+    `badges/rozetler.md`'de dondurulmuş).
+  - `roulette.py` (GÖREV 23) · `rank_delta.py` (sıra değişimi okları) · `tx.py`
+    (`maybe_transaction`: durum yazımı + iki evren replay TEK transaction, fix-3).
   - `role_ratings.py` — rol evreni: `is_role_eligible` (10 pozisyon dolu + takım
     başına 5 farklı rol), `apply_match_incremental_roles`, `replay_roles`,
     `current_role_ratings`.
   - `player_stats.py` (profil) · `weekly.py` (`weekly_window` paylaşımlı) · `nemesis.py`.
 - `backend/migrations/` — 0001 temel, 0002 perf_score, 0003 role_rating_history,
-  0004 collector_health + matches.client_id, 0005 match_participants.items_json.
+  0004 collector_health + matches.client_id, 0005 match_participants.items_json,
+  0006 roulette (sessions/assignments + matches.status 'roulette').
   - `items.py` — GÖREV 14: items doğrulama/serileştirme kuralının tek tanımı.
   - `health.py` (services+routers) — GÖREV 13: heartbeat upsert + collectors listesi.
-- `backend/tests/` — 247 test. Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
+- `backend/tests/` — 473 test. Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
   "incremental yolu korunur" kanıtları, bit-bit replay eşitlikleri.
 
 ## Değişmezler (worker bunları BOZAMAZ)
