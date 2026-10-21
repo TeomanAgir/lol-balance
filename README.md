@@ -75,11 +75,6 @@ cd <repo root> && backend\.venv\Scripts\python -m pytest collector -q  # collect
   to `main`, a Docker image to GHCR (`backend/Dockerfile`, backend+webui in a single container).
 - Kubernetes (VPS): `deploy/VPS_AGENT_BRIEF.md`.
 
-## Privacy note
-
-The real LCU captures under `collector/fixtures/` contain players' puuids and
-Riot IDs. **The repository must remain private**; if it is ever to be made
-public, the fixtures must be anonymized first.
 
 ## License
 
