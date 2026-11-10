@@ -36,7 +36,7 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
     okuma önceliği, status, refresh (süreç içi kilit 409, ≤10 dk ham önbellek, guard,
     already_current, tek transaction yazma + saklama 5), history, activate. Ağ `fetch`
     parametresiyle enjekte edilir; testler gerçek ağa çıkmaz.
-- `backend/tests/` — 580 test (2026-11-10, GÖREV 35 sonrası). Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
+- `backend/tests/` — 591 test (2026-11-10, GÖREV 37 sonrası). Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
   "incremental yolu korunur" kanıtları, bit-bit replay eşitlikleri.
 
 ## Çoklu grup (GÖREV 35 — api_contract "Çoklu grup")

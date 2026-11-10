@@ -2,6 +2,18 @@
 
 Son güncelleme: 2026-11-10 (orkestratör, GÖREV 35)
 
+## 2026-11-10: GÖREV 37 — gruplar arası istemci tarafı yalıtım (branch `fix/g37-grup-gecisi`)
+- Teoman bildirimi: G2 anahtarıyla bir oyuncunun profilinde diğer grubun istatistikleri.
+  Teşhis: DB + API + taze sayfa yalıtımı SAĞLAM (canlıda doğrulandı); hata taze sayfada
+  yeniden üretilemedi. Açık: anahtar modalı sayfayı yenilemiyordu → önceki grubun `state`'i,
+  modül önbellekleri (`paGroupPromise` maç endeksi vb.) ve yoldaki yanıtlar yeni gruba taşınıyordu.
+- Düzeltme: webui'de anahtar DEĞİŞİNCE tam sayfa yenileme (`reloadForKeyChange`); backend'de
+  `/api/v1/*` yanıtlarına `Vary: X-API-Key` + varsayılan `Cache-Control: no-store`
+  (`main.ApiCacheHeadersMiddleware`; meta `no-cache` ve statik mount aynen).
+- Testler: backend 580 → 591, webui 126 → 131. İki gerçek anahtarla tarayıcı E2E YAPILMADI.
+- Aynı gün: ana gruba yanlış giden 2 maç Teoman onayıyla KALICI silindi (tek seferlik istisna,
+  CHANGE_REQUESTS); G2 panel şifresi ana grupla aynı yapıldı.
+
 ## 2026-11-10: GÖREV 36 — collector çoklu grup (branch `feat/g36-collector-gruplar`, sürüm 0.4.0)
 - Teoman isteği: collector'da birden fazla grup anahtarı kayıtlı olsun, maç doğru gruba gitsin;
   yeni (boş) grup için son özel maçlardaki herkes sisteme çekilebilsin. Kararlar: CHANGE_REQUESTS.
