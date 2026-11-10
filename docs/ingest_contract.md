@@ -76,3 +76,31 @@ Aynı endpoint `source: "manual"` ve `source_game_id: "manual:<uuid4>"` ile de k
 { "player_id": 3, "team": 100, "position": "BOTTOM" }
 ```
 Backend her participant'ta `puuid` VEYA `player_id`'den en az birini zorunlu tutar.
+
+## Çoklu grup — collector tarafı (GÖREV 36, Teoman 2026-11-10)
+
+Backend'de grup = API anahtarı (api_contract "Çoklu grup"). Collector birden fazla grubun
+anahtarını yerelde saklayabilir; payload şeması ve uçlar DEĞİŞMEZ, yalnız "hangi anahtarla
+gönderileceği" seçilir.
+
+- **Grup profilleri:** her profil = kullanıcının verdiği etiket (varsayılan "Grup 1", "Grup 2"…)
+  + API anahtarı. `BACKEND_URL` ortaktır. Mevcut tek anahtarlı `.env` DEĞİŞTİRİLMEDEN çalışmaya
+  devam eder (o anahtar ilk profildir). Profiller pencereden eklenir/yeniden adlandırılır/silinir
+  ve yerelde kalıcıdır; anahtar değeri log'a ve ekrana maskesiz YAZILMAZ. Pencerede bir
+  "seçili grup" seçicisi vardır (seçim kalıcıdır).
+- **Otomatik yönlendirme** (canlı EOG, MH fallback, oto-yetişme, normal tarama): bir maç, roster
+  filtresini (`MIN_KNOWN`) geçtiği gruba gönderilir; filtre HER grubun kendi roster'ına
+  (`GET /players`, o grubun anahtarıyla) karşı ayrı değerlendirilir. Tam bir grup geçerse oraya;
+  birden fazlası geçerse seçili grup geçenler arasındaysa ona, değilse en çok tanınan oyuncusu
+  olana (eşitlikte profil sırası); hiçbiri geçmezse maç bugünkü gibi atlanır. Bir maç aynı
+  değerlendirmede en fazla BİR gruba gider. `seed_roster.json` yalnız İLK profil için sayılır.
+- **Outbox:** bekleyen her kayıt hedef grubunu taşır ve yalnız o gruba yeniden denenir. Hedefi
+  olmayan eski kayıtlar ilk profile aittir. Hedef profili silinmiş kayıt gönderilmez, silinmez,
+  uyarı verilir.
+- **Heartbeat** her profile ayrı gönderilir (her grubun sağlık paneli cihazı görsün).
+  `backfill-positions` / `backfill-items` seçili gruba karşı çalışır.
+- **İlk kurulum taraması** (yeni/boş grup için; roster filtresi KAPALI): son özel SR maçlarını
+  (remake hariç) geriye doğru tarar ve HİÇBİR ŞEY GÖNDERMEDEN tarih + süre + oyuncu adlarıyla
+  listeler; kullanıcı gönderilecek maçları işaretler ve onaylar; işaretlenenler KRONOLOJİK sırayla
+  SEÇİLİ gruba gönderilir (oyuncular backend'de auto-create olur). Otomatik akışların hiçbiri
+  roster filtresini kapatmaz — filtresiz gönderim yalnız bu açık, onaylı akıştadır.
