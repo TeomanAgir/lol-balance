@@ -11,7 +11,7 @@ from typing import Iterator, Optional
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from .config import Settings, get_settings
+from .config import Group, Settings, get_settings
 from .db import connect
 
 # ── Admin hız sınırı (api_contract "Hız sınırı", fix-3) ──────────────────
@@ -84,7 +84,38 @@ def _clear_admin_failures(ip: str) -> None:
         _admin_failures.pop(ip, None)
 
 
-def get_db(settings: Settings = Depends(get_settings)) -> Iterator[sqlite3.Connection]:
+def require_api_key(
+    x_api_key: Optional[str] = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> Group:
+    """X-API-Key → isteğin grubu (api_contract "Çoklu grup", GÖREV 35).
+
+    Grup YALNIZ bu anahtardan çözülür; eşleşme yoksa 401 (tek gruplu kurulumla
+    aynı yanıt). FastAPI dependency önbelleği sayesinde aynı istekte get_db /
+    require_admin_key bu sonucu yeniden kullanır (tek çözüm noktası).
+    """
+    group = settings.resolve_group(x_api_key)
+    if group is None:
+        raise HTTPException(status_code=401, detail="API anahtarı eksik veya hatalı.")
+    return group
+
+
+def get_db(group: Group = Depends(require_api_key)) -> Iterator[sqlite3.Connection]:
+    """İsteğin GRUBUNUN SQLite dosyası — izolasyon dosya seviyesindedir."""
+    conn = connect(group.db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def get_meta_db(
+    _group: Group = Depends(require_api_key),
+    settings: Settings = Depends(get_settings),
+) -> Iterator[sqlite3.Connection]:
+    """Meta verisi ORTAKTIR (api_contract "Çoklu grup" TEK istisna):
+    `meta_snapshots` hangi gruptan çağrılırsa çağrılsın ANA grubun dosyasından
+    okunur/yazılır. Kimlik doğrulaması yine çağıranın grubuyla yapılır."""
     conn = connect(settings.db_path)
     try:
         yield conn
@@ -92,18 +123,10 @@ def get_db(settings: Settings = Depends(get_settings)) -> Iterator[sqlite3.Conne
         conn.close()
 
 
-def require_api_key(
-    x_api_key: Optional[str] = Header(default=None),
-    settings: Settings = Depends(get_settings),
-) -> None:
-    if x_api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="API anahtarı eksik veya hatalı.")
-
-
 def require_admin_key(
     request: Request,
     x_admin_key: Optional[str] = Header(default=None),
-    settings: Settings = Depends(get_settings),
+    group: Group = Depends(require_api_key),
 ) -> None:
     """İdari uçların EK katmanı (api_contract "Admin anahtarı", fix-2/fix-3).
 
@@ -116,17 +139,21 @@ def require_admin_key(
     Sıra: yapılandırma hataları (503) → hız sınırı (429) → doğrulama (403).
     Yapılandırma hatası sayaca YAZILMAZ; sorun istemcinin denemesinde değil.
     """
-    if not settings.admin_key:
+    # GÖREV 35: admin anahtarı YALNIZ isteğin grubununkiyle karşılaştırılır —
+    # bir grubun admin anahtarı başka grubun API anahtarıyla ASLA geçmez.
+    admin_key = group.admin_key
+    admin_env = group.admin_env
+    if not admin_key:
         # 503 — 403 DEĞİL, çünkü sorun istemcinin gönderdiği değerde değil
         # sunucu yapılandırmasındadır.
         raise HTTPException(
             status_code=503,
             detail=(
-                "Yönetim anahtarı sunucuda yapılandırılmamış (ADMIN_KEY); "
+                f"Yönetim anahtarı sunucuda yapılandırılmamış ({admin_env}); "
                 "idari uçlar kapalı."
             ),
         )
-    if not settings.admin_key.isascii():
+    if not admin_key.isascii():
         # api_contract "ADMIN_KEY yalnız ASCII olabilir" (fix-3): HTTP
         # header'ları latin-1 ile taşınır ve tarayıcı fetch'i kod birimi > 255
         # olan karakterde TypeError atar — ASCII olmayan anahtar DOĞRU girilse
@@ -136,9 +163,9 @@ def require_admin_key(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Yönetim anahtarı (ADMIN_KEY) ASCII olmayan karakter içeriyor "
+                f"Yönetim anahtarı ({admin_env}) ASCII olmayan karakter içeriyor "
                 "(ör. ş, ğ, ı). HTTP header'ları latin-1 ile taşındığı için "
-                "böyle bir anahtar doğru girilse bile doğrulanamaz. ADMIN_KEY "
+                f"böyle bir anahtar doğru girilse bile doğrulanamaz. {admin_env} "
                 "yalnız ASCII karakterlerden oluşmalıdır; idari uçlar bu "
                 "düzeltilene kadar kapalı."
             ),
@@ -165,7 +192,7 @@ def require_admin_key(
     # latin-1 çözüldüğü için ASCII dışı karakter taşıyabilir (o durumda str
     # karşılaştırması TypeError atardı).
     if x_admin_key is None or not secrets.compare_digest(
-        x_admin_key.encode("utf-8"), settings.admin_key.encode("utf-8")
+        x_admin_key.encode("utf-8"), admin_key.encode("utf-8")
     ):
         _record_admin_failure(ip)
         # Sabit gecikme: sync dependency threadpool'da koştuğu için event

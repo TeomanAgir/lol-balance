@@ -5,6 +5,9 @@
 - `/admin/meta/*`: `X-Admin-Key` de ister (admin.py deseni, fix-2/fix-3).
 
 Rating/replay/ingest ile HİÇBİR ilişkisi yoktur; yalnız `meta_snapshots`.
+
+Çoklu grup (GÖREV 35): meta ORTAKTIR — bütün uçlar `get_meta_db` ile ANA grubun
+dosyasını açar; admin doğrulaması yine çağıranın kendi grubunun anahtarıyladır.
 """
 from __future__ import annotations
 
@@ -13,7 +16,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from ..config import Settings, get_settings
-from ..deps import get_db, require_admin_key
+from ..deps import get_meta_db, require_admin_key
 from ..schemas import (
     MetaActivateOut,
     MetaCountersOut,
@@ -47,7 +50,7 @@ def _document(kind: str, conn: sqlite3.Connection, settings: Settings,
 @router.get("/meta/tiers")
 def get_meta_tiers(
     response: Response,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
     settings: Settings = Depends(get_settings),
 ) -> MetaTiersOut:
     return MetaTiersOut(**_document("tiers", conn, settings, response))
@@ -56,7 +59,7 @@ def get_meta_tiers(
 @router.get("/meta/counters")
 def get_meta_counters(
     response: Response,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
     settings: Settings = Depends(get_settings),
 ) -> MetaCountersOut:
     return MetaCountersOut(**_document("counters", conn, settings, response))
@@ -64,7 +67,7 @@ def get_meta_counters(
 
 @router.get("/admin/meta/status", dependencies=[Depends(require_admin_key)])
 def admin_meta_status(
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
     settings: Settings = Depends(get_settings),
 ) -> MetaStatusOut:
     return MetaStatusOut(**meta_store.status(conn, settings))
@@ -73,7 +76,7 @@ def admin_meta_status(
 @router.post("/admin/meta/refresh", dependencies=[Depends(require_admin_key)])
 def admin_meta_refresh(
     body: MetaRefreshIn | None = None,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
     settings: Settings = Depends(get_settings),
 ) -> MetaRefreshOut:
     body = body or MetaRefreshIn()
@@ -86,7 +89,7 @@ def admin_meta_refresh(
 
 @router.get("/admin/meta/history", dependencies=[Depends(require_admin_key)])
 def admin_meta_history(
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
 ) -> MetaHistoryOut:
     return MetaHistoryOut(**meta_store.history(conn))
 
@@ -95,6 +98,6 @@ def admin_meta_history(
              dependencies=[Depends(require_admin_key)])
 def admin_meta_activate(
     snapshot_id: int,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: sqlite3.Connection = Depends(get_meta_db),
 ) -> MetaActivateOut:
     return MetaActivateOut(**meta_store.activate(conn, snapshot_id))

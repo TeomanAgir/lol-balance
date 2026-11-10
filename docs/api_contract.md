@@ -1,6 +1,40 @@
 # Backend API Contract — v1
 
-Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (tek shared secret; arkadaş grubu ölçeği için yeterli, kullanıcı bazlı auth bilinçli olarak kapsam dışı).
+Base: `{BACKEND_URL}/api/v1` · Auth: tüm endpoint'lerde `X-API-Key` header (GRUP başına tek shared secret; arkadaş grubu ölçeği için yeterli, kullanıcı bazlı auth bilinçli olarak kapsam dışı).
+
+**Çoklu grup (GÖREV 35, Teoman 2026-11-10):** Tek backend süreci birden fazla arkadaş
+grubuna ("grup") hizmet eder. Her grubun KENDİ API anahtarı, KENDİ admin anahtarı ve KENDİ
+SQLite dosyası vardır; isteğin grubunu yalnız `X-API-Key` belirler (URL, header veya gövdede
+ayrı bir grup alanı YOKTUR; yanıt şekilleri DEĞİŞMEZ; yeni endpoint YOKTUR).
+- **Ana grup:** `API_KEY` / `ADMIN_KEY` / `DB_PATH` env'leri (bu karardan önceki tek ortam;
+  davranışı ve verisi birebir aynı kalır, veri taşınmaz).
+- **Ek grup:** `GROUP_<AD>_API_KEY` (grubu tanımlar) + `GROUP_<AD>_ADMIN_KEY` (isteğe bağlı).
+  `<AD>` = `[A-Z0-9]{1,32}`; grubun DB dosyası `DB_PATH` ile AYNI dizinde
+  `group_<ad küçük harf>.db`'dir (yol env'den alınmaz — türetilir). Değerler k8s secret'ında
+  yaşar, REPOYA YAZILMAZ. Yeni grup = secret'a anahtar ekle + yeniden başlat.
+- **Yapılandırma hataları:** değeri boş `GROUP_<AD>_API_KEY` grubu TANIMLAMAZ (yok sayılır,
+  uyarı log'u). `<AD>` biçime uymuyorsa (alt çizgi, küçük harf, 33+ karakter) değişken grup
+  tanımı DEĞİLDİR (yok sayılır, uyarı log'u; o anahtar 401 alır). API anahtarı olmadan
+  tanımlanan `GROUP_<AD>_ADMIN_KEY` de yok sayılır (uyarı log'u). İki grubun API anahtarı
+  AYNIYSA (ana grup dahil) uygulama BAŞLAMAZ (hangi gruba ait olduğu belirsiz istek kabul
+  edilemez); iki grup AYNI DB dosyasına düşüyorsa (ör. `DB_PATH`'in kendisi `group_x.db`)
+  yine BAŞLAMAZ. Log'lara anahtar DEĞERİ yazılmaz.
+- **Doğrulama:** `X-API-Key` hiçbir grupla eşleşmezse 401 (bugünkü yanıtın aynısı).
+  `X-Admin-Key` YALNIZ isteğin grubunun admin anahtarıyla karşılaştırılır; o grubun admin
+  anahtarı yoksa/ASCII değilse 503 (aşağıdaki kurallar grup başına uygulanır). Bir grubun
+  admin anahtarı başka grubun API anahtarıyla birlikte ASLA geçerli değildir. Hız sınırı
+  sayacı değişmez (IP başına, gruplar arası ortak).
+- **İzolasyon:** bütün uçlar yalnız isteğin grubunun DB dosyasını açar — oyuncular, maçlar,
+  ingest idempotency'si (`source_game_id` UNIQUE grup başınadır), iki rating evreni, replay,
+  rulet, collector sağlığı ve bunlardan türeyen her şey grup başınadır. `POST /admin/replay`
+  yalnız çağıranın grubunu yeniden üretir. Süreç içi durum (önbellek/kilit) gruplar arasında
+  veri sızdıramaz.
+- **TEK istisna — meta verisi ORTAKTIR:** `meta_snapshots` yalnız ANA grubun DB'sinde
+  yaşar; `GET /meta/*` ve `/admin/meta/*` uçları hangi gruptan çağrılırsa çağrılsın o tabloyu
+  okur/yazar. `/admin/meta/*` çağıranın KENDİ grubunun admin anahtarıyla doğrulanır; yani her
+  grubun admini meta'yı güncelleyebilir/geri alabilir ve etkisi tüm gruplara yansır (Teoman
+  kararı; veri herkese aynı kamuya açık kaynaktan gelir).
+- Migration'lar açılışta her grubun DB dosyasına uygulanır (dosya yoksa oluşturulur).
 
 **Admin anahtarı (fix-2, Teoman 2026-08-19; kapsam fix-3'te genişletildi):** İdari uçlar
 `X-API-Key`'e EK olarak `X-Admin-Key` header'ı ister. Değer backend'e `ADMIN_KEY` env

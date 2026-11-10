@@ -1,6 +1,22 @@
 # 90 — Güncel durum (yaşayan dosya — orkestratör her görev sonunda tazeler)
 
-Son güncelleme: 2026-10-05 (orkestratör, GÖREV 34)
+Son güncelleme: 2026-11-10 (orkestratör, GÖREV 35)
+
+## 2026-11-10: GÖREV 35 — çoklu grup: tek backend, grup başına SQLite (branch `feat/g35-coklu-grup`)
+- Teoman isteği: farklı bir arkadaş grubu için ikinci API anahtarıyla ikinci ortam; ikinci pod
+  YOK. Karar günlüğü (elenen seçenekler dahil): CHANGE_REQUESTS 2026-11-10.
+- `X-API-Key` → grup → o grubun dosyası (`deps.get_db` tek nokta; sorgular/şema/uçlar değişmedi).
+  Ana grup = eski tek ortam (veri taşınmadı). Ek grup = secret'a `GROUP_<AD>_API_KEY` +
+  `GROUP_<AD>_ADMIN_KEY` + restart; dosya `/data/group_<ad>.db`. Web UI/collector kodu değişmedi.
+- Meta ORTAK (Teoman): `meta_snapshots` yalnız ana DB'de; her grubun admini günceller.
+- Doğrulama: backend 562 → 580 (mevcut testler değişmedi), webui 126; gerçek süreçte iki gruplu
+  duman testi (8123): 401/200, çapraz admin anahtarı 403, oyuncu izolasyonu, ortak meta, replay.
+- CANLIYA ALIRKEN: (1) PR merge → deploy; (2) VPS'te secret'a ek grup anahtarları + rollout
+  restart; (3) `kubectl apply -f deploy/k8s.yaml` (yedek CronJob artık `/data/*.db`; CI deploy
+  yalnız restart yapar); (4) yeni grup boş başlar — collector `MIN_KNOWN` yüzünden ilk maçlar
+  için oyuncular Kontrol Paneli'nden eklenir ya da `seed_roster.json` doldurulur.
+- Bilinen sonuç: admin hız sınırı IP başına ve gruplar arası ortak. Engine değişikliğinde
+  `POST /admin/replay` her grup için AYRI koşulur.
 
 ## 2026-10-05: GÖREV 34 — META/counter verisi backend sahipli, Kontrol Paneli'nden tek tık (branch `feat/g34-meta-admin`)
 - Teoman isteği: şampiyon meta + eşleşme (counter) verisi 7 haftadır 16.16'da kalmıştı; admin

@@ -60,7 +60,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        run_migrations(settings.db_path)
+        # GÖREV 35: her grubun dosyasına (yoksa oluşturularak) migration koşar.
+        for group in settings.groups:
+            run_migrations(group.db_path)
         yield
 
     app = FastAPI(title="lol-balance backend", lifespan=lifespan)
