@@ -46,6 +46,51 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
+class ApiCacheHeadersMiddleware:
+    """`/api/v1/*` yanıtlarına önbellek yalıtım başlıkları (GÖREV 37).
+
+    Aynı URL farklı `X-API-Key` ile farklı grubun verisini döndürür:
+    (a) `Vary: X-API-Key` HER API yanıtına eklenir (var olan Vary birleştirilir);
+    (b) uç kendi Cache-Control'ünü koymadıysa `no-store` eklenir (meta uçlarının
+    `no-cache`'ine dokunulmaz). Hata yanıtları dahil — ASGI seviyesinde, yanıt
+    başlangıcında uygulandığı için handler/exception ayrımı yoktur. Statik
+    webui mount'u (/api/v1 dışı) etkilenmez.
+    """
+
+    PREFIX = "/api/v1"
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        path = scope.get("path", "") if scope["type"] == "http" else ""
+        if not (path == self.PREFIX or path.startswith(self.PREFIX + "/")):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                names = [k.lower() for k, _ in headers]
+                vary_idx = names.index(b"vary") if b"vary" in names else None
+                if vary_idx is None:
+                    headers.append((b"vary", b"X-API-Key"))
+                else:
+                    existing = headers[vary_idx][1].decode("latin-1")
+                    tokens = [t.strip().lower() for t in existing.split(",")]
+                    if "*" not in tokens and "x-api-key" not in tokens:
+                        headers[vary_idx] = (
+                            headers[vary_idx][0],
+                            (existing + ", X-API-Key").encode("latin-1"),
+                        )
+                if b"cache-control" not in names:
+                    headers.append((b"cache-control", b"no-store"))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 def _validation_detail(exc: RequestValidationError) -> str:
     """Pydantic hatalarını contract'ın tek-string Türkçe detail formatına çevirir."""
     parts = []
@@ -80,6 +125,9 @@ def create_app() -> FastAPI:
         ProxyHeadersMiddleware,
         trusted_hosts=list(settings.forwarded_allow_ips),
     )
+
+    # GÖREV 37: önbellek yalıtım başlıkları (api_contract "İstemci tarafı yalıtım").
+    app.add_middleware(ApiCacheHeadersMiddleware)
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):
