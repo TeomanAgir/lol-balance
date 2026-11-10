@@ -2,6 +2,20 @@
 
 Son güncelleme: 2026-11-10 (orkestratör, GÖREV 35)
 
+## 2026-11-10: GÖREV 36 — collector çoklu grup (branch `feat/g36-collector-gruplar`, sürüm 0.4.0)
+- Teoman isteği: collector'da birden fazla grup anahtarı kayıtlı olsun, maç doğru gruba gitsin;
+  yeni (boş) grup için son özel maçlardaki herkes sisteme çekilebilsin. Kararlar: CHANGE_REQUESTS.
+- Profiller `groups.json` (exe yanı) + pencerede grup çubuğu; canlı/yetişme/taramada OTOMATİK
+  yönlendirme (`MIN_KNOWN` grup başına; çakışmada seçili grup); "İlk Kurulum Taraması"
+  (filtresiz listele → işaretle → onayla → seçili gruba). Tek profilli kurulumlar değişmedi.
+- Doğrulama: collector 479 → 533 (mevcut testler değişmedi). GERÇEK PENCERE/EXE DOĞRULAMASI
+  YAPILMADI (LoL client + iki gerçek anahtar gerekir) — Teoman'da: grup çubuğu görünümü, ilk
+  kurulum listesi, iki anahtarla bir canlı maç.
+- DAĞITIM: merge → `git checkout main && git pull && git tag v0.4.0 && git push origin v0.4.0`.
+- CANLI (GÖREV 35 devamı): G2 grubu 2026-11-10'da açıldı (secret'ta `GROUP_G2_*`,
+  `/data/group_g2.db`). Yedek CronJob güncellemesi (`/data/*.db`) VPS'te elle uygulanacak —
+  uygulanana dek G2 YEDEKLENMİYOR.
+
 ## 2026-11-10: GÖREV 35 — çoklu grup: tek backend, grup başına SQLite (branch `feat/g35-coklu-grup`)
 - Teoman isteği: farklı bir arkadaş grubu için ikinci API anahtarıyla ikinci ortam; ikinci pod
   YOK. Karar günlüğü (elenen seçenekler dahil): CHANGE_REQUESTS 2026-11-10.

@@ -27,6 +27,16 @@ Yazma izni: yalnız `collector/` (`packaging/.build_venv`, `raw_archive/`, `.env
   sözlükleri, `msg()`; eksik anahtar testi CI'da.
 - `lcu.py` — endpoint sabitleri + `LcuClient` protokolü; testler `tests/fakes.py` sahteleriyle.
 
+## Çoklu grup (GÖREV 36 — ingest_contract "Çoklu grup — collector tarafı")
+- `groups.py` — profiller (`groups.json`, exe yanı; ilk profil = `.env` `API_KEY`, dosyaya
+  YAZILMAZ), `choose_group` (yönlendirme kuralının TEK tanımı), `GroupRouter` (profil başına
+  Sender + roster; Sender ile aynı flush/heartbeat/close arayüzü). Tek profilde düz `Sender`
+  kullanılır ve davranış eskisiyle aynıdır (canlı EOG filtresiz).
+- Ek grupların outbox'ı `outbox/groups/<id>/` (hedef = klasör); kök `outbox/*.json` ilk profilin.
+- `backfill.scan_first_setup` (sender parametresi YOK — listeleme gönderemez) +
+  `send_first_setup`; pencerede "İlk Kurulum Taraması" (işaretle → onayla → seçili gruba).
+- Anahtar değeri log/ekranda yalnız maskeli (`groups.mask_key`); testle kilitli.
+
 ## Fixture envanteri (`collector/fixtures/`)
 Hepsi ANONİM (PlayerNN#FAKE; anonimlik testle kilitli: `test_real_fixtures.py`).
 `eog_custom_real` (gerçek şema, patch A) · `eog_custom_detected` (selectedPosition boş +
@@ -53,5 +63,5 @@ Heartbeat hatası HER ZAMAN yutulur, outbox'a yazılmaz. Sürüm: `__init__.__ve
 (dağıtım öncesi yükselt).
 
 ## Test
-479 test: `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
+533 test (2026-11-10, GÖREV 36 sonrası): `backend\.venv\Scripts\python.exe -m pytest collector`. Gerçek `.env`/backend'e
 dokunmadan, fake/fixture tabanlı.
