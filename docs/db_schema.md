@@ -2,6 +2,12 @@
 
 DB: SQLite (WAL mode). Migration aracı: yalın SQL migration dosyaları (`backend/migrations/000X_*.sql`), uygulama başlangıcında sırayla uygulanır ve `schema_migrations` tablosuna işlenir.
 
+**Çoklu grup (GÖREV 35):** Her grup AYNI şemayı taşıyan AYRI bir SQLite dosyasıdır (ana grup
+`DB_PATH`, ek gruplar aynı dizinde `group_<ad>.db`; bkz. api_contract "Çoklu grup"). Şemada
+grup/tenant kolonu YOKTUR ve eklenmez — izolasyon dosya seviyesindedir; bu yüzden aşağıdaki
+tüm UNIQUE kısıtları ve değişmezler grup başına geçerlidir. `meta_snapshots` her dosyada
+tablo olarak bulunur ama yalnız ANA grubun dosyasındaki kullanılır (meta ortaktır).
+
 ## Tasarım ilkeleri (neden böyle)
 
 1. **Ham veri immutable, rating türetilmiş veridir.** LCU'dan gelen payload olduğu gibi `ingest_events`'e yazılır ve asla değiştirilmez. Rating tabloları her an silinip `ingest_events` + `matches` üzerinden **replay** edilerek yeniden üretilebilir. Bu, rating algoritması değiştiğinde geçmişi yeniden hesaplamayı mümkün kılar.
