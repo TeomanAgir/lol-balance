@@ -36,8 +36,18 @@ Yazma izni: yalnız `backend/` (ama `backend/rating/` rating worker'ınındır, 
     okuma önceliği, status, refresh (süreç içi kilit 409, ≤10 dk ham önbellek, guard,
     already_current, tek transaction yazma + saklama 5), history, activate. Ağ `fetch`
     parametresiyle enjekte edilir; testler gerçek ağa çıkmaz.
-- `backend/tests/` — 561 test (2026-10-05, GÖREV 34 sonrası). Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
+- `backend/tests/` — 580 test (2026-11-10, GÖREV 35 sonrası). Kalıp: geçici DB fixture'ları, spy/monkeypatch ile
   "incremental yolu korunur" kanıtları, bit-bit replay eşitlikleri.
+
+## Çoklu grup (GÖREV 35 — api_contract "Çoklu grup")
+- Tek süreç, `X-API-Key` → grup → o grubun SQLite dosyası. Çözüm TEK noktada:
+  `config.Settings.resolve_group` → `deps.require_api_key` (Group döner) → `deps.get_db`.
+  Ana grup `API_KEY/ADMIN_KEY/DB_PATH`; ek grup `GROUP_<AD>_API_KEY/_ADMIN_KEY`,
+  dosya `group_<ad>.db` (türetilir). Migration açılışta her dosyaya koşar (`main.py`).
+- Yeni uç/servis yazarken DB'ye YALNIZ `Depends(get_db)` ile bağlan; `settings.db_path`'i
+  doğrudan açmak izolasyonu deler. TEK istisna meta: `deps.get_meta_db` (ana grubun dosyası).
+- Modül seviyesi önbellek/kilit grup verisi TUTAMAZ (bugün tutan yok; meta kilidi/önbelleği
+  ortak veri olduğu için global). Testler: `tests/test_multi_group.py`.
 
 ## Değişmezler (worker bunları BOZAMAZ)
 1. `ingest_events` immutable; rating her an replay ile yeniden üretilebilir.
