@@ -13,8 +13,9 @@ Son güncelleme: 2026-11-10 (orkestratör, GÖREV 35)
   kurulum listesi, iki anahtarla bir canlı maç.
 - DAĞITIM: merge → `git checkout main && git pull && git tag v0.4.0 && git push origin v0.4.0`.
 - CANLI (GÖREV 35 devamı): G2 grubu 2026-11-10'da açıldı (secret'ta `GROUP_G2_*`,
-  `/data/group_g2.db`). Yedek CronJob güncellemesi (`/data/*.db`) VPS'te elle uygulanacak —
-  uygulanana dek G2 YEDEKLENMİYOR.
+  `/data/group_g2.db`). Yedek CronJob'ı VPS'te güncellendi (`/data/*.db`, Teoman uyguladı,
+  orkestratör tanımı doğruladı); G2'nin ilk yedeği bir sonraki 03:30 UTC koşusunda oluşur.
+- Collector 0.4.0 yayında (etiket `v0.4.0`, exe Release'te).
 
 ## 2026-11-10: GÖREV 35 — çoklu grup: tek backend, grup başına SQLite (branch `feat/g35-coklu-grup`)
 - Teoman isteği: farklı bir arkadaş grubu için ikinci API anahtarıyla ikinci ortam; ikinci pod
