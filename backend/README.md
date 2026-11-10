@@ -50,6 +50,19 @@ SQLite dosyası `/data/lol_balance.db` yolunda, `lol-balance-data` volume'unda k
 | `DB_PATH` | hayır | `backend/data/lol_balance.db` | SQLite dosya yolu |
 | `ENGINE_VERSION` | hayır | `openskill-pl-blend25-v1` | Aktif rating engine versiyonu |
 | `WEBUI_DIR` | hayır | `../webui` | Statik servis edilecek dizin |
+| `GROUP_<AD>_API_KEY` | hayır | — | Ek arkadaş grubu tanımlar (GÖREV 35, api_contract "Çoklu grup"). `<AD>` = `[A-Z0-9]{1,32}` (alt çizgi/küçük harf YOK; uymayan değişken grup sayılmaz, uyarı log'u). Grubun DB'si `DB_PATH` ile aynı dizinde `group_<ad küçük harf>.db` (yoksa açılışta oluşturulur, migration'lar uygulanır). Boş değer grubu tanımlamaz (uyarı log'u). İki grubun API anahtarı aynıysa (ana grup dahil) uygulama başlamaz |
+| `GROUP_<AD>_ADMIN_KEY` | hayır | — | O grubun `X-Admin-Key` değeri; kurallar `ADMIN_KEY` ile aynı (tanımsız → o grubun idari uçları `503`). Yalnız o grubun API anahtarıyla birlikte geçerlidir |
+
+### Çoklu grup (GÖREV 35)
+
+Tek süreç birden fazla gruba hizmet eder; isteğin grubunu yalnız `X-API-Key` belirler ve
+her uç yalnız o grubun SQLite dosyasını açar (oyuncular, maçlar, idempotency, rating
+evrenleri, replay, rulet, collector sağlığı grup başınadır). **Tek istisna meta verisidir:**
+`/meta/*` ve `/admin/meta/*` hangi gruptan çağrılırsa çağrılsın ANA grubun DB'sindeki
+`meta_snapshots`'ı kullanır (admin doğrulaması çağıranın kendi grubunun anahtarıyla).
+Admin hız sınırı sayacı IP başınadır ve gruplar arası ortaktır. Yeni grup = secret'a
+`GROUP_<AD>_API_KEY` (+ isteğe bağlı `GROUP_<AD>_ADMIN_KEY`) ekle + yeniden başlat.
+Anahtar değerleri yalnız k8s secret'ında / yerel `.env`'de yaşar, repoya yazılmaz.
 
 ## Tasarım notları
 
