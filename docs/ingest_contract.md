@@ -94,6 +94,14 @@ gönderileceği" seçilir.
   birden fazlası geçerse seçili grup geçenler arasındaysa ona, değilse en çok tanınan oyuncusu
   olana (eşitlikte profil sırası); hiçbiri geçmezse maç bugünkü gibi atlanır. Bir maç aynı
   değerlendirmede en fazla BİR gruba gider. `seed_roster.json` yalnız İLK profil için sayılır.
+  **Tek profilde hiçbir şey değişmez:** canlı EOG bugünkü gibi FİLTRESİZ gönderilir (roster
+  filtresi yalnız tarama/yetişmededir). Canlı EOG'de roster filtresi YALNIZ birden fazla profil
+  varken uygulanır; o durumda hiçbir grubun tanımadığı maç gönderilmez (ham kaydı arşivde kalır,
+  sonraki yetişme/tarama yeniden değerlendirir; yeni grup için yol "İlk kurulum taraması"dır).
+  Roster çekilemezse son başarılı roster kullanılır.
+- **Profil kısıtları:** ilk profil (`.env` anahtarı) yeniden adlandırılabilir ama silinemez
+  (anahtarı Ayarlar/`--setup` ile değişir); aynı API anahtarıyla ikinci profil reddedilir; iş
+  koşarken (canlı mod dahil) seçici ve yönetim düğmeleri kilitlidir.
 - **Outbox:** bekleyen her kayıt hedef grubunu taşır ve yalnız o gruba yeniden denenir. Hedefi
   olmayan eski kayıtlar ilk profile aittir. Hedef profili silinmiş kayıt gönderilmez, silinmez,
   uyarı verilir.
