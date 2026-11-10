@@ -377,11 +377,30 @@
   }
   $("#key-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    state.apiKey = $("#key-input").value.trim();
+    const newKey = $("#key-input").value.trim();
+    const changed = newKey !== state.apiKey;
+    state.apiKey = newKey;
     localStorage.setItem("apiKey", state.apiKey);
     $("#key-modal").hidden = true;
-    showView(currentView, true); // aktif görünümü yeni anahtarla yeniden yükle
+    if (changed) {
+      // GÖREV 37: anahtar başka bir gruba çıkabilir; oyuncu/maç id'leri gruplar
+      // arasında çakışır. Bellekteki her şey (state, modül önbellekleri, yoldaki
+      // yanıtlar) önceki gruba ait olabilir → ayıklamak yerine TAM yeniden yükleme.
+      reloadForKeyChange();
+      return;
+    }
+    showView(currentView, true); // aynı anahtar: aktif görünümü yenile
   });
+  function reloadForKeyChange() {
+    // Adres çubuğunda yalnız SSS (#faq/..) hash'i anlamlı ve gruptan bağımsız;
+    // başka her hash önceki gruba ait bir id taşıyabilir → temizle.
+    try {
+      if (location.hash && !FAQ_HASH_RE.test(location.hash)) {
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+    } catch { /* file:// vb. kısıtlı ortam */ }
+    location.reload();
+  }
   // Mobilde anahtar modalı çekmecenin üstüne binmesin: önce çekmece kapanır
   // (masaüstünde sbCloseNav no-op'tur, panel zaten sabittir).
   $("#btn-key").addEventListener("click", () => { sbCloseNav(); openKeyModal(); });

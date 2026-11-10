@@ -35,6 +35,12 @@ ayrı bir grup alanı YOKTUR; yanıt şekilleri DEĞİŞMEZ; yeni endpoint YOKTU
   grubun admini meta'yı güncelleyebilir/geri alabilir ve etkisi tüm gruplara yansır (Teoman
   kararı; veri herkese aynı kamuya açık kaynaktan gelir).
 - Migration'lar açılışta her grubun DB dosyasına uygulanır (dosya yoksa oluşturulur).
+- **İstemci tarafı yalıtım (GÖREV 37):** aynı URL farklı anahtarla farklı grubun verisini
+  döndürdüğü için (a) `/api/v1/*` yanıtları `Vary: X-API-Key` taşır ve uç kendi
+  `Cache-Control`'ünü koymadıysa `Cache-Control: no-store` alır (meta uçlarının `no-cache`'i
+  aynen kalır; statik webui mount'u etkilenmez); (b) Web UI'da API anahtarı DEĞİŞTİĞİNDE sayfa
+  TAM yeniden yüklenir — önceki grubun bellekteki durumu (oyuncu id'leri, açık profil, seçimler,
+  geri zinciri, yoldaki yanıtlar) yeni gruba taşınamaz. Anahtar aynı kalırsa yeniden yükleme yok.
 
 **Admin anahtarı (fix-2, Teoman 2026-08-19; kapsam fix-3'te genişletildi):** İdari uçlar
 `X-API-Key`'e EK olarak `X-Admin-Key` header'ı ister. Değer backend'e `ADMIN_KEY` env

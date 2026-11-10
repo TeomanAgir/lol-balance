@@ -78,7 +78,7 @@ def test_index_304_davranisi(webui_client):
 
 
 def test_api_yanitlari_etkilenmez(webui_client):
-    """API yanıtlarına Cache-Control eklenmez (yalnız statik mount kapsanır)."""
+    """API yanıtları statik `no-cache`'i almaz (GÖREV 37: API `no-store` + Vary taşır)."""
     r = webui_client.get("/api/v1/players")
     assert r.status_code == 200
-    assert "cache-control" not in r.headers
+    assert r.headers["cache-control"] == "no-store"
