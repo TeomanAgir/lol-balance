@@ -13,8 +13,12 @@ ayrı bir grup alanı YOKTUR; yanıt şekilleri DEĞİŞMEZ; yeni endpoint YOKTU
   `group_<ad küçük harf>.db`'dir (yol env'den alınmaz — türetilir). Değerler k8s secret'ında
   yaşar, REPOYA YAZILMAZ. Yeni grup = secret'a anahtar ekle + yeniden başlat.
 - **Yapılandırma hataları:** değeri boş `GROUP_<AD>_API_KEY` grubu TANIMLAMAZ (yok sayılır,
-  uyarı log'u). İki grubun API anahtarı AYNIYSA (ana grup dahil) uygulama BAŞLAMAZ (hangi
-  gruba ait olduğu belirsiz istek kabul edilemez).
+  uyarı log'u). `<AD>` biçime uymuyorsa (alt çizgi, küçük harf, 33+ karakter) değişken grup
+  tanımı DEĞİLDİR (yok sayılır, uyarı log'u; o anahtar 401 alır). API anahtarı olmadan
+  tanımlanan `GROUP_<AD>_ADMIN_KEY` de yok sayılır (uyarı log'u). İki grubun API anahtarı
+  AYNIYSA (ana grup dahil) uygulama BAŞLAMAZ (hangi gruba ait olduğu belirsiz istek kabul
+  edilemez); iki grup AYNI DB dosyasına düşüyorsa (ör. `DB_PATH`'in kendisi `group_x.db`)
+  yine BAŞLAMAZ. Log'lara anahtar DEĞERİ yazılmaz.
 - **Doğrulama:** `X-API-Key` hiçbir grupla eşleşmezse 401 (bugünkü yanıtın aynısı).
   `X-Admin-Key` YALNIZ isteğin grubunun admin anahtarıyla karşılaştırılır; o grubun admin
   anahtarı yoksa/ASCII değilse 503 (aşağıdaki kurallar grup başına uygulanır). Bir grubun
