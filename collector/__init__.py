@@ -5,4 +5,5 @@
 # doğrular ve uyuşmazsa derlemeyi kırar.
 # 0.2.0 — GÖREV 13 (kimlik+heartbeat) + GÖREV 14 (items) dağıtımı.
 # 0.3.0 — GÖREV 16: tkinter arayüzü, güncelleme bildirimi, --windowed exe.
-__version__ = "0.3.0"
+# 0.4.0 — GÖREV 36: çoklu grup profilleri, otomatik yönlendirme, ilk kurulum taraması.
+__version__ = "0.4.0"

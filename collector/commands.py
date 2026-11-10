@@ -4,6 +4,11 @@ Bu modül, daha önce `__main__.py` içinde gömülü olan iki akışı tek kayn
 
 - `run_backfill_command` — lockfile oku → LCU'ya bağlan → `backfill.run_backfill`.
 - `run_live_command`     — client'i bekle → bağlan → yetişme → canlı döngü → yeniden bağlan.
+- `run_first_setup_scan_command` / `run_first_setup_send_command` (GÖREV 36) — ilk
+  kurulum taraması: önce filtresiz LİSTELE (sıfır gönderim), sonra işaretlenenleri gönder.
+
+`sender` parametreleri düz `Sender` ya da çoklu grup `GroupRouter`'ı kabul eder
+(CLI ve arayüz router verir; tek profilde davranış aynıdır).
 
 Böylece tkinter arayüzü (`gui.py`) canlı döngüyü/backfill'i KOPYALAMAZ, aynı
 fonksiyonları çağırır. Fark yalnızca kesme (`stop`) ve durum bildirimi
@@ -17,15 +22,24 @@ import logging
 import threading
 import time
 from datetime import date
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
-from .backfill import BackfillStats, run_backfill
-from .catchup import run_catchup
+from .backfill import (
+    AnySender,
+    BackfillStats,
+    SetupCandidate,
+    SetupScanResult,
+    first_setup_days,
+    run_backfill,
+    scan_first_setup,
+    send_first_setup,
+)
+from .catchup import catchup_since, run_catchup
 from .config import Config
+from .groups import GroupRouter
 from .lcu import HttpLcuClient
 from .live import LcuConnectionLost, LiveRunner
 from .lockfile import LockfileNotFound, read_lockfile
-from .sender import Sender
 
 log = logging.getLogger("collector.commands")
 
@@ -57,7 +71,7 @@ def _sleeper(stop: Optional[threading.Event]) -> Callable[[float], None]:
 
 def run_backfill_command(
     config: Config,
-    sender: Sender,
+    sender: AnySender,
     *,
     since: Optional[date] = None,
 ) -> BackfillStats:
@@ -78,9 +92,42 @@ def run_backfill_command(
         lcu.close()
 
 
+def run_first_setup_scan_command(
+    config: Config,
+    *,
+    since: Optional[date] = None,
+    today: Optional[date] = None,
+) -> SetupScanResult:
+    """İlk kurulum taramasının LİSTELEME adımı (GÖREV 36): hiçbir şey göndermez.
+
+    Varsayılan pencere `backfill.first_setup_days` (yetişme penceresinden dar
+    olmayan, en az 30 gün). `LockfileNotFound` yukarı fırlatılır.
+    """
+    if since is None:
+        since = catchup_since(first_setup_days(config), today)
+    info = read_lockfile(config.lol_dir)
+    lcu = HttpLcuClient(info)
+    try:
+        return scan_first_setup(config, lcu, since=since)
+    finally:
+        lcu.close()
+
+
+def run_first_setup_send_command(
+    config: Config,
+    router: GroupRouter,
+    candidates: Sequence[SetupCandidate],
+    group_id: str,
+) -> BackfillStats:
+    """Onay adımı: İŞARETLENEN adaylar kronolojik sırayla `group_id` grubuna (LCU gerekmez)."""
+    stats = send_first_setup(config, router, candidates, group_id)
+    router.send_heartbeat("first-setup-done")
+    return stats
+
+
 def run_live_command(
     config: Config,
-    sender: Sender,
+    sender: AnySender,
     *,
     stop: Optional[threading.Event] = None,
     on_status: Optional[StatusCallback] = None,

@@ -111,6 +111,8 @@ class Config:
     raw_archive_dir: Path = field(default_factory=lambda: app_dir() / "raw_archive")
     outbox_dir: Path = field(default_factory=lambda: app_dir() / "outbox")
     seed_roster_path: Path = field(default_factory=lambda: app_dir() / "seed_roster.json")
+    #: GÖREV 36: ek grup profilleri + etiketler + seçili grup (bkz. groups.py).
+    groups_path: Path = field(default_factory=lambda: app_dir() / "groups.json")
 
 
 def load_config(env_file: Path | None = None) -> Config:

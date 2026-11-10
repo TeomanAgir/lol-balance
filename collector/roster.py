@@ -55,26 +55,36 @@ def load_seed_roster(path: Path) -> set[str]:
     return {_norm(item) for item in data if isinstance(item, str) and item.strip()}
 
 
+def fetch_players(config: Config, transport: httpx.BaseTransport | None = None) -> list:
+    """`GET /players` (config'in anahtarıyla). Hata YUKARI fırlatılır (httpx.HTTPError/ValueError)."""
+    with httpx.Client(
+        base_url=config.backend_url,
+        headers={"X-API-Key": config.api_key},
+        timeout=15.0,
+        transport=transport,
+    ) as client:
+        response = client.get(PLAYERS_PATH)
+        response.raise_for_status()
+        return response.json() or []
+
+
 def fetch_backend_roster(
     config: Config, transport: httpx.BaseTransport | None = None
 ) -> KnownRoster:
     """Backend erişilemezse boş roster döner (backfill seed ile devam edebilir)."""
-    roster = KnownRoster()
     try:
-        with httpx.Client(
-            base_url=config.backend_url,
-            headers={"X-API-Key": config.api_key},
-            timeout=15.0,
-            transport=transport,
-        ) as client:
-            response = client.get(PLAYERS_PATH)
-            response.raise_for_status()
-            players = response.json()
+        players = fetch_players(config, transport)
     except (httpx.HTTPError, ValueError) as exc:
         log.warning("Could not fetch backend roster, continuing with seed_roster: %s", exc)
-        return roster
+        return KnownRoster()
+    return roster_from_players(players)
 
+
+def roster_from_players(players: Iterable[dict]) -> KnownRoster:
+    roster = KnownRoster()
     for player in players or []:
+        if not isinstance(player, dict):
+            continue
         if player.get("puuid"):  # contract'ta yok; backend eklerse kullanılır
             roster.puuids.add(str(player["puuid"]))
         if player.get("riot_id"):

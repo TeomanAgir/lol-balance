@@ -4,6 +4,9 @@
   (bellek + raw_archive dosya varlığı, restart'a dayanıklı).
 - Canlı modda roster filtresi YOK; yalnızca custom olmayan ve Sihirdar Vadisi
   dışında oynanan (custom ARAM/URF vb.) maçlar atlanır.
+- GÖREV 36: birden fazla grup profili varsa maç, roster filtresini geçtiği gruba
+  otomatik yönlendirilir (`groups.GroupRouter.route_live`); tek profilde yukarıdaki
+  filtresiz davranış aynen sürer.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from .normalizer import (
     normalize_eog,
     normalize_match_history_game,
 )
+from .groups import GroupRouter
 from .sender import Sender
 
 log = logging.getLogger("collector.live")
@@ -103,12 +107,28 @@ class LiveRunner:
             self._sleep(delay)
         return {}
 
-    def _process(self, game_id: str, raw: dict[str, Any], payload_dict: dict[str, Any] | None) -> None:
+    def _process(self, game_id: str, raw: dict[str, Any], payload_dict: dict[str, Any] | None) -> bool:
+        """Arşivle + (gövde varsa) gönder. Gönderildiyse True.
+
+        GÖREV 36: sender bir `GroupRouter` ise hedef grup otomatik yönlendirmeyle seçilir
+        (tek profilde filtre yok = bugünkü davranış). Birden fazla grupta hiçbir grubun
+        roster'ı maçı tanımıyorsa maç atlanır; ham kayıt arşivdedir ve bir sonraki
+        yetişme/tarama roster'lar güncellenmişse onu yine yakalar.
+        """
         archive_raw(self._config, game_id, raw)
         self._processed.add(game_id)
-        if payload_dict is not None:
+        if payload_dict is None:
+            return False
+        if isinstance(self._sender, GroupRouter):
+            target = self._sender.route_live(payload_dict)
+            if target is None:
+                log.info("Roster filter: %s matches no group, skipped", game_id)
+                return False
+            self._sender.send_or_outbox(payload_dict, target)
+        else:
             self._sender.send_or_outbox(payload_dict)
-            self._notify_match(game_id)
+        self._notify_match(game_id)
+        return True
 
     def _notify_match(self, game_id: str) -> None:
         """Arayüzün durum bandı için: son işlenen maç. Geri çağrı hatası yutulur."""
@@ -146,8 +166,7 @@ class LiveRunner:
                 log.error("Could not normalize: %s", exc)
                 self._process(game_id, eog, None)
                 return False
-            self._process(game_id, eog, payload.model_dump())
-            return True
+            return self._process(game_id, eog, payload.model_dump())
 
         # Fallback: EOG bloğu gelmedi → gameflow session'dan gameId, match history'den detay
         log.warning("Could not fetch EOG block, trying match history fallback")
@@ -184,8 +203,7 @@ class LiveRunner:
             log.error("Could not normalize (fallback): %s", exc)
             self._process(game_id, game, None)
             return False
-        self._process(game_id, game, payload.model_dump())
-        return True
+        return self._process(game_id, game, payload.model_dump())
 
     def poll_forever(self) -> None:
         """Ana döngü. LCU art arda yanıt vermezse LcuConnectionLost fırlatır.
