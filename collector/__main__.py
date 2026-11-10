@@ -40,6 +40,7 @@ from .commands import run_backfill_command, run_live_command
 from .config import REQUIRED_ENV_KEYS, app_dir, find_env_file, is_frozen, load_config
 from .i18n import msg
 from .lockfile import LockfileNotFound
+from .groups import GroupRouter, GroupSettings, load_groups, needs_router, profile_config
 from .sender import Sender
 from .wizard import report_backend_check, run_wizard, stdin_is_interactive
 
@@ -129,6 +130,22 @@ def _maybe_run_gui() -> int | None:
     return gui.run_gui()
 
 
+def _groups_line(groups: GroupSettings) -> str:
+    """`Grup 1 (seçili), Grup 2` — etiketler; anahtar ASLA yazılmaz."""
+    return ", ".join(
+        profile.label + (msg("cli.groups_selected") if profile.id == groups.selected_id else "")
+        for profile in groups.profiles
+    )
+
+
+def _make_sender(config, groups: GroupSettings):
+    """Tek profilde (eski kurulum) düz `Sender` — kod yolu bugünküyle birebir aynı;
+    birden fazla profilde (ya da silinmiş grubun bekleyen kaydı varken) `GroupRouter`."""
+    if needs_router(config, groups):
+        return GroupRouter(config, groups)
+    return Sender(config)
+
+
 def main(argv: list[str] | None = None) -> int:
     # Dil, config'de varsa daha --help/banner basılmadan sessizce yüklenir.
     i18n.resolve_language(allow_prompt=False)
@@ -163,17 +180,23 @@ def main(argv: list[str] | None = None) -> int:
         print(msg("cli.setup_done"))
         return 0
 
+    groups = load_groups(config)
+    if groups.is_multi:
+        print(msg("cli.groups", groups=_groups_line(groups)))
+
     if args.command == "backfill-positions":
-        # LCU'ya ihtiyaç yok: kaynak raw_archive, hedef backend.
-        stats = run_position_backfill(config, dry_run=args.dry_run)
+        # LCU'ya ihtiyaç yok: kaynak raw_archive, hedef backend (GÖREV 36: SEÇİLİ grup).
+        stats = run_position_backfill(
+            profile_config(config, groups.selected), dry_run=args.dry_run
+        )
         return 0 if not stats.errors else 1
 
     if args.command == "backfill-items":
         # Aynı desen (GÖREV 14): kaynak raw_archive, hedef backend, LCU yok.
-        stats = run_items_backfill(config, dry_run=args.dry_run)
+        stats = run_items_backfill(profile_config(config, groups.selected), dry_run=args.dry_run)
         return 0 if not stats.errors else 1
 
-    sender = Sender(config)
+    sender = _make_sender(config, groups)
 
     if _wants_backfill(args):
         try:

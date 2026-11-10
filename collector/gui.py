@@ -1,8 +1,12 @@
 """tkinter arayüzü (GÖREV 16 Faz C) — collector'ın çift tıklanan yüzü.
 
-Pencere: durum bandı (bağlantı/canlı durum + son işlenen maç) · GÖMÜLÜ log alanı ·
-düğmeler (Canlı Başlat/Durdur · Maçları Tara · Eşyaları Doldur · Rolleri Doldur ·
-Ayarlar) · yeni sürüm çıktıysa sarı bilgi bandı (GÖREV 16 Faz B).
+Pencere: durum bandı (bağlantı/canlı durum + son işlenen maç) · grup bandı (GÖREV 36:
+kalıcı "seçili grup" seçicisi + Grup Ekle / Yeniden Adlandır / Grubu Sil) · GÖMÜLÜ log
+alanı · düğmeler (Canlı Başlat/Durdur · Maçları Tara · İlk Kurulum Taraması · Eşyaları
+Doldur · Rolleri Doldur · Ayarlar) · yeni sürüm çıktıysa sarı bilgi bandı (GÖREV 16 Faz B).
+
+İlk kurulum taraması "dry-run → Uygula" desenini izler: önce filtresiz LİSTELEME (sıfır
+gönderim), sonra işaretli liste + onay, sonra işaretlenenlerin seçili gruba gönderimi.
 
 Mimari kurallar (bunlar bilinçli sınırlardır, "iyileştirme" ile bozulmaz):
 
@@ -24,19 +28,38 @@ Mimari kurallar (bunlar bilinçli sınırlardır, "iyileştirme" ile bozulmaz):
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import queue
 import threading
 import webbrowser
-from typing import Any, Callable, Optional
+from datetime import datetime
+from typing import Any, Callable, Optional, Sequence
 
 from . import __version__
-from .backfill import BackfillStats
+from .backfill import BackfillStats, SetupCandidate, SetupScanResult, first_setup_days
 from .backfill_items import ItemsBackfillStats, run_items_backfill
 from .backfill_positions import PositionBackfillStats, run_position_backfill
-from .commands import run_backfill_command, run_live_command
+from .commands import (
+    run_backfill_command,
+    run_first_setup_scan_command,
+    run_first_setup_send_command,
+    run_live_command,
+)
 from .config import REQUIRED_ENV_KEYS, Config, find_env_file, load_config
+from .groups import (
+    GroupError,
+    GroupRouter,
+    GroupSettings,
+    load_groups,
+    mask_key,
+    needs_router,
+    orphan_outbox_counts,
+    profile_config,
+    profile_outbox_dir,
+    save_groups,
+)
 from .i18n import msg
 from .lockfile import LockfileNotFound
 from .sender import Sender
@@ -62,7 +85,8 @@ JOB_BACKFILL = "backfill"
 JOB_ITEMS = "items"
 JOB_POSITIONS = "positions"
 JOB_SETTINGS = "settings"
-JOBS = (JOB_LIVE, JOB_BACKFILL, JOB_ITEMS, JOB_POSITIONS, JOB_SETTINGS)
+JOB_FIRST_SETUP = "first_setup"
+JOBS = (JOB_LIVE, JOB_BACKFILL, JOB_FIRST_SETUP, JOB_ITEMS, JOB_POSITIONS, JOB_SETTINGS)
 
 #: Sihirbazın evet/hayır sorusuna verilecek dilden bağımsız yanıtlar (wizard.py
 #: hem "y/yes" hem "e/evet" kabul eder; "y"/"n" iki dilde de doğru çalışır).
@@ -156,6 +180,11 @@ class UiState:
 
     def live_button_key(self) -> str:
         return "gui.btn.live_stop" if self.active == JOB_LIVE else "gui.btn.live_start"
+
+    def groups_enabled(self) -> bool:
+        """Grup seçici/yönetimi yalnız boştayken açıktır: koşan iş (canlı dahil) kendi
+        grup anlık görüntüsüyle çalışır, yarıda değişen profil listesi görmez."""
+        return self.active is None
 
 
 class WizardCancelled(Exception):
@@ -261,6 +290,47 @@ def status_text(status_key: str, last_match: Optional[str] = None) -> str:
     return msg("gui.status_line", state=state, match=match)
 
 
+def format_duration(seconds: int) -> str:
+    minutes, secs = divmod(max(0, int(seconds or 0)), 60)
+    return f"{minutes}:{secs:02d}"
+
+
+def format_played_at(played_at: str, *, local: bool = True) -> str:
+    """`2026-11-08T18:14:00Z` → `2026-11-08 21:14` (varsayılan: bilgisayarın saat dilimi)."""
+    try:
+        moment = datetime.fromisoformat(str(played_at).replace("Z", "+00:00"))
+    except ValueError:
+        return str(played_at)
+    if local:
+        moment = moment.astimezone()
+    return moment.strftime("%Y-%m-%d %H:%M")
+
+
+def format_setup_row(candidate: SetupCandidate, *, local: bool = True) -> str:
+    """İlk kurulum listesinin bir satırı: tarih · süre · oyuncu adları (takım takım)."""
+    return msg(
+        "gui.first_setup.row",
+        date=format_played_at(candidate.played_at, local=local),
+        duration=format_duration(candidate.duration_s),
+        team1=", ".join(name for team, name in candidate.players if team == 100),
+        team2=", ".join(name for team, name in candidate.players if team != 100),
+    )
+
+
+def pick_candidates(
+    candidates: Sequence[SetupCandidate], ticked: Sequence[bool]
+) -> list[SetupCandidate]:
+    """Yalnız İŞARETLENEN adaylar (gönderim sırası `send_first_setup`'ta kronolojiktir)."""
+    return [candidate for candidate, flag in zip(candidates, ticked) if flag]
+
+
+def make_sender(config: Config, groups: GroupSettings) -> Any:
+    """Tek profilde düz `Sender` (eski davranış), aksi halde `GroupRouter` (anlık görüntüyle)."""
+    if needs_router(config, groups):
+        return GroupRouter(config, copy.deepcopy(groups))
+    return Sender(config)
+
+
 def tkinter_available() -> bool:
     """tkinter import edilebiliyor mu? (Windows exe'de her zaman evet.)"""
     try:
@@ -320,6 +390,27 @@ class CollectorApp:
         )
         self.status_label.pack(fill="x")
 
+        # --- grup bandı (GÖREV 36): seçili grup + ekle / yeniden adlandır / sil ---
+        self.groups: Optional[GroupSettings] = None
+        group_bar = tk.Frame(self.root, padx=8)
+        group_bar.pack(fill="x")
+        tk.Label(group_bar, text=msg("gui.groups.label")).pack(side="left")
+        self.group_var = tk.StringVar(value="")
+        self.group_menu = tk.OptionMenu(group_bar, self.group_var, "")
+        self.group_menu.configure(width=24)
+        self.group_menu.pack(side="left", padx=(4, 8))
+        self.group_buttons: dict[str, Any] = {
+            "add": tk.Button(group_bar, text=msg("gui.groups.btn.add"), command=self.on_add_group),
+            "rename": tk.Button(
+                group_bar, text=msg("gui.groups.btn.rename"), command=self.on_rename_group
+            ),
+            "delete": tk.Button(
+                group_bar, text=msg("gui.groups.btn.delete"), command=self.on_delete_group
+            ),
+        }
+        for name in ("add", "rename", "delete"):
+            self.group_buttons[name].pack(side="left", padx=(0, 6))
+
         # --- gömülü log alanı ---
         self.log_text = scrolledtext.ScrolledText(
             self.root, height=18, wrap="word", state="disabled"
@@ -332,6 +423,9 @@ class CollectorApp:
         self.buttons: dict[str, Any] = {
             JOB_LIVE: tk.Button(bar, text=msg("gui.btn.live_start"), command=self.on_live),
             JOB_BACKFILL: tk.Button(bar, text=msg("gui.btn.backfill"), command=self.on_backfill),
+            JOB_FIRST_SETUP: tk.Button(
+                bar, text=msg("gui.btn.first_setup"), command=self.on_first_setup
+            ),
             JOB_ITEMS: tk.Button(bar, text=msg("gui.btn.items"), command=self.on_items),
             JOB_POSITIONS: tk.Button(
                 bar, text=msg("gui.btn.positions"), command=self.on_positions
@@ -343,6 +437,7 @@ class CollectorApp:
 
         self.log_handler = QueueLogHandler(self.log_queue)
         logging.getLogger().addHandler(self.log_handler)
+        self.refresh_groups()  # ayarlar yüklenene kadar grup denetimleri kapalı
 
     # ------------------------------------------------------------------ #
     # Arayüz yardımcıları (yalnız arayüz thread'inden çağrılır)
@@ -386,6 +481,43 @@ class CollectorApp:
             self.buttons[JOB_LIVE].configure(text=msg(self.state.live_button_key()))
         except Exception:  # noqa: BLE001
             pass
+        self._refresh_group_controls()
+
+    def _refresh_group_controls(self) -> None:
+        enabled = self.state.groups_enabled() and self.groups is not None
+        first_selected = self.groups is not None and self.groups.selected.is_first
+        states = {
+            "add": enabled,
+            "rename": enabled,
+            "delete": enabled and not first_selected,
+        }
+        for name, on in states.items():
+            try:
+                self.group_buttons[name].configure(state="normal" if on else "disabled")
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self.group_menu.configure(state="normal" if enabled else "disabled")
+        except Exception:  # noqa: BLE001
+            pass
+
+    def refresh_groups(self) -> None:
+        """Seçici menüsünü profil listesinden yeniden kurar (etiketler; anahtar ASLA)."""
+        try:
+            menu = self.group_menu["menu"]
+            menu.delete(0, "end")
+            if self.groups is not None:
+                for profile in self.groups.profiles:
+                    menu.add_command(
+                        label=profile.label,
+                        command=lambda pid=profile.id: self.on_select_group(pid),
+                    )
+                self.group_var.set(self.groups.selected.label)
+            else:
+                self.group_var.set("")
+        except Exception:  # noqa: BLE001
+            pass
+        self._refresh_group_controls()
 
     def post(self, action: Callable[[], None]) -> None:
         """Worker thread'den arayüz thread'ine iş gönderir (widget'a dokunmadan)."""
@@ -456,6 +588,9 @@ class CollectorApp:
             self.config = None
             self.append_log(msg("gui.config_error", error=exc))
             return None
+        self.groups = load_groups(self.config)
+        self.refresh_groups()
+        self._warn_orphan_outbox()
         if check_backend:
             self._check_backend_async(self.config)
         return self.config
@@ -554,12 +689,31 @@ class CollectorApp:
         if on_done is not None:
             on_done(result)
 
-    def _with_sender(self, config: Config, work: Callable[[Sender], Any]) -> Any:
-        sender = Sender(config)
+    def _current_groups(self, config: Config) -> GroupSettings:
+        if self.groups is None:
+            self.groups = load_groups(config)
+        return self.groups
+
+    def _with_sender(self, config: Config, work: Callable[[Any], Any]) -> Any:
+        """Tek profilde düz Sender, çoklu grupta GroupRouter (otomatik yönlendirme)."""
+        sender = make_sender(config, self._current_groups(config))
         try:
             return work(sender)
         finally:
             sender.close()
+
+    def _selected_config(self, config: Config) -> Config:
+        """Seçili grubun anahtarıyla config (eşya/rol backfill'i seçili gruba çalışır)."""
+        groups = self._current_groups(config)
+        if groups.is_multi:
+            self.append_log(msg("gui.groups.target", label=groups.selected.label))
+        return profile_config(config, groups.selected)
+
+    def _warn_orphan_outbox(self) -> None:
+        if self.config is None or self.groups is None:
+            return
+        for group_id, count in orphan_outbox_counts(self.config, self.groups).items():
+            self.append_log(msg("gui.groups.orphan_outbox", group_id=group_id, count=count))
 
     # --- Canlı ---
 
@@ -624,9 +778,10 @@ class CollectorApp:
         summarize: Callable[[Any], str],
     ) -> None:
         """ÖNCE dry-run koşar, özeti gösterir, "Uygula" onayıyla gerçeğini koşar."""
-        config = self.require_config()
-        if config is None:
+        base_config = self.require_config()
+        if base_config is None:
             return
+        config = self._selected_config(base_config)
 
         def after_dry_run(stats: Any) -> None:
             summary = summarize(stats)
@@ -659,6 +814,225 @@ class CollectorApp:
             lambda dry, config: run_position_backfill(config, dry_run=dry),
             format_positions_summary,
         )
+
+    # --- İlk kurulum taraması (GÖREV 36): listele → işaretle → onayla → gönder ---
+
+    def on_first_setup(self) -> None:
+        config = self.require_config()
+        if config is None:
+            return
+        self.append_log(msg("gui.first_setup.intro", days=first_setup_days(config)))
+
+        def work() -> SetupScanResult:
+            try:
+                return run_first_setup_scan_command(config)  # gönderim YOK
+            except LockfileNotFound as exc:
+                raise RuntimeError(msg("gui.backfill.no_lockfile", path=config.lol_dir)) from exc
+
+        self.start_job(
+            JOB_FIRST_SETUP,
+            work,
+            on_done=lambda result: self._show_first_setup_picker(config, result),
+        )
+
+    def _show_first_setup_picker(self, config: Config, result: SetupScanResult) -> None:
+        import tkinter as tk
+
+        candidates = list(result.candidates)
+        self.append_log(
+            msg("gui.first_setup.listed", count=len(candidates), scanned=result.stats.scanned)
+        )
+        if not candidates:
+            self.append_log(msg("gui.first_setup.empty"))
+            return
+        groups = self._current_groups(config)
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(msg("gui.first_setup.title"))
+        dialog.transient(self.root)
+        dialog.minsize(640, 360)
+        target_var = tk.StringVar(value=msg("gui.first_setup.target", label=groups.selected.label))
+        tk.Label(dialog, textvariable=target_var, anchor="w", justify="left", padx=8, pady=6,
+                 wraplength=760).pack(fill="x")
+
+        # Kaydırılabilir onay kutusu listesi (Canvas + iç Frame)
+        holder = tk.Frame(dialog)
+        holder.pack(fill="both", expand=True, padx=8)
+        canvas = tk.Canvas(holder, highlightthickness=0)
+        scrollbar = tk.Scrollbar(holder, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas)
+        inner.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        ticks: list[Any] = []
+        for candidate in candidates:  # varsayılan: hiçbiri işaretli DEĞİL
+            var = tk.BooleanVar(value=False)
+            ticks.append(var)
+            tk.Checkbutton(
+                inner, text=format_setup_row(candidate), variable=var, anchor="w",
+                justify="left", wraplength=720,
+            ).pack(fill="x", anchor="w")
+
+        def set_all(value: bool) -> None:
+            for var in ticks:
+                var.set(value)
+
+        def cancel() -> None:
+            dialog.destroy()
+            self.append_log(msg("gui.dry_run.cancelled"))
+
+        def send() -> None:
+            chosen = pick_candidates(candidates, [bool(var.get()) for var in ticks])
+            if not chosen:
+                dialog.destroy()
+                self.append_log(msg("gui.first_setup.none_selected"))
+                return
+            target = groups.selected
+            if not self._ask_yes_no(
+                msg("gui.first_setup.confirm_title"),
+                msg("gui.first_setup.confirm", count=len(chosen), label=target.label),
+            ):
+                return  # liste açık kalır; kullanıcı düzeltebilir ya da vazgeçebilir
+            dialog.destroy()
+            snapshot = copy.deepcopy(groups)
+
+            def work() -> BackfillStats:
+                router = GroupRouter(config, snapshot)
+                try:
+                    return run_first_setup_send_command(config, router, chosen, target.id)
+                finally:
+                    router.close()
+
+            self.start_job(
+                JOB_FIRST_SETUP,
+                work,
+                on_done=lambda stats: self.append_log(
+                    msg("gui.first_setup.done", sent=stats.sent, label=target.label)
+                ),
+            )
+
+        buttons = tk.Frame(dialog, padx=8, pady=8)
+        buttons.pack(fill="x")
+        tk.Button(buttons, text=msg("gui.first_setup.select_all"),
+                  command=lambda: set_all(True)).pack(side="left", padx=(0, 6))
+        tk.Button(buttons, text=msg("gui.first_setup.select_none"),
+                  command=lambda: set_all(False)).pack(side="left", padx=(0, 6))
+        tk.Button(buttons, text=msg("gui.first_setup.cancel"), command=cancel).pack(side="right")
+        tk.Button(buttons, text=msg("gui.first_setup.send"), command=send).pack(
+            side="right", padx=(0, 6)
+        )
+        dialog.protocol("WM_DELETE_WINDOW", cancel)
+        try:
+            dialog.grab_set()  # liste açıkken ana pencerede başka iş başlatılmasın
+        except Exception:  # noqa: BLE001
+            pass
+
+    # --- Gruplar (GÖREV 36) ---
+
+    def _save_groups(self) -> bool:
+        """Kaydeder; başarısızsa diskteki son hâle döner (bellek/disk ayrışmasın)."""
+        assert self.config is not None and self.groups is not None
+        try:
+            save_groups(self.config, self.groups)
+            return True
+        except OSError as exc:
+            self.append_log(msg("gui.groups.save_failed", error=exc))
+            self.groups = load_groups(self.config)
+            return False
+        finally:
+            self.refresh_groups()
+
+    def _groups_ready(self) -> bool:
+        return self.state.groups_enabled() and self.require_config() is not None
+
+    def on_select_group(self, profile_id: str) -> None:
+        if not self._groups_ready():
+            self.refresh_groups()
+            return
+        groups = self._current_groups(self.config)
+        try:
+            profile = groups.select(profile_id)
+        except GroupError as exc:
+            self.append_log(exc.message())
+            return
+        if self._save_groups():
+            self.append_log(msg("gui.groups.selected", label=profile.label))
+
+    def _ask_text(self, prompt: str, *, initial: str = "", secret: bool = False) -> Optional[str]:
+        from tkinter import simpledialog
+
+        options: dict[str, Any] = {"parent": self.root, "initialvalue": initial}
+        if secret:
+            options["show"] = "*"
+        return simpledialog.askstring(msg("gui.groups.title"), prompt, **options)
+
+    def on_add_group(self) -> None:
+        if not self._groups_ready():
+            return
+        config = self.config
+        groups = self._current_groups(config)
+        label = self._ask_text(msg("gui.groups.ask_label"), initial=groups.next_default_label())
+        if label is None:
+            return
+        api_key = self._ask_text(msg("gui.groups.ask_key"), secret=True)
+        if api_key is None:
+            return
+        try:
+            profile = groups.add(label, api_key)
+        except GroupError as exc:
+            self.append_log(exc.message())
+            return
+        if not self._save_groups():
+            return
+        self.append_log(
+            msg("gui.groups.added", label=profile.label, masked=mask_key(profile.api_key))
+        )
+        self._check_backend_async(profile_config(config, profile))
+
+    def on_rename_group(self) -> None:
+        if not self._groups_ready():
+            return
+        groups = self._current_groups(self.config)
+        current = groups.selected
+        label = self._ask_text(msg("gui.groups.ask_rename", label=current.label),
+                               initial=current.label)
+        if label is None:
+            return
+        try:
+            profile = groups.rename(current.id, label)
+        except GroupError as exc:
+            self.append_log(exc.message())
+            return
+        if self._save_groups():
+            self.append_log(msg("gui.groups.renamed", label=profile.label))
+
+    def on_delete_group(self) -> None:
+        if not self._groups_ready():
+            return
+        config = self.config
+        groups = self._current_groups(config)
+        current = groups.selected
+        if current.is_first:
+            self.append_log(msg("groups.error.first_not_deletable"))
+            return
+        pending_dir = profile_outbox_dir(config, current.id)
+        pending = len(list(pending_dir.glob("*.json"))) if pending_dir.is_dir() else 0
+        question = msg("gui.groups.delete_question", label=current.label)
+        if pending:
+            question += msg("gui.groups.delete_pending", count=pending)
+        if not self._ask_yes_no(msg("gui.groups.title"), question):
+            return
+        try:
+            groups.delete(current.id)
+        except GroupError as exc:
+            self.append_log(exc.message())
+            return
+        if self._save_groups():
+            self.append_log(msg("gui.groups.deleted", label=current.label))
+            self._warn_orphan_outbox()
 
     # --- Ayarlar (sihirbaz; diyaloglar arayüz thread'inde koşmalıdır) ---
 

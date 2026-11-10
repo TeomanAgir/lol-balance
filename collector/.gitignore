@@ -6,3 +6,8 @@ packaging/*.spec.bak
 
 # GÖREV 16 — konsolsuz exe çökerse buraya yığın izi düşer (teşhis dosyası)
 collector-error.log
+
+# GÖREV 36 — grup profilleri API anahtarı içerir (asla commit'lenmez)
+groups.json
+groups.json.bad
+groups.json.tmp

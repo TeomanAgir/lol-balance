@@ -201,6 +201,64 @@ MESSAGES: dict[str, dict[str, str]] = {
         "gui.wizard.cancelled": "Setup cancelled, settings were not changed.",
         "gui.close.title": "Close?",
         "gui.close.question": "{job} is still running. Stop it and close the window?",
+        # -- multiple groups (GOREV 36) --
+        "cli.groups": "Groups: {groups}",
+        "cli.groups_selected": " (selected)",
+        "groups.default_label": "Group {number}",
+        "groups.error.label_empty": "The group name cannot be empty.",
+        "groups.error.label_too_long": "The group name can be at most {max} characters.",
+        "groups.error.label_taken": "There is already a group called \"{label}\".",
+        "groups.error.key_empty": "The API key cannot be empty.",
+        "groups.error.key_taken": "This API key is already saved in another group.",
+        "groups.error.unknown": "No such group.",
+        "groups.error.first_not_deletable": "The first group cannot be deleted (its key "
+                                            "lives in the settings file; change it via "
+                                            "Settings). You can rename it.",
+        "gui.groups.label": "Group:",
+        "gui.groups.btn.add": "Add group",
+        "gui.groups.btn.rename": "Rename",
+        "gui.groups.btn.delete": "Delete group",
+        "gui.groups.title": "Groups",
+        "gui.groups.ask_label": "Group name:",
+        "gui.groups.ask_key": "API key of this group (ask the group admin):",
+        "gui.groups.ask_rename": "New name for \"{label}\":",
+        "gui.groups.added": "Group \"{label}\" added (key: {masked}). Matches are sent "
+                            "automatically to the group that knows their players.",
+        "gui.groups.renamed": "Group renamed: \"{label}\".",
+        "gui.groups.deleted": "Group \"{label}\" deleted.",
+        "gui.groups.delete_question": "Delete group \"{label}\"? Its key is removed "
+                                      "from this computer.",
+        "gui.groups.delete_pending": "\n\n{count} pending record(s) of this group stay in "
+                                     "the outbox: they are not sent and not deleted.",
+        "gui.groups.selected": "Selected group: {label}",
+        "gui.groups.target": "Target group: {label}",
+        "gui.groups.save_failed": "Group settings could not be saved: {error}",
+        "gui.groups.orphan_outbox": "WARNING: {count} pending record(s) belong to a "
+                                    "deleted group ({group_id}) - they are not sent and "
+                                    "not deleted (outbox/groups/{group_id}).",
+        # -- first-setup scan (GOREV 36) --
+        "gui.btn.first_setup": "First-setup scan",
+        "gui.job.name.first_setup": "first-setup scan",
+        "gui.status.first_setup": "first-setup scan",
+        "gui.first_setup.intro": "First-setup scan: the custom Summoner's Rift matches of "
+                                 "the last {days} days are listed WITHOUT the roster "
+                                 "filter. Nothing is sent until you confirm.",
+        "gui.first_setup.listed": "{count} matches listed ({scanned} scanned) - nothing "
+                                  "was sent.",
+        "gui.first_setup.empty": "No custom Summoner's Rift match found to list.",
+        "gui.first_setup.title": "First-setup scan - tick the matches to send",
+        "gui.first_setup.target": "Ticked matches are sent in chronological order to "
+                                  "the group \"{label}\". Players are created there "
+                                  "automatically.",
+        "gui.first_setup.row": "{date}   {duration}   {team1}   vs   {team2}",
+        "gui.first_setup.select_all": "Tick all",
+        "gui.first_setup.select_none": "Untick all",
+        "gui.first_setup.send": "Send ticked",
+        "gui.first_setup.cancel": "Cancel",
+        "gui.first_setup.confirm_title": "Send?",
+        "gui.first_setup.confirm": "Send {count} matches to the group \"{label}\"?",
+        "gui.first_setup.none_selected": "No match ticked, nothing was sent.",
+        "gui.first_setup.done": "{sent} matches sent to the group \"{label}\".",
     },
     "tr": {
         # -- dil seçimi (bilerek iki dilde de aynı) --
@@ -367,6 +425,63 @@ MESSAGES: dict[str, dict[str, str]] = {
         "gui.wizard.cancelled": "Kurulum iptal edildi, ayarlar değişmedi.",
         "gui.close.title": "Kapatılsın mı?",
         "gui.close.question": "{job} hâlâ çalışıyor. Durdurulup pencere kapatılsın mı?",
+        # -- çoklu grup (GÖREV 36) --
+        "cli.groups": "Gruplar: {groups}",
+        "cli.groups_selected": " (seçili)",
+        "groups.default_label": "Grup {number}",
+        "groups.error.label_empty": "Grup adı boş olamaz.",
+        "groups.error.label_too_long": "Grup adı en fazla {max} karakter olabilir.",
+        "groups.error.label_taken": "\"{label}\" adında bir grup zaten var.",
+        "groups.error.key_empty": "API anahtarı boş olamaz.",
+        "groups.error.key_taken": "Bu API anahtarı zaten başka bir grupta kayıtlı.",
+        "groups.error.unknown": "Böyle bir grup yok.",
+        "groups.error.first_not_deletable": "İlk grup silinemez (anahtarı ayar dosyasında; "
+                                            "Ayarlar'dan değiştirilir). Adını "
+                                            "değiştirebilirsin.",
+        "gui.groups.label": "Grup:",
+        "gui.groups.btn.add": "Grup Ekle",
+        "gui.groups.btn.rename": "Yeniden Adlandır",
+        "gui.groups.btn.delete": "Grubu Sil",
+        "gui.groups.title": "Gruplar",
+        "gui.groups.ask_label": "Grup adı:",
+        "gui.groups.ask_key": "Bu grubun API anahtarı (grup yöneticisinden al):",
+        "gui.groups.ask_rename": "\"{label}\" için yeni ad:",
+        "gui.groups.added": "\"{label}\" grubu eklendi (anahtar: {masked}). Maçlar, "
+                            "oyuncularını tanıyan gruba otomatik gönderilir.",
+        "gui.groups.renamed": "Grup yeniden adlandırıldı: \"{label}\".",
+        "gui.groups.deleted": "\"{label}\" grubu silindi.",
+        "gui.groups.delete_question": "\"{label}\" grubu silinsin mi? Anahtarı bu "
+                                      "bilgisayardan kaldırılır.",
+        "gui.groups.delete_pending": "\n\nBu grubun {count} bekleyen kaydı outbox'ta "
+                                     "kalır: gönderilmez, silinmez.",
+        "gui.groups.selected": "Seçili grup: {label}",
+        "gui.groups.target": "Hedef grup: {label}",
+        "gui.groups.save_failed": "Grup ayarları kaydedilemedi: {error}",
+        "gui.groups.orphan_outbox": "UYARI: silinmiş bir grubun ({group_id}) {count} "
+                                    "bekleyen kaydı var — gönderilmiyor, silinmiyor "
+                                    "(outbox/groups/{group_id}).",
+        # -- ilk kurulum taraması (GÖREV 36) --
+        "gui.btn.first_setup": "İlk Kurulum Taraması",
+        "gui.job.name.first_setup": "ilk kurulum taraması",
+        "gui.status.first_setup": "ilk kurulum taraması",
+        "gui.first_setup.intro": "İlk kurulum taraması: son {days} günün özel Sihirdar "
+                                 "Vadisi maçları roster filtresi OLMADAN listelenir. "
+                                 "Onaylamadan hiçbir şey gönderilmez.",
+        "gui.first_setup.listed": "{count} maç listelendi ({scanned} tarandı) — hiçbir "
+                                  "şey gönderilmedi.",
+        "gui.first_setup.empty": "Listelenecek özel Sihirdar Vadisi maçı bulunamadı.",
+        "gui.first_setup.title": "İlk kurulum taraması — gönderilecek maçları işaretle",
+        "gui.first_setup.target": "İşaretlenen maçlar kronolojik sırayla \"{label}\" "
+                                  "grubuna gönderilir. Oyuncular orada otomatik oluşur.",
+        "gui.first_setup.row": "{date}   {duration}   {team1}   vs   {team2}",
+        "gui.first_setup.select_all": "Tümünü İşaretle",
+        "gui.first_setup.select_none": "İşaretleri Kaldır",
+        "gui.first_setup.send": "İşaretlileri Gönder",
+        "gui.first_setup.cancel": "Vazgeç",
+        "gui.first_setup.confirm_title": "Gönderilsin mi?",
+        "gui.first_setup.confirm": "{count} maç \"{label}\" grubuna gönderilsin mi?",
+        "gui.first_setup.none_selected": "Hiç maç işaretlenmedi, hiçbir şey gönderilmedi.",
+        "gui.first_setup.done": "{sent} maç \"{label}\" grubuna gönderildi.",
     },
 }
 

@@ -67,9 +67,11 @@ Argümansız çalıştırma **tkinter penceresini** açar (sıfır ek bağımlı
 - **Gömülü log alanı** — normalde terminale düşen tüm log satırları pencerenin
   içinde akar (logging handler → thread-safe kuyruk → Text widget). En eski
   satırlar 1500'ü aşınca kırpılır.
-- **Düğmeler** — `Canlı Başlat/Durdur` · `Maçları Tara` (backfill) · `Eşyaları
-  Doldur` · `Rolleri Doldur` · `Ayarlar`. Eşya/rol düğmeleri **önce dry-run**
-  koşar, özeti gösterir ve yalnızca "Uygula" onayıyla gerçeğini koşar.
+- **Grup bandı (GÖREV 36)** — `Grup:` seçicisi (seçim kalıcıdır) + `Grup Ekle` ·
+  `Yeniden Adlandır` · `Grubu Sil`. Bkz. [Çoklu grup](#çoklu-grup-görev-36).
+- **Düğmeler** — `Canlı Başlat/Durdur` · `Maçları Tara` (backfill) · `İlk Kurulum
+  Taraması` · `Eşyaları Doldur` · `Rolleri Doldur` · `Ayarlar`. Eşya/rol düğmeleri
+  **önce dry-run** koşar, özeti gösterir ve yalnızca "Uygula" onayıyla gerçeğini koşar.
 - **Sarı güncelleme bandı** — açılışta GitHub Releases'e tek bir istek atılır;
   yeni sürüm varsa "Yeni sürüm X.Y.Z — İndir" görünür ve düğme
   `https://github.com/TeomanAgir/lol-balance/releases/latest` adresini tarayıcıda
@@ -258,6 +260,42 @@ roller web UI'daki maç detayından düzeltilir (`PUT /matches/{id}/positions`).
   emniyet ağıdır. Match-history yolunda (`--backfill` / `backfill-positions`) açık alan
   yoktur, orada zincir çalışır.
 
+## Çoklu grup (GÖREV 36)
+
+Spec: `docs/ingest_contract.md` "Çoklu grup — collector tarafı". Backend'de grup = API
+anahtarı; collector birden fazla grubun anahtarını saklayıp her maçı doğru gruba yollar.
+Payload ve uçlar değişmez.
+
+- **Profiller:** ilk profil `.env`'deki `API_KEY`'dir (dosyaya dokunulmaz; eski tek
+  anahtarlı kurulum hiçbir şey yapmadan aynen çalışır, sihirbaz yeniden açılmaz). Ek
+  profiller (etiket + anahtar), etiketler ve seçili grup pencereden yönetilir ve
+  `groups.json`'a (exe'nin yanında; kaynakta `collector/`, gitignore'lu) yazılır.
+  İlk profil yeniden adlandırılabilir ama silinemez (anahtarı `Ayarlar`/`--setup` ile
+  değişir). Anahtar ekrana yalnız maskeli (`abc*****`) yazılır, log'a hiç yazılmaz.
+  `BACKEND_URL` ortaktır.
+- **Otomatik yönlendirme** (canlı EOG, MH fallback, oto-yetişme, `Maçları Tara`):
+  roster filtresi (`MIN_KNOWN`) her grubun kendi `GET /players` listesine karşı ayrı
+  değerlendirilir; tek grup geçerse o, birden fazlası geçerse seçili grup (geçenler
+  arasındaysa), değilse en çok tanınanı olan (eşitlikte profil sırası); hiçbiri
+  geçmezse maç atlanır. Bir maç en fazla bir gruba gider. `seed_roster.json` yalnız
+  ilk profile sayılır. **Tek profilde canlı mod eskisi gibi filtresizdir.** Çoklu
+  grupta canlı maç hiçbir grubu geçmezse atlanır ama ham kaydı arşivdedir; sonraki
+  yetişme/tarama onu yine değerlendirir.
+- **Outbox:** ilk profilin kayıtları `outbox/*.json` (hedefsiz eski kayıtlar da ilk
+  profile aittir); diğer grupların kayıtları `outbox/groups/<grup-kimliği>/` altındadır
+  ve yalnız o grubun anahtarıyla yeniden denenir. Silinmiş bir grubun kayıtları
+  gönderilmez, silinmez; pencere ve log uyarır.
+- **Heartbeat** her profile ayrı gider (her grubun sağlık paneli cihazı görür).
+  `Eşyaları/Rolleri Doldur` (`backfill-items` / `backfill-positions`) **seçili gruba**
+  karşı çalışır.
+- **İlk Kurulum Taraması** (yeni/boş grup için): roster filtresi KAPALI olarak son
+  `max(CATCHUP_DAYS, 30)` günün özel Sihirdar Vadisi maçlarını (remake hariç, en fazla
+  50) tarar ve **hiçbir şey göndermeden** tarih + süre + oyuncu adlarıyla listeler.
+  İşaretlediğin maçlar onaydan sonra kronolojik sırayla **seçili gruba** gönderilir
+  (oyuncular orada otomatik oluşur). Otomatik akışların hiçbiri filtreyi kapatmaz.
+- Grup seçici/yönetimi bir iş (canlı mod dahil) çalışırken kilitlidir; seçimi
+  değiştirmek için canlı modu durdur.
+
 ## Teslimat garantisi (outbox)
 
 Gönderim başarısız olursa (ağ hatası / 5xx) payload `collector/outbox/`'a JSON olarak
@@ -347,6 +385,9 @@ collector/
   normalizer.py    # ham EOG / match-history → contract
   role_infer.py    # kısıt-çözümlü rol (position) tahmini
   sender.py        # backend POST + outbox retry
+  groups.py        # çoklu grup: profiller (groups.json), yönlendirme kuralı, GroupRouter
+  gui.py           # tkinter penceresi (tkinter YALNIZ burada)
+  commands.py      # CLI/arayüz ortak komut katmanı
   roster.py        # backfill roster filtresi
   live.py          # canlı polling döngüsü
   backfill.py      # geçmiş tarama
@@ -358,7 +399,8 @@ collector/
   fixtures/        # örnek LCU payload'ları (test verisi)
   tests/           # pytest
   raw_archive/     # (runtime) ham payload arşivi
-  outbox/          # (runtime) gönderilemeyen payload'lar
+  outbox/          # (runtime) gönderilemeyen payload'lar (ek gruplar: outbox/groups/<id>/)
+  groups.json      # (runtime) ek grup profilleri + etiketler + seçili grup (gitignore'lu)
   seed_roster.json # ilk backfill için elle doldurulan riot_id listesi (repo'da boş)
   seed_roster.example.json  # şablon (2-3 sahte kayıt)
 ```
