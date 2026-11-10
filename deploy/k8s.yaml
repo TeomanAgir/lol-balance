@@ -5,6 +5,11 @@
 #     --from-literal=API_KEY=<değer> --from-literal=ADMIN_KEY=<değer>
 #   kubectl -n lol-balance create secret docker-registry ghcr-pull ... (apps ns'inden kopyalandı)
 # ADMIN_KEY (fix-2) idari uçların ikinci anahtarıdır; yoksa o uçlar 503 verir.
+# Ek grup (GÖREV 35, api_contract "Çoklu grup"): aynı secret'a iki anahtar eklenir,
+# envFrom hepsini yükler — manifest değişmez, yeniden başlatma yeter:
+#   kubectl -n lol-balance patch secret lol-balance-secrets \
+#     -p '{"stringData":{"GROUP_<AD>_API_KEY":"<değer>","GROUP_<AD>_ADMIN_KEY":"<değer>"}}'
+#   kubectl -n lol-balance rollout restart deployment/lol-balance
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -155,8 +160,14 @@ spec:
                   set -e
                   apk add --no-cache sqlite >/dev/null
                   mkdir -p /data/backup
-                  sqlite3 /data/lol_balance.db ".backup /data/backup/lol_balance-$(date +%F).db"
-                  find /data/backup -name 'lol_balance-*.db' -mtime +7 -delete
+                  # Çoklu grup (GÖREV 35): /data altındaki HER grup DB'si yedeklenir
+                  # (lol_balance.db = ana grup, group_<ad>.db = ek gruplar).
+                  for db in /data/*.db; do
+                    [ -f "$db" ] || continue
+                    name=$(basename "$db" .db)
+                    sqlite3 "$db" ".backup /data/backup/${name}-$(date +%F).db"
+                  done
+                  find /data/backup -name '*.db' -mtime +7 -delete
                   ls -lh /data/backup
               volumeMounts:
                 - name: data
