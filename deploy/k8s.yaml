@@ -14,6 +14,29 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: lol-balance
+  labels:
+    # GÖREV 38: host ağı/hostPath/ayrıcalıklı konteyner isteyen pod'lar reddedilir.
+    pod-security.kubernetes.io/enforce: baseline
+---
+# GÖREV 38: namespace giriş yalıtımı. Pod'lara yalnız aynı namespace ve izleme
+# (monitoring) bağlanabilir; ingress-nginx ve kubelet host üzerinden geldiği için
+# Cilium'da her zaman izinlidir.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ns-isolation
+  namespace: lol-balance
+  labels:
+    hardening: g38-ns-isolation
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
