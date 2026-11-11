@@ -2,6 +2,16 @@
 
 Son güncelleme: 2026-11-10 (orkestratör, GÖREV 35)
 
+## 2026-11-11: GÖREV 38 — maliyet/istek seli araştırması + VPS sertleştirme (branch `chore/g38-vps-sertlestirme`)
+- Teoman sorusu: Vercel tarzı "istek yağdırıp fatura şişirme" bize yapılabilir mi? Bulgu: netcup
+  VPS'te trafik sabit fiyata dahil, otomatik ölçekleme yok → gerçek risk fatura değil KESİNTİ;
+  para tarafında bakılacak tek yer harici S3 (qrmenu/iknow). Dışa açık yalnız 22/80/443.
+- Bu repo: `deploy/k8s.yaml` ingress'ine IP başına hız/bağlantı sınırı (30 istek/sn, ani 300,
+  150 bağlantı; ölçülen meşru tepe 109 istek/sn) + yedek CronJob'ına kaynak limiti.
+- KÜMEDE UYGULAMA TEOMAN'DA (orkestratörün küme yazması izin sınıflandırıcısına takıldı):
+  tüm ingress'lere aynı annotation'lar, journald üst sınırı. Trafik uyarısı qrmenu reposundaki
+  izleme yığınında yapılmalı (node-exporter hostNetwork DEĞİL → host trafiğini görmüyor).
+
 ## 2026-11-10: GÖREV 37 — gruplar arası istemci tarafı yalıtım (branch `fix/g37-grup-gecisi`)
 - Teoman bildirimi: G2 anahtarıyla bir oyuncunun profilinde diğer grubun istatistikleri.
   Teşhis: DB + API + taze sayfa yalıtımı SAĞLAM (canlıda doğrulandı); hata taze sayfada

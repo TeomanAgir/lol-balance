@@ -116,6 +116,13 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"   # API key düz metin — HTTPS zorunlu
+    # İstek seli sınırı (GÖREV 38): IP başına sürekli 30 istek/sn, 300'e kadar ani yük
+    # (ölçülen meşru tepe: tek IP'den 109 istek/sn — görsel ağırlıklı sayfa açılışı),
+    # IP başına en çok 150 eşzamanlı bağlantı. Küme içi ve sunucunun kendi IP'si muaf.
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "150"
+    nginx.ingress.kubernetes.io/limit-whitelist: "10.244.0.0/16,159.195.216.232/32,127.0.0.1/32"
 spec:
   ingressClassName: nginx
   rules:
@@ -153,6 +160,14 @@ spec:
           containers:
             - name: backup
               image: alpine:3.20
+              # GÖREV 38: yedek işi sınırsız kaynak tüketemesin (DB'ler MB mertebesinde).
+              resources:
+                requests:
+                  cpu: 20m
+                  memory: 32Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
               command:
                 - /bin/sh
                 - -c
